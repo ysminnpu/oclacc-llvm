@@ -43,7 +43,7 @@
 
 // TODO
 // find better way to include these passes. Eventually move them out of oclacc
-#include "../src/OCLAcc/OCLAccSPIRCheckVisitor.h"
+//#include "../src/OCLAcc/OCLAccSPIRCheckVisitor.h"
 
 using namespace llvm;
 
