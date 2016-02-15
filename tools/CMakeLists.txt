@@ -14,6 +14,7 @@ else()
   ignore_llvm_tool_subdirectory(llvm-shlib)
 endif()
 
+add_llvm_tool_subdirectory(oclacc-llc)
 add_llvm_tool_subdirectory(opt)
 add_llvm_tool_subdirectory(llvm-as)
 add_llvm_tool_subdirectory(llvm-dis)
