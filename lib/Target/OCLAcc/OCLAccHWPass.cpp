@@ -42,7 +42,7 @@
 #include "OCLAccHWVisitor.h"
 #include "OCLAccTargetMachine.h"
 #include "OCLAccGenSubtargetInfo.inc"
-#include "OCL.h"
+#include "OpenCLDefines.h"
 
 #include "HW/HW.h"
 #include "HW/typedefs.h"

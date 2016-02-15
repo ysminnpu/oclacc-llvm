@@ -1,5 +1,5 @@
-#ifndef OCL_H
-#define OCL_H
+#ifndef OPENCLDEFINES_H
+#define OPENCLDEFINES_H
 
 namespace ocl {
 
@@ -82,4 +82,4 @@ const auto FUN_INT_E = std::end(FUN_INT);
 
 }
 
-#endif /* OCL_H */
+#endif /* OPENCLDEFINES_H */
