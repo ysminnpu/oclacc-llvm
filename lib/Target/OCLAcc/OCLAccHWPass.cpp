@@ -78,13 +78,17 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
  * Must be here since results of pass are needed. No need to transfer them to
  * oclacc-llc.
  */
-static cl::opt<bool> GenerateDesign("oclacc-design", cl::init(true), cl::desc("Output Hardware Design.") );
 static cl::opt<bool> GenerateDot("oclacc-dot", cl::init(true), cl::desc("Output .dot-Graph for each Kernel-Function.") );
 
-OCLAccHWPass::OCLAccHWPass(raw_ostream &Log) : ModulePass(OCLAccHWPass::ID), Log(Log) {
+OCLAccHWPass::OCLAccHWPass() : ModulePass(OCLAccHWPass::ID) {
+  DEBUG_WITH_TYPE("OCLAccHWPass", dbgs() << "OCLAccHWPass created\n");
 }
 
 OCLAccHWPass::~OCLAccHWPass() {
+}
+
+OCLAccHWPass *OCLAccHWPass::createOCLAccHWPass() {
+  return new OCLAccHWPass();
 }
 
 bool OCLAccHWPass::doInitialization(Module &M) {
@@ -96,9 +100,6 @@ bool OCLAccHWPass::doFinalization(Module &M) {
 }
 
 void OCLAccHWPass::getAnalysisUsage(AnalysisUsage &AU) const {
-#if 0
-  AU.addRequired<OpenCLMDKernels>();
-#endif
   AU.addRequired<CreateBlocksPass>();
   AU.setPreservesAll();
 }
@@ -131,7 +132,7 @@ bool OCLAccHWPass::runOnModule(Module &M) {
 
   StringRef ModuleName = M.getName();
 
-  Log << "Compile Module " << ModuleName << "\n";
+  outs() << "Compile Module " << ModuleName << "\n";
 
   createMakefile();
 
@@ -146,45 +147,44 @@ bool OCLAccHWPass::runOnModule(Module &M) {
   //FIXME: unused debug info
   NamedMDNode *debug = M.getNamedMetadata("llvm.dbg.cu");
   if ( ! debug ) {
-    Log << "No debug information for Module " << M.getName() << "\n";
+    outs() << "No debug information for Module " << M.getName() << "\n";
   }
 
-  DesignUnit Design(ModuleName);
+  Design.setName(ModuleName);
 
-  // Query all Functions to learn which are WorkItem kernels
+  // Process all kernel functions
   for (Function &KernelFunction: M.getFunctionList()) {
-    // Omit declarations still in list, e.g. to built-in functions.
+
+    // Omit declarations, e.g. to built-in functions.
     if (KernelFunction.isDeclaration()) 
       continue;
 
+    bool isWorkItemKernel=false;
     std::string KernelName = KernelFunction.getName();
-    HWKernel = std::make_shared<oclacc::Kernel>(KernelName, false);
-
-    // Instantiate visitors for each Function to create HW hierarchy
-    OCLAccHWVisitor V(HWKernel);
+    oclacc::kernel_p HWKernel = oclacc::makeHW<oclacc::Kernel>(&KernelFunction, KernelName, isWorkItemKernel);
 
     //Visit all Arguments first
     for (const Argument &Arg : KernelFunction.getArgumentList()) {
-      handleArgument(Arg);
+      handleArgument(HWKernel, Arg);
     }
 
     // We directly generate the control flow through the basic block.
-
     CreateBlocksPass &CBP = getAnalysis<CreateBlocksPass>(KernelFunction);
     CreateBlocksPass::BlockListType HWBlocks = CBP.getBlocks();
 
-    errs() << "Blocks: \n";
-    for (block_p BP : HWBlocks) {
-      errs() << BP->getName() << "\n";
-    }
-
-
+#if 0
     // Separatly visit each Basic Block
     for (BasicBlock &BB : KernelFunction.getBasicBlockList()) {
       V.visit(BB);
     }
+#endif
+
+#if 0
+    // Instantiate visitors for each Function to create HW hierarchy
+    OCLAccHWVisitor V(HWKernel);
 
     Design.addKernel(V.getKernel());
+#endif
   }
 
   if (GenerateDot) {
@@ -192,19 +192,15 @@ bool OCLAccHWPass::runOnModule(Module &M) {
     Design.accept(V);
   }
 
-  if (GenerateDesign) {
-    VhdlVisitor V;
-    Design.accept(V);
-  }
-
   return false;
 }
 
 /// \brief Create ScalarInput/InputStream for Kernel
+///
 /// Depending on its type, InScalar (int, float) or Streams referencing 
 /// global memory references are created and assigned to the kernel.
 ///
-void OCLAccHWPass::handleArgument(const Argument &A) {
+void OCLAccHWPass::handleArgument(oclacc::kernel_p HWKernel, const Argument &A) {
   Type *AType = A.getType();
   std::string Name = A.getName().str();
 
@@ -282,6 +278,9 @@ void OCLAccHWPass::handleArgument(const Argument &A) {
 }
 
 char OCLAccHWPass::ID = 0;
+
+static RegisterPass<OCLAccHWPass> X("oclacc-hw", 
+    "Create HW Tree.");
 
 } // end namespace llvm
 

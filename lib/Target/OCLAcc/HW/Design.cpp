@@ -6,7 +6,9 @@
 
 namespace oclacc {
 
-DesignUnit::DesignUnit( const std::string &Name) : Identifiable(Name) {};
+DesignUnit::DesignUnit() : Identifiable("unnamed") {}
+
+DesignUnit::DesignUnit( const std::string &Name) : Identifiable(Name) {}
 
 void DesignUnit::addKernel(kernel_p Kernel) {
   Kernels.push_back(Kernel);

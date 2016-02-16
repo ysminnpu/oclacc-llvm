@@ -1,6 +1,8 @@
 #include "OCLAccTargetMachine.h"
 #include "OCLAccHWPass.h"
 #include "CreateBlocksPass.h"
+#include "GenerateVhdlPass.h"
+#include "GenerateVerilogPass.h"
 
 #include "llvm/PassManager.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -9,6 +11,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
 
+static cl::opt<bool> GenerateDesign("oclacc-design", cl::init(true), cl::desc("Output Hardware Design.") );
 
 using namespace llvm;
 
@@ -41,10 +44,17 @@ OCLAccTargetMachine::OCLAccTargetMachine(const Target &T, StringRef TT,
   setRequiresStructuredCFG(true);
 }
 
-void OCLAccTargetMachine::addAnalysisPasses(PassManagerBase &PM) {
-}
+OCLAccTargetMachine::~OCLAccTargetMachine() {}
 
-bool OCLAccTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
+/// \brief Vhdl Target Machine
+
+OCLAccVhdlTargetMachine::OCLAccVhdlTargetMachine(const Target &T, StringRef TT,
+    StringRef CPU, StringRef FS, const TargetOptions &Options,
+    Reloc::Model RM, CodeModel::Model CM,
+    CodeGenOpt::Level OL) :
+  OCLAccTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL) { }
+
+bool OCLAccVhdlTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
                                            formatted_raw_ostream &O,
                                            CodeGenFileType FileType,
                                            bool DisableVerify,
@@ -53,18 +63,17 @@ bool OCLAccTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   if (FileType != TargetMachine::CGFT_AssemblyFile)
     return true;
 
-  PM.add(new OCLAccHWPass(O));
+  if (GenerateDesign)
+    PM.add(new GenerateVhdlPass());
+  else 
+    PM.add(new OCLAccHWPass());
 
   return false;
 }
 
-OCLAccVhdlTargetMachine::OCLAccVhdlTargetMachine(const Target &T, StringRef TT,
-    StringRef CPU, StringRef FS, const TargetOptions &Options,
-    Reloc::Model RM, CodeModel::Model CM,
-    CodeGenOpt::Level OL) :
-  OCLAccTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL) { }
+void OCLAccVhdlTargetMachine::anchor() { }
 
-  void OCLAccVhdlTargetMachine::anchor() { };
+/// \brief Verilog Target Machine
 
 OCLAccVerilogTargetMachine::OCLAccVerilogTargetMachine(const Target &T, StringRef TT,
     StringRef CPU, StringRef FS, const TargetOptions &Options,
@@ -72,4 +81,21 @@ OCLAccVerilogTargetMachine::OCLAccVerilogTargetMachine(const Target &T, StringRe
     CodeGenOpt::Level OL) :
   OCLAccTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL) { }
 
-  void OCLAccVerilogTargetMachine::anchor() { };
+bool OCLAccVerilogTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
+                                           formatted_raw_ostream &O,
+                                           CodeGenFileType FileType,
+                                           bool DisableVerify,
+                                           AnalysisID StartAfter,
+                                           AnalysisID StopAfter) {
+  if (FileType != TargetMachine::CGFT_AssemblyFile)
+    return true;
+
+  if (GenerateDesign)
+    PM.add(new GenerateVerilogPass());
+  else 
+    PM.add(new OCLAccHWPass());
+
+  return false;
+}
+
+void OCLAccVerilogTargetMachine::anchor() { }

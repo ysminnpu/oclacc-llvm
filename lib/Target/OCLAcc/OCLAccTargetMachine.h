@@ -26,15 +26,11 @@ class OCLAccTargetMachine : public TargetMachine {
         Reloc::Model RM, CodeModel::Model CM,
         CodeGenOpt::Level OL);
 
+    ~OCLAccTargetMachine();
+
     virtual const OCLAccSubtarget *getSubtargetImpl() const { return &Subtarget; }
 
-  virtual void addAnalysisPasses(PassManagerBase &PM);
-    virtual bool addPassesToEmitFile(PassManagerBase &PM,
-        formatted_raw_ostream &Out,
-        CodeGenFileType FileType,
-        bool DisableVerify,
-        AnalysisID StartAfter,
-        AnalysisID StopAfter);
+    //virtual void addAnalysisPasses(PassManagerBase &PM);
 
     virtual const DataLayout *getDataLayout() const { return &DL; }
 
@@ -49,6 +45,13 @@ class OCLAccVhdlTargetMachine : public OCLAccTargetMachine {
         StringRef CPU, StringRef FS, const TargetOptions &Options,
         Reloc::Model RM, CodeModel::Model CM,
         CodeGenOpt::Level OL);
+
+    virtual bool addPassesToEmitFile(PassManagerBase &PM,
+        formatted_raw_ostream &Out,
+        CodeGenFileType FileType,
+        bool DisableVerify,
+        AnalysisID StartAfter,
+        AnalysisID StopAfter);
 };
 
 class OCLAccVerilogTargetMachine : public OCLAccTargetMachine {
@@ -59,6 +62,13 @@ class OCLAccVerilogTargetMachine : public OCLAccTargetMachine {
         StringRef CPU, StringRef FS, const TargetOptions &Options,
         Reloc::Model RM, CodeModel::Model CM,
         CodeGenOpt::Level OL);
+  
+    virtual bool addPassesToEmitFile(PassManagerBase &PM,
+        formatted_raw_ostream &Out,
+        CodeGenFileType FileType,
+        bool DisableVerify,
+        AnalysisID StartAfter,
+        AnalysisID StopAfter);
 };
 
 extern Target TheOCLAccVhdlTarget;

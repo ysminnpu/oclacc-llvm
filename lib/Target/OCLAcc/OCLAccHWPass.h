@@ -6,6 +6,7 @@
 
 #include "OCLAccTargetMachine.h"
 #include "HW/typedefs.h"
+#include "HW/Design.h"
 
 
 namespace llvm {
@@ -18,17 +19,19 @@ class OCLAccHWVisitor;
 class OCLAccHWPass : public ModulePass {
 
   private:
-    raw_ostream &Log;
     void createMakefile();
 
-    void handleArgument(const Argument &);
+    void handleArgument(oclacc::kernel_p HWKernel, const Argument &);
+
 
   public:
-    OCLAccHWPass(raw_ostream &);
+    OCLAccHWPass();
     ~OCLAccHWPass();
 
     OCLAccHWPass (const OCLAccHWPass &) = delete;
     OCLAccHWPass &operator =(const OCLAccHWPass &) = delete;
+
+    OCLAccHWPass *createOCLAccHWPass();
 
     virtual const char *getPassName() const { return "OCLAcc OCLAccHWPass"; }
 
@@ -44,9 +47,13 @@ class OCLAccHWPass : public ModulePass {
 
     static char ID;
 
+    oclacc::DesignUnit &getDesign() {
+      return Design;
+    }
+
   private:
     ValueMapType ValueMap;
-    oclacc::kernel_p HWKernel;
+    oclacc::DesignUnit Design;
 };
 
 } //end namespace llvm

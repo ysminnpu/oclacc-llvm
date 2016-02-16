@@ -27,9 +27,9 @@ class HW : public Identifiable, public BaseVisitable
     HW(const std::string &Name, size_t Bitwidth, llvm::Value *IR=nullptr) : Identifiable(Name), Bitwidth(Bitwidth), IR(IR) { 
     }
 
-    virtual ~HW() {};
+    virtual ~HW() = default;
 
-    NO_COPY_ASSIGN(HW);
+    NO_COPY_ASSIGN(HW)
 
     void setBlock(block_p P) {
       Block = P;
@@ -65,8 +65,8 @@ class HW : public Identifiable, public BaseVisitable
     virtual const std::string dump(const std::string &Indent="") const;
 };
 
-/// \brief Make std::shared_pointer to HW object and set mapping to IR
-/// object
+/// \brief 
+///   Make std::shared_pointer to HW object and set mapping to IR object
 template<class HW, class ...Args> 
 std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
   std::shared_ptr<HW> P = std::make_shared<HW>(args...);

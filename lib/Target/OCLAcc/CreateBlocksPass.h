@@ -40,7 +40,8 @@ class CreateBlocksPass : public FunctionPass, public InstVisitor<CreateBlocksPas
   public:
     CreateBlocksPass();
     ~CreateBlocksPass();
-    NO_COPY_ASSIGN(CreateBlocksPass);
+
+    NO_COPY_ASSIGN(CreateBlocksPass)
 
     virtual const char *getPassName() const { return "OCLAcc CreateBlocksPass"; }
     virtual bool doInitialization(Module &);

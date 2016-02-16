@@ -11,7 +11,7 @@
   virtual ReturnType accept( BaseVisitor &V) { \
     V.visit(*this); \
     return 0; \
-  } 
+  } \
 
 namespace oclacc {
 

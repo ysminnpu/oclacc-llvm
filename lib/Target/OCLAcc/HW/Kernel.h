@@ -31,10 +31,12 @@ class Block : public Identifiable, public BaseVisitable {
     base_p Condition;
     successor_t Successors;
 
+    const llvm::Value *IR;
+
   public:
     Block (const std::string &Name) : Identifiable(Name) { }
 
-    NO_COPY_ASSIGN(Block);
+    NO_COPY_ASSIGN(Block)
 
     void addIn(input_p P) { Ins.push_back(P); }
     const std::vector<input_p> &getIns() const { return Ins; }
@@ -75,6 +77,9 @@ class Block : public Identifiable, public BaseVisitable {
        return Successors;
     }
 
+    const llvm::Value * getIR() const { return IR; }
+    void setIR(const llvm::Value *P) { IR=P; }
+
     DECLARE_VISIT
 };
 
@@ -84,6 +89,7 @@ class Kernel : public Identifiable, public BaseVisitable
 {
   private:
     bool WorkItem;
+    const llvm::Value *IR;
 
     std::vector<instream_p> InStreams;
     std::vector<inscalar_p> InScalars;
@@ -98,7 +104,10 @@ class Kernel : public Identifiable, public BaseVisitable
 
     Kernel (const std::string &Name="unnamed", bool WorkItem=false) : Identifiable(Name), WorkItem(false) { }
 
-    NO_COPY_ASSIGN(Kernel);
+    NO_COPY_ASSIGN(Kernel)
+
+    const llvm::Value * getIR() const { return IR; }
+    void setIR(const llvm::Value *P) { IR=P; }
 
     void addInScalar(inscalar_p p) { InScalars.push_back(p); }
     const std::vector<inscalar_p> &getInScalars() const { return InScalars; }

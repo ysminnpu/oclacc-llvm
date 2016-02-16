@@ -9,6 +9,8 @@ add_llvm_target(OCLAccCodeGen
   OCLAccTargetMachine.cpp
   OCLAccSubtarget.cpp
   CreateBlocksPass.cpp
+  GenerateVhdlPass.cpp
+  GenerateVerilogPass.cpp
   )
 
 add_subdirectory(TargetInfo)

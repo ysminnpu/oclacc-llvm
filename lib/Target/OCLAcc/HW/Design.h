@@ -12,10 +12,10 @@ namespace oclacc {
 
 class DesignUnit : public Identifiable, public BaseVisitable
 {
-
   public:
     std::vector<kernel_p> Kernels;
 
+    DesignUnit();
     DesignUnit(const std::string &Name);
     DesignUnit (const DesignUnit &) = delete;
     DesignUnit &operator =(const DesignUnit &) = delete;

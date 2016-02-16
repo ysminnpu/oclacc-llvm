@@ -3,6 +3,7 @@
 #include <list>
 #include <cxxabi.h>
 
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/ADT/PostOrderIterator.h"
 #include "llvm/IR/Dominators.h"
@@ -43,6 +44,7 @@ bool CreateBlocksPass::isDefInCurrentBB(Value *V) {
 
 
 CreateBlocksPass::CreateBlocksPass() : FunctionPass(CreateBlocksPass::ID) {
+  DEBUG_WITH_TYPE("CreateBlocksPass", dbgs() << "CreateBlocksPass created\n");
 }
 
 CreateBlocksPass::~CreateBlocksPass() {
@@ -61,7 +63,6 @@ void CreateBlocksPass::getAnalysisUsage(AnalysisUsage &AU) const {
 } 
 
 bool CreateBlocksPass::runOnFunction(Function &F) {
-  errs() << "CreateBlocks for Function " << F.getName() << "\n";
   visit(F);
   return false;
 }
@@ -71,6 +72,8 @@ CreateBlocksPass *createCreateBlocksPass() {
 }
 
 void CreateBlocksPass::visitBasicBlock(BasicBlock &B) {
+  DEBUG_WITH_TYPE("CreateBlocksPass", dbgs() << "Found block " << B.getName() << "\n");
+
   oclacc::block_p HWB = std::make_shared<oclacc::Block>(B.getName());
   Blocks.push_back(HWB);
 }
