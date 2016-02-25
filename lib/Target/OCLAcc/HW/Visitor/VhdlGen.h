@@ -13,6 +13,7 @@
 #include "../Writeable.h"
 
 namespace oclacc {
+namespace vhdl {
 
 class VhdlPort;
 typedef std::shared_ptr<VhdlPort> port_p;
@@ -427,6 +428,7 @@ class VhdlIntMul : public VhdlCombinational {
 };
 
 
+} //ns vhdl
 } //ns oclacc
 
 #endif /* VHDLGEN_H */

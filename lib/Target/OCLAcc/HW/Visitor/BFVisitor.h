@@ -5,7 +5,7 @@
 
 #include "llvm/Support/Debug.h"
 
-#include "Base.h"
+#include "BaseVisitor.h"
 #include "../typedefs.h"
 #include "../HW.h"
 #include "../Arith.h"
@@ -48,7 +48,7 @@ class BFVisitor : public BaseVisitor
       }
     }
 
-    virtual int visit(BaseVisitable &R) {
+    virtual int visit(Visitable &R) {
       return VISIT_OK;
     }
 
@@ -83,8 +83,13 @@ class BFVisitor : public BaseVisitor
     virtual int visit(URem &R) { return visit(static_cast<Arith &>  (R));}
     virtual int visit(SRem &R) { return visit(static_cast<Arith &>  (R));}
     virtual int visit(FRem &R) { return visit(static_cast<FPArith &>(R));}
-    virtual int visit(And &R)  { return visit(static_cast<Arith &>  (R));}
-    virtual int visit(Or &R)   { return visit(static_cast<Arith &>  (R)); }
+
+    virtual int visit(Shl &R)  { return visit(static_cast<Arith &>  (R));}
+    virtual int visit(LShr &R)   { return visit(static_cast<Arith &>  (R)); }
+    virtual int visit(AShr &R)  { return visit(static_cast<Arith &>  (R));}
+    virtual int visit(And &R)   { return visit(static_cast<Arith &>  (R)); }
+    virtual int visit(Or &R)  { return visit(static_cast<Arith &>  (R));}
+    virtual int visit(Xor &R)   { return visit(static_cast<Arith &>  (R)); }
 
     virtual int visit(Compare &R)
     {
@@ -194,7 +199,7 @@ class BFVisitor : public BaseVisitor
       for ( base_p P : R.getInScalars() ) {
         ToVisit.push_back(P);
       }
-      for ( instream_p P : R.getInStreams() ) {
+      for ( streamport_p P : R.getInStreams() ) {
         for (streamindex_p SI : P->getIndices()) {
           ToVisit.push_back(SI);
         }
@@ -210,9 +215,6 @@ class BFVisitor : public BaseVisitor
 
       return VISIT_OK;
     }
-
-    virtual int visit(InStream &R)  { return visit(static_cast<Stream &>(R)); }
-    virtual int visit(OutStream &R) { return visit(static_cast<Stream &>(R)); }
 
 #if 0
     virtual int visit(InStream &R) 
@@ -230,7 +232,7 @@ class BFVisitor : public BaseVisitor
     }
 #endif
 
-    virtual int visit(Stream &R)
+    virtual int visit(StreamPort &R)
     {
       DEBUG_CALL(R);
 
@@ -288,16 +290,6 @@ class BFVisitor : public BaseVisitor
       return VISIT_OK;
     }
 
-    virtual int visit(InScalar &R)
-    {
-      DEBUG_CALL(R);
-
-      for ( base_p P : R.getOuts() ) {
-        ToVisit.push_back(P);
-      }
-      return VISIT_OK;
-    }
-
 #if 0
     virtual int visit(OutStreamIndex &R)
     {
@@ -316,13 +308,18 @@ class BFVisitor : public BaseVisitor
     }
 #endif
 
-    virtual int visit(OutScalar &R)
+    virtual int visit(ScalarPort &R)
     {
       DEBUG_CALL(R);
 
 
-      if ( base_p I = R.getIn() )
-        I->accept(*this);
+      for ( base_p P : R.getIns() ) {
+        ToVisit.push_back(P);
+      }
+
+      for ( base_p P : R.getOuts() ) {
+        ToVisit.push_back(P);
+      }
 
       return VISIT_OK;
     }
@@ -342,17 +339,6 @@ class BFVisitor : public BaseVisitor
       return VISIT_OK;
     }
 #endif
-
-    virtual int visit(Tmp &R)
-    {
-      DEBUG_CALL(R);
-      
-      for ( base_p P : R.getOuts() ) {
-        ToVisit.push_back(P);
-      }
-
-      return VISIT_OK;
-    }
 };
 
 } //ns oclacc

@@ -6,11 +6,11 @@
 #include "HW.h"
 #include "typedefs.h"
 #include "Identifiable.h"
-#include "Visitor/Base.h"
+#include "Visitor/Visitable.h"
 
 namespace oclacc {
 
-class DesignUnit : public Identifiable, public BaseVisitable
+class DesignUnit : public Identifiable, public Visitable
 {
   public:
     std::vector<kernel_p> Kernels;

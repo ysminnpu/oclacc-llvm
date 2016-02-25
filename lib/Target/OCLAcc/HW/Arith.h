@@ -7,16 +7,12 @@
 
 namespace oclacc {
 
+/// \brief Base class for all arithmetic operations
 class Arith : public HW
 {
 
   public:
-    Arith(const std::string &Name, size_t Bitwidth=0) : HW(Name, Bitwidth)
-    {
-    }
-
-    Arith (const Arith &) = delete;
-    Arith &operator =(const Arith &) = delete;
+    Arith(const std::string &Name, size_t Bitwidth=0) : HW(Name, Bitwidth) { }
 
     virtual size_t getMaxBitwidth() const {
       size_t max = 0;
@@ -42,9 +38,6 @@ class FPArith : public Arith {
         MantissaBitwidth(MantissaBitwidth),
         ExponentBitwidth(ExponentBitwidth) {
     }
-
-    FPArith (const FPArith &) = delete;
-    FPArith &operator =(const FPArith &) = delete;
 
     size_t getMantissaBitwidth() const {
       return MantissaBitwidth;
@@ -180,6 +173,33 @@ class FRem : public FPArith
     DECLARE_VISIT
 };
 
+class Shl : public Arith
+{
+  public:
+    Shl(const std::string &Name, size_t Bitwidth=0) : Arith(Name)
+    {
+      //pass
+    }
+    DECLARE_VISIT
+};
+class LShr : public Arith
+{
+  public:
+    LShr(const std::string &Name, size_t Bitwidth=0) : Arith(Name)
+    {
+      //pass
+    }
+    DECLARE_VISIT
+};
+class AShr : public Arith
+{
+  public:
+    AShr(const std::string &Name, size_t Bitwidth=0) : Arith(Name)
+    {
+      //pass
+    }
+    DECLARE_VISIT
+};
 class And : public Arith
 {
   public:
@@ -193,6 +213,15 @@ class Or : public Arith
 {
   public:
     Or(const std::string &Name, size_t Bitwidth=0) : Arith(Name)
+    {
+      //pass
+    }
+    DECLARE_VISIT
+};
+class Xor : public Arith
+{
+  public:
+    Xor(const std::string &Name, size_t Bitwidth=0) : Arith(Name)
     {
       //pass
     }

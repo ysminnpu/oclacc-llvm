@@ -1,28 +1,28 @@
 #ifndef OCLACCHWPASS_H
 #define OCLACCHWPASS_H
 
-#include "llvm/IR/Argument.h"
+#include "llvm/IR/InstVisitor.h"
 #include "llvm/Pass.h"
 
 #include "OCLAccTargetMachine.h"
 #include "HW/typedefs.h"
 #include "HW/Design.h"
 
-
 namespace llvm {
 
-class formatted_raw_ostream;
+class Argument;
 class AnalysisUsage;
 
 class OCLAccHWVisitor;
 
-class OCLAccHWPass : public ModulePass {
+class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
 
   private:
     void createMakefile();
 
-    void handleArgument(oclacc::kernel_p HWKernel, const Argument &);
-
+    void handleKernel(const Function &F);
+    void handleArgument(const Argument &);
+    void handleBBPorts(const BasicBlock &B);
 
   public:
     OCLAccHWPass();
@@ -44,6 +44,15 @@ class OCLAccHWPass : public ModulePass {
 
     typedef std::map<const Value *, oclacc::base_p> ValueMapType;
     typedef ValueMapType::iterator ValueMapIt;
+    typedef ValueMapType::const_iterator ValueMapConstIt;
+
+    typedef std::map<const Value *, oclacc::kernel_p> KernelMapType;
+    typedef KernelMapType::iterator KernelMapIt;
+    typedef KernelMapType::const_iterator KernelMapConstIt;
+
+    typedef std::map<const Value *, oclacc::block_p> BlockMapType;
+    typedef BlockMapType::iterator BlockMapIt;
+    typedef BlockMapType::const_iterator BlockMapConstIt;
 
     static char ID;
 
@@ -51,9 +60,75 @@ class OCLAccHWPass : public ModulePass {
       return Design;
     }
 
+
+    // Visitor Methods
+    void visitBinaryOperator(Instruction &I);
+
   private:
     ValueMapType ValueMap;
+    KernelMapType KernelMap;
+    BlockMapType BlockMap;
+    
+    // FIXME Instantiate Design independent of Pass
     oclacc::DesignUnit Design;
+
+    template<class HW, class ...Args> 
+    std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
+      std::shared_ptr<HW> P = std::make_shared<HW>(args...);
+      P->setIR(IR);
+      ValueMap[IR] = P;
+      return P;
+    }
+
+    template<class ...Args> 
+    std::shared_ptr<oclacc::Kernel> makeKernel(const Value *IR, Args&& ...args) {
+      std::shared_ptr<oclacc::Kernel> P = std::make_shared<oclacc::Kernel>(args...);
+      KernelMap[IR] = P;
+      return P;
+    }
+
+    template<class ...Args> 
+    std::shared_ptr<oclacc::Block> makeBlock(const Value *IR, Args&& ...args) {
+      std::shared_ptr<oclacc::Block> P = std::make_shared<oclacc::Block>(args...);
+      BlockMap[IR] = P;
+      return P;
+    }
+
+    template<class HW> 
+    std::shared_ptr<HW> getHW(const Value *IR) const {
+      ValueMapConstIt VI = ValueMap.find(IR);
+      if (VI == ValueMap.end()) {
+        errs() << IR->getName() << "\n";
+        llvm_unreachable("No HW");
+      }
+      
+      std::shared_ptr<HW> P = std::dynamic_pointer_cast<HW>(VI->second);
+      return P;
+    }
+    std::shared_ptr<oclacc::Block> getBlock(const Value *IR) const {
+      BlockMapConstIt VI = BlockMap.find(IR);
+      if (VI == BlockMap.end()) {
+        errs() << IR->getName() << "\n";
+        llvm_unreachable("No Block");
+      }
+      
+      return VI->second;
+    }
+
+    std::shared_ptr<oclacc::Kernel> getKernel(const Value *IR) const {
+      KernelMapConstIt VI = KernelMap.find(IR);
+      if (VI == KernelMap.end()) {
+        errs() << IR->getName() << "\n";
+        llvm_unreachable("No Kernel");
+      }
+      
+      return VI->second;
+    }
+
+    void connect(oclacc::base_p HWFrom, oclacc::base_p HWTo) {
+      HWFrom->appOut(HWTo);
+      HWTo->appIn(HWFrom);
+    }
 };
 
 } //end namespace llvm

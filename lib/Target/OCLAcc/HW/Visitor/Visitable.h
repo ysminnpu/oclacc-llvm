@@ -1,9 +1,8 @@
-#ifndef BASE_H
-#define BASE_H
+#ifndef VISITABLE_H
+#define VISITABLE_H
 
 #include "llvm/Support/Debug.h"
-
-#include "Visitor.h"
+#include "BaseVisitor.h"
 
 //DEBUG_WITH_TYPE("Visitor", llvm::dbgs() << __PRETTY_FUNCTION__ << "\n" );
 
@@ -15,22 +14,20 @@
 
 namespace oclacc {
 
-class BaseVisitor;
-
-class BaseVisitable
+class Visitable
 {
   protected:
-    BaseVisitable() { }
+    Visitable() { }
 
   public:
     typedef int ReturnType;
-    virtual ~BaseVisitable() {};
+    virtual ~Visitable() {};
 
-    BaseVisitable(const BaseVisitable&) = delete;
-    BaseVisitable &operator =(const BaseVisitable &) = delete;
+    Visitable(const Visitable&) = delete;
+    Visitable &operator =(const Visitable &) = delete;
 
     virtual ReturnType accept(BaseVisitor & ) = 0;
 };
 } //end namespace oclacc
 
-#endif /* BASE_H */
+#endif /* VISITABLE_H */

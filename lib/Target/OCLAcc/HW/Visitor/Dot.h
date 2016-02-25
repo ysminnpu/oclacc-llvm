@@ -91,6 +91,7 @@ class DotVisitor : public DFVisitor
     virtual int visit(Mux &R)
     {
       VISIT_ONCE(R)
+#if 0
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       block_p ThisBlock = R.getBlock();
@@ -122,6 +123,7 @@ class DotVisitor : public DFVisitor
       for ( base_p p : R.getOuts() ) {
         (*F) << "n" << R.getUID() << " -> " << "n" << p->getUID() << "\n";
       }
+#endif
 
       super::visit(R);
 
@@ -282,6 +284,23 @@ class DotVisitor : public DFVisitor
       (*F) << "subgraph cluster_" << "n" << r.getUID() << " {" << "\n";
       (*F) << "label = \"kernel_" << r.getName()  << "\";" << "\n";
 
+      for (port_p P : r.getInScalars()) {
+        (*F) << "n" << P->getUID() << " [shape=box,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
+        RankInStream << "n" << P->getUID() << " ";
+      }
+      for (port_p P : r.getInStreams()) {
+        (*F) << "n" << P->getUID() << " [shape=house,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
+        RankInStream << "n" << P->getUID() << " ";
+      }
+      for (port_p P : r.getOutScalars()) {
+        (*F) << "n" << P->getUID() << " [shape=box,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
+        RankOutStream << "n" << P->getUID() << " ";
+      }
+      for (port_p P : r.getOutStreams()) {
+        (*F) << "n" << P->getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
+        RankOutStream << "n" << P->getUID() << " ";
+      }
+
       super::visit(r);
 
       (*F) << "{ rank=source; " << RankInStream.str() << " }\n";
@@ -296,25 +315,7 @@ class DotVisitor : public DFVisitor
       return 0;
     }
 
-    virtual int visit(InStream &r)
-    {
-      VISIT_ONCE(r)
-      DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-//      (*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << r.getName() << "\"];" << "\n";
-
-//      RankInStream << "n" << r.getUID() << " ";
-
- // for ( streamindex_p P : r.getIndices() ) {
- // (*F) << "n" << P->UID << " -> " << "n" << r.getUID() << "\n";
-//        (*F) << "n" << P.first->UID << " -> " << "n" << P.second->UID << "\n";
-    //  }
-
-      super::visit(r);
-      return 0;
-    }
-
-    virtual int visit(OutStream &r)
+    virtual int visit(StreamPort &r)
     {
       VISIT_ONCE(r)
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
@@ -357,7 +358,7 @@ class DotVisitor : public DFVisitor
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       base_p Index  = r.getIndex();
-      stream_p Stream = r.getStream();
+      streamport_p Stream = r.getStream();
 
 
       if (!Index)
@@ -365,13 +366,8 @@ class DotVisitor : public DFVisitor
       if (!Stream)
         llvm_unreachable("StreamIndex has no Stream");
 
-      if (Stream->isInStream()) {
-        (*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[]" << "\"];" << "\n";
-        RankInStream << "n" << r.getUID() << " ";
-      } else {
-        (*F) << "n" << r.getUID() << " [shape=house,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[]" << "\"];" << "\n";
-        RankOutStream << "n" << r.getUID() << " ";
-      }
+        //(*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[]" << "\"];" << "\n";
+        //RankInStream << "n" << r.getUID() << " ";
 
       // Edge already drawn by Index-Node itself.
       //(*F) << "n" << Index->getUID() << " -> " << "n" << r.getUID() << " [headlabel=\"Idx\"];" << "\n";
@@ -390,16 +386,12 @@ class DotVisitor : public DFVisitor
       VISIT_ONCE(r)
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      stream_p Stream = r.getStream();
+      streamport_p Stream = r.getStream();
 
       if (!Stream)
         llvm_unreachable("StreamIndex has no Stream");
 
-      if (Stream->isInStream()) {
-        (*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[" << r.getIndex() << "]" << "\"];" << "\n";
-      } else {
-        (*F) << "n" << r.getUID() << " [shape=house,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[" << r.getIndex() << "]" << "\"];" << "\n";
-      }
+//      (*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[" << r.getIndex() << "]" << "\"];" << "\n";
 
       for ( base_p p : r.getOuts() ) {
         (*F) << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
@@ -410,11 +402,12 @@ class DotVisitor : public DFVisitor
       return 0;
     }
 
-    virtual int visit(InScalar &r)
+    virtual int visit(ScalarPort &r)
     {
       VISIT_ONCE(r)
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
+#if 0
       (*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/8\",style=filled,tailport=n,label=\"" << r.getName() << "\"];" << "\n";
 
       RankInStream << "n" << r.getUID() << " ";
@@ -422,6 +415,7 @@ class DotVisitor : public DFVisitor
       for ( base_p p : r.getOuts() ) {
         (*F) << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
       }
+#endif
 
       super::visit(r);
       return 0;
@@ -479,22 +473,6 @@ class DotVisitor : public DFVisitor
       return 0;
     }
 #endif
-
-    virtual int visit(Tmp &r)
-    {
-      VISIT_ONCE(r);
-      DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-      (*F) << "n" << r.getUID() << " [shape=diamond,fillcolor=\"/greys9/5\",style=filled,tailport=n,label=\"" << r.getUniqueName() << "\"];" << "\n";
-
-      super::visit(r);
-
-      for ( base_p p : r.getOuts() ) {
-        (*F) << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
-      }
-
-      return 0;
-    }
 
 };
 

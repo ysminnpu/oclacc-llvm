@@ -18,6 +18,7 @@
 #define DEBUG_CALL DEBUG_WITH_TYPE( "VhdlVisitor", llvm::dbgs() << __PRETTY_FUNCTION__ << "\n" );
 
 namespace oclacc {
+namespace vhdl {
 
 class VhdlVisitor : public BFVisitor
 {
@@ -100,15 +101,15 @@ class VhdlVisitor : public BFVisitor
       // 
       // Scalars have to be declared here, otherwise we have no access to the
       // shared_ptr keeping it.
-      for ( inscalar_p p : r.getInScalars() ) {
+      for ( scalarport_p p : r.getInScalars() ) {
         auto S = std::make_shared<VhdlInPort>( p->getUniqueName(), p->getBitwidth() );
         CurrentKernelEntity->InScalar.push_back( S );
         SignalMap[p.get()] = S;
       }
 
-      for ( outscalar_p p : r.getOutScalars() ) {
+      for ( scalarport_p p : r.getOutScalars() ) {
         auto S = std::make_shared<VhdlInPort>( p->getUniqueName(), p->getBitwidth() );
-        CurrentKernelEntity->InScalar.push_back( S );
+        CurrentKernelEntity->InScalar.push_back(S);
         SignalMap[p.get()] = S;
       }
 
@@ -160,7 +161,7 @@ class VhdlVisitor : public BFVisitor
     }
 #endif
 
-    virtual int visit(InScalar &r)
+    virtual int visit(ScalarPort &r)
     {
       VISIT_ONCE(r);
       DEBUG_CALL;
@@ -168,20 +169,13 @@ class VhdlVisitor : public BFVisitor
       super::visit(r);
       return 0;
     }
-    virtual int visit(OutScalar &r)
-    {
-      llvm_unreachable("TODO: Remove OutScalar");
-      return 0;
-    }
 
-    virtual int visit(Stream &r)
+    virtual int visit(StreamPort &r)
     {
       VISIT_ONCE(r);
       DEBUG_CALL;
 
       bool In = false;
-      if (dynamic_cast<InStream*>(&r))
-        In = true;
 
       for (streamindex_p I : r.getIndices()) {
         std::shared_ptr<VhdlMemPort> Mem;
@@ -471,15 +465,8 @@ class VhdlVisitor : public BFVisitor
       super::visit(r);
       return 0;
     }
-
-    virtual int visit(Tmp &r)
-    {
-      VISIT_ONCE(r);
-      DEBUG_CALL;
-      super::visit(r);
-      return 0;
-    }
 };
+} //end namespace vhdl
 } //end namespace oclacc
 
 #undef TYPENAME

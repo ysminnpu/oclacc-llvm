@@ -3,7 +3,7 @@
 
 #include "llvm/Support/Debug.h"
 
-#include "Base.h"
+#include "BaseVisitor.h"
 #include "../typedefs.h"
 #include "../HW.h"
 #include "../Arith.h"
@@ -29,7 +29,7 @@ class DFVisitor : public BaseVisitor
     DFVisitor() {};
 
   public:
-    virtual int visit(BaseVisitable &r) {
+    virtual int visit(Visitable &r) {
       return 0;
     }
 
@@ -64,8 +64,13 @@ class DFVisitor : public BaseVisitor
     virtual int visit(URem &r) { return visit(static_cast<Arith &>(r));}
     virtual int visit(SRem &r) { return visit(static_cast<Arith &>(r));}
     virtual int visit(FRem &r) { return visit(static_cast<FPArith &>(r));}
-    virtual int visit(And &r)  { return visit(static_cast<Arith &>(r));}
-    virtual int visit(Or &r)   { return visit(static_cast<Arith &>(r)); }
+
+    virtual int visit(Shl &r)  { return visit(static_cast<Arith &>(r));}
+    virtual int visit(LShr &r)   { return visit(static_cast<Arith &>(r)); }
+    virtual int visit(AShr &r)  { return visit(static_cast<Arith &>(r));}
+    virtual int visit(And &r)   { return visit(static_cast<Arith &>(r)); }
+    virtual int visit(Or &r)  { return visit(static_cast<Arith &>(r));}
+    virtual int visit(Xor &r)   { return visit(static_cast<Arith &>(r)); }
 
     virtual int visit(Compare &r)
     {
@@ -165,25 +170,16 @@ class DFVisitor : public BaseVisitor
         P->accept(*this);
       }
 
-#if 0
-      for ( base_p P : R.getInScalars() ) {
+      for ( base_p P : R.getIns() ) {
         P->accept(*this);
       }
-      for ( base_p P : R.getInStreams() ) {
-        P->accept(*this);
-      }
-
-      for ( base_p P : R.getOutScalars() ) {
-        P->accept(*this);
-      }
-      for ( base_p P : R.getOutStreams() ) {
+      for ( base_p P : R.getOuts() ) {
         P->accept(*this);
       }
 
       for ( const_p P : R.getConstVals()) {
         P->accept(*this);
       }
-#endif
 
       return 0;
     }
@@ -205,26 +201,20 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(InStream &r)  { return visit(static_cast<Stream &>(r)); }
-    virtual int visit(OutStream &r) { return visit(static_cast<Stream &>(r)); }
 
-#if 0
-    virtual int visit(InStream &r) 
-    {
+    virtual int visit(ScalarPort &r) { 
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+      for (base_p P : r.getIns())
+        P->accept(*this);
+
+      for (base_p P : r.getOuts())
+        P->accept(*this);
 
       return 0;
     }
 
-    virtual int visit(OutStream &r)
-    {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-      return 0;
-    }
-#endif
-
-    virtual int visit(Stream &r)
+    virtual int visit(StreamPort &r)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
@@ -273,72 +263,6 @@ class DFVisitor : public BaseVisitor
 
       for (base_p P : r.getOuts())
         P->accept(*this);
-
-      return 0;
-    }
-
-    virtual int visit(InScalar &r)
-    {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-      for ( base_p p : r.getOuts() ) {
-        p->accept(*this);
-      }
-      return 0;
-    }
-
-#if 0
-    virtual int visit(OutStreamIndex &r)
-    {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-      if ( r.getIns() )
-        r.getIns()->accept(*this);
-
-      if ( r.getOuts() )
-        r.getOuts()->accept(*this);
-
-      if ( r.Idx )
-        r.Idx->accept(*this);
-
-      return 0;
-    }
-#endif
-
-    virtual int visit(OutScalar &r)
-    {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-
-      if ( base_p I = r.getIn() )
-        I->accept(*this);
-
-      return 0;
-    }
-
-#if 0
-    virtual int visit(InOutStream &r)
-    {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-      if ( r.getIns() )
-        r.getIns()->accept(*this);
-
-      for ( base_p p : r.getOuts() ) {
-        p->accept(*this);
-      }
-
-      return 0;
-    }
-#endif
-
-    virtual int visit(Tmp &r)
-    {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-      for ( base_p p : r.getOuts() ) {
-        p->accept(*this);
-      }
 
       return 0;
     }

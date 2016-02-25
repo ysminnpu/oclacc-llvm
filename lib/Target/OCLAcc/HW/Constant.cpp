@@ -8,12 +8,12 @@ namespace oclacc {
 
 ConstVal::ConstVal(const std::string &Name, uint64_t V, size_t W) : HW(Name, W), T(Unsigned), V(V) {
 }
-ConstVal::ConstVal(const std::string &Name, DataType T, uint64_t V, size_t W) : HW(Name, W), T(T), V(V) {
+ConstVal::ConstVal(const std::string &Name, Datatype T, uint64_t V, size_t W) : HW(Name, W), T(T), V(V) {
 }
 
 const std::string ConstVal::dump(const std::string &Indent) const {
   std::stringstream ss;
-  ss << Indent << getName() << Strings_DataType[T] << V;
+  ss << Indent << getName() << Strings_Datatype[T] << V;
   return ss.str();
 }
 

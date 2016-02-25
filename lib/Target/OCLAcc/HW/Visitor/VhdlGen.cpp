@@ -2,6 +2,8 @@
 
 namespace oclacc {
 
+namespace vhdl {
+
 VhdlEntity::VhdlEntity(const std::string &Name,
         port_p Clk,
         port_p Reset )
@@ -10,4 +12,5 @@ VhdlEntity::VhdlEntity(const std::string &Name,
 
         }
 
+} // end namespace vhdl
 } // end namespace oclacc

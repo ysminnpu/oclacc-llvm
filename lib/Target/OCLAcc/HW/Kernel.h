@@ -4,8 +4,8 @@
 #include <vector>
 
 #include "Identifiable.h"
-#include "Visitor/Visitor.h"
-#include "Visitor/Base.h"
+#include "Visitor/Visitable.h"
+#include "Streams.h"
 
 namespace oclacc {
 
@@ -14,115 +14,87 @@ const std::string ConditionFlagNames[] = {
   "COND_TRUE", "COND_FALSE", "COND_NONE"};
 
 /// \brief Basic component used to build dataflow.
-/// Blocks have a list of inputs used inside. Blocks use their inputs when valid
+/// Components, i.e. Blocks and Kernels have a list of inputs used inside. Blocks use their inputs when valid
 /// and generate outputs. Multiple blocks are connected by connecting their
 /// inputs/outputs.
-class Block : public Identifiable, public BaseVisitable {
-  public:
-
-    typedef std::map<block_p, ConditionFlag> successor_t;
-
-  private:
-    std::vector<input_p> Ins;
-    std::vector<output_p> Outs;
-    std::vector<base_p> Ops;
-    std::vector<const_p> Consts;
-
-    base_p Condition;
-    successor_t Successors;
-
+class Component : public Identifiable {
+  protected:
     const llvm::Value *IR;
 
+    std::vector<streamport_p> InStreams;
+    std::vector<scalarport_p> InScalars;
+
+    std::vector<streamport_p> OutStreams;
+    std::vector<scalarport_p> OutScalars;
+
+    std::vector<const_p> ConstVals;
+
   public:
-    Block (const std::string &Name) : Identifiable(Name) { }
+    const llvm::Value * getIR() const { return IR; }
+    void setIR(const llvm::Value *P) { IR=P; }
+
+    void addInScalar(scalarport_p p) { InScalars.push_back(p); }
+    const std::vector<scalarport_p> &getInScalars() const { return InScalars; }
+
+    void addInStream(streamport_p p) { InStreams.push_back(p); }
+    const std::vector<streamport_p> &getInStreams() const { return InStreams; }
+
+    void addOutScalar(scalarport_p p) { OutScalars.push_back(p); }
+    const std::vector<scalarport_p> &getOutScalars() const { return OutScalars; }
+
+    const std::vector<port_p> getOuts() {
+      std::vector<port_p> Outs;
+      Outs.insert(Outs.end(), OutStreams.begin(), OutStreams.end());
+      Outs.insert(Outs.end(), OutScalars.begin(), OutScalars.end());
+      return Outs;
+    }
+
+    const std::vector<port_p> getIns() {
+      std::vector<port_p> Ins;
+      Ins.insert(Ins.end(), InStreams.begin(), InStreams.end());
+      Ins.insert(Ins.end(), InScalars.begin(), InScalars.end());
+      return Ins;
+    }
+
+    void addOutStream(streamport_p p) { OutStreams.push_back(p); }
+    const std::vector<streamport_p> &getOutStreams() const { return OutStreams; }
+
+    void addConstVal(const_p p) { ConstVals.push_back(p); }
+    const std::vector<const_p> &getConstVals() const { return ConstVals; }
+
+
+  protected: 
+    Component(const std::string &Name) : Identifiable(Name) { }
+
+};
+
+class Block : public Component, public Visitable {
+  private:
+    std::vector<base_p> Ops;
+
+  public:
+    Block (const std::string &Name) : Component(Name) { }
 
     NO_COPY_ASSIGN(Block)
 
-    void addIn(input_p P) { Ins.push_back(P); }
-    const std::vector<input_p> &getIns() const { return Ins; }
-
-    void addOut(output_p P) { Outs.push_back(P); }
-    const std::vector<output_p> &getOuts() const { return Outs; }
-
-    void addOp(base_p P) { Ops.push_back(P); }
+    void addOp(base_p p) { Ops.push_back(p); }
     const std::vector<base_p> &getOps() const { return Ops; }
-
-    void addConst(const_p P) { Consts.push_back(P); }
-    const std::vector<const_p> &getConsts() const { return Consts; }
-
-    void setCondition(base_p P) {
-      Condition = P;
-    }
-
-    const base_p &getCondition() const {
-      return Condition;
-    }
-
-    void addSuccessor(block_p P, ConditionFlag F) {
-      Successors[P] = F;
-    }
-
-    const ConditionFlag &getConditionFlag(block_p B) const {
-      successor_t::const_iterator It = Successors.find(B);
-
-      if (It == Successors.end()) {
-        llvm::errs() << "From " << getName() << "to Block: " << B->getName() << "\n";
-        llvm_unreachable("Successor block not in map.");
-      }
-
-      return It->second;
-    }
-
-    const std::map<block_p, ConditionFlag> &getSuccessors() const {
-       return Successors;
-    }
-
-    const llvm::Value * getIR() const { return IR; }
-    void setIR(const llvm::Value *P) { IR=P; }
 
     DECLARE_VISIT
 };
 
-/// \brief Schedulable Blocks
+/// \brief Schedulable Kernels
 /// Kernels are blocks which represent the beginning dataflow of a WorkItem.
-class Kernel : public Identifiable, public BaseVisitable
-{
+class Kernel : public Component, public Visitable {
   private:
     bool WorkItem;
-    const llvm::Value *IR;
 
-    std::vector<instream_p> InStreams;
-    std::vector<inscalar_p> InScalars;
-
-    std::vector<outstream_p> OutStreams;
-    std::vector<outscalar_p> OutScalars;
-
-    std::vector<const_p> ConstVals;
     std::vector<block_p> Blocks;
-
   public:
 
-    Kernel (const std::string &Name="unnamed", bool WorkItem=false) : Identifiable(Name), WorkItem(false) { }
+    Kernel (const std::string &Name="unnamed", bool WorkItem=false) : Component(Name), WorkItem(false) { }
 
     NO_COPY_ASSIGN(Kernel)
-
-    const llvm::Value * getIR() const { return IR; }
-    void setIR(const llvm::Value *P) { IR=P; }
-
-    void addInScalar(inscalar_p p) { InScalars.push_back(p); }
-    const std::vector<inscalar_p> &getInScalars() const { return InScalars; }
-
-    void addInStream(instream_p p) { InStreams.push_back(p); }
-    const std::vector<instream_p> &getInStreams() const { return InStreams; }
-
-    void addOutScalar(outscalar_p p) { OutScalars.push_back(p); }
-    const std::vector<outscalar_p> &getOutScalars() const { return OutScalars; }
-
-    void addOutStream(outstream_p p) { OutStreams.push_back(p); }
-    const std::vector<outstream_p> &getOutStreams() const { return OutStreams; }
-
-    void addConstVal(const_p p) { ConstVals.push_back(p); }
-    const std::vector<const_p> &getConstVals() const { return ConstVals; }
 
     void addBlock(block_p p) { Blocks.push_back(p); }
     const std::vector<block_p> &getBlocks() const { return Blocks; }

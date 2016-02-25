@@ -1,5 +1,5 @@
-#ifndef VISITOR_H
-#define VISITOR_H
+#ifndef BASEVISITOR_H
+#define BASEVISITOR_H
 
 #include <vector>
 
@@ -22,7 +22,7 @@
 
 namespace oclacc {
 
-class BaseVisitable;
+class Visitable;
 
 class DesignUnit;
 class Kernel;
@@ -42,8 +42,14 @@ class FDiv;
 class URem;
 class SRem;
 class FRem;
+
+class Shl;
+class LSHr;
+class AShr;
 class And;
 class Or;
+class Xor;
+
 class Compare;
 class Mux;
 class Reg;
@@ -55,7 +61,6 @@ class InScalar;
 //class OutStreamIndex;
 class OutScalar;
 //class InOutStream;
-class Tmp;
 class Stream;
 class InStream;
 class OutStream;
@@ -79,8 +84,9 @@ class BaseVisitor
     virtual ~BaseVisitor() {
     };
 
-    virtual int visit( BaseVisitable &) = 0;
+    virtual int visit( Visitable &) = 0;
     virtual int visit( DesignUnit &) = 0;
+
     virtual int visit( Arith &) = 0;
     virtual int visit( FPArith &) = 0;
     virtual int visit( Add &) = 0;
@@ -95,8 +101,14 @@ class BaseVisitor
     virtual int visit( URem & ) = 0;
     virtual int visit( SRem & ) = 0;
     virtual int visit( FRem & ) = 0;
-    virtual int visit( And & ) = 0;
-    virtual int visit( Or & )  = 0;
+
+    virtual int visit( Shl & ) = 0;
+    virtual int visit( LShr & )  = 0;
+    virtual int visit( AShr & ) = 0;
+    virtual int visit( And & )  = 0;
+    virtual int visit( Or & ) = 0;
+    virtual int visit( Xor & )  = 0;
+
     virtual int visit( Compare & ) = 0;
     virtual int visit( Mux & ) = 0;
     virtual int visit( Reg & ) = 0;
@@ -106,19 +118,14 @@ class BaseVisitor
     virtual int visit( Kernel & ) = 0;
     virtual int visit( Block & ) = 0;
     //virtual int visit( InStreamIndex & ) = 0;
-    virtual int visit( InScalar & )  = 0;
+    virtual int visit( ScalarPort & )  = 0;
    // virtual int visit( OutStreamIndex & ) = 0;
-    virtual int visit( OutScalar & ) = 0;
-    //virtual int visit( InOutStream & ) = 0;
-    virtual int visit( Stream & ) = 0;
-    virtual int visit( InStream & )  = 0;
-    virtual int visit( OutStream & ) = 0;
+    virtual int visit( StreamPort & ) = 0;
     virtual int visit( StreamIndex & ) = 0;
     virtual int visit( DynamicStreamIndex & ) = 0;
     virtual int visit( StaticStreamIndex & ) = 0;
-    virtual int visit( Tmp & ) = 0;
 };
 
 } //ns oclacc
 
-#endif /* VISITOR_H */
+#endif /* BASEVISITOR_H */

@@ -64,7 +64,7 @@ bool GenerateVhdlPass::runOnModule(Module &M) {
   DesignUnit &Design = HWP.getDesign(); 
   DEBUG_WITH_TYPE("GenerateVhdlPass", dbgs() << "DesignUnit: " << Design.getName() << "\n");
 
-  VhdlVisitor V;
+  vhdl::VhdlVisitor V;
   Design.accept(V);
 
   return false;

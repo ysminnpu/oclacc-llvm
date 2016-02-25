@@ -61,7 +61,6 @@ bool GenerateVerilogPass::runOnModule(Module &M) {
   DesignUnit &Design = HWP.getDesign(); 
   DEBUG_WITH_TYPE("GenerateVerilogPass", dbgs() << "DesignUnit: " << Design.getName() << "\n");
 
-  errs() << "Verilog not implemented\n";
   //VeriloVisitor V;
   //Design.accept(V);
 

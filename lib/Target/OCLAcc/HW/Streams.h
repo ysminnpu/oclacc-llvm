@@ -1,12 +1,58 @@
 #ifndef STREAMS_H
 #define STREAMS_H
 
+#include <unordered_set>
+
+#include "Visitor/Visitable.h"
 #include "typedefs.h"
 #include "Identifiable.h"
-#include <unordered_set>
+#include "OpenCLDefines.h"
 
 namespace oclacc {
 
+class Port : public HW {
+  protected:
+    Port(const std::string &Name, size_t W) : HW(Name, W) { }
+    virtual bool isScalar()=0;
+
+    DECLARE_VISIT
+};
+
+class ScalarPort : public Port {
+  public:
+    ScalarPort(const std::string &Name, size_t W) : Port(Name, W) { }
+    DECLARE_VISIT
+    bool isScalar() { return true; }
+};
+
+class StreamPort : public Port {
+  private:
+    std::unordered_set<streamindex_p> Indices;
+
+  public:
+    StreamPort(const std::string &Name, size_t W, ocl::AddressSpace) : Port(Name, W) { }
+    DECLARE_VISIT
+
+    bool isScalar() { return false; }
+
+    void appIndex(streamindex_p Index) {
+      Indices.insert(Index);
+    }
+
+    const std::unordered_set<streamindex_p> &getIndices() const {
+      return Indices;
+    }
+
+    ///
+    // hasIndex - Return true if Stream already contains given Index 
+    //
+    bool hasIndex(streamindex_p I) const {
+      return (Indices.count(I) != 0);
+    }
+};
+
+
+#if 0
 class InScalar;
 
 class Input : public HW
@@ -26,7 +72,7 @@ class Input : public HW
 class InScalar : public Input
 {
   public:
-    InScalar (const std::string &Name, size_t W) : Input(Name, W)
+    InScalar (const std::string &Name, Datatype T, size_t W) : Input(Name, W)
     {
     }
 
@@ -75,7 +121,7 @@ class Output : public HW
 class OutScalar : public Output
 {
   public:
-    OutScalar (const std::string &Name, size_t W ) : Output(Name, W)
+    OutScalar (const std::string &Name, Datatype T, size_t W ) : Output(Name, W)
     {
     }
 
@@ -121,25 +167,27 @@ class Stream : public HW {
 
     DECLARE_VISIT;
 };
+#endif
 
 class StreamIndex : public HW {
   private:
-    stream_p Stream;
-    base_p In;
+    streamport_p Stream;
+    base_p Index;
 
   protected:
-    StreamIndex(const std::string &Name, stream_p Stream) : HW(Name,0), Stream(Stream) { }
+    StreamIndex(const std::string &Name, streamport_p Stream) : HW(Name,0), Stream(Stream) { }
 
   public:
     StreamIndex(const StreamIndex&) = delete;
     StreamIndex& operator=(const StreamIndex&) = delete;
 
-    stream_p getStream() const {
+    streamport_p getStream() const {
       return Stream;
     }
 
     virtual bool isStatic() const = 0;
-    DECLARE_VISIT;
+
+    DECLARE_VISIT
 
 };
 
@@ -149,7 +197,7 @@ class DynamicStreamIndex : public StreamIndex {
     base_p Index;
 
   public:
-    DynamicStreamIndex(const std::string &Name, stream_p Stream, base_p Index) : StreamIndex(Name, Stream), Index(Index) { }
+    DynamicStreamIndex(const std::string &Name, streamport_p Stream, base_p Index) : StreamIndex(Name, Stream), Index(Index) { }
 
     DynamicStreamIndex(const DynamicStreamIndex&) = delete;
     DynamicStreamIndex& operator=(const DynamicStreamIndex&) = delete;
@@ -163,14 +211,14 @@ class DynamicStreamIndex : public StreamIndex {
 
     bool isStatic() const {return false;}
 
-    DECLARE_VISIT;
+    DECLARE_VISIT
 };
 
 class StaticStreamIndex : public StreamIndex {
   private:
     size_t Index;
   public:
-    StaticStreamIndex(const std::string &Name, stream_p Stream, size_t Index, size_t W) : StreamIndex(Name, Stream), Index(Index) {
+    StaticStreamIndex(const std::string &Name, streamport_p Stream, size_t Index, size_t W) : StreamIndex(Name, Stream), Index(Index) {
       setBitwidth(W);
     }
 
@@ -190,6 +238,8 @@ class StaticStreamIndex : public StreamIndex {
 
     DECLARE_VISIT;
 };
+
+#if 0
 
 class InStream : public Stream
 {
@@ -217,6 +267,7 @@ class OutStream : public Stream
 
     DECLARE_VISIT;
 };
+#endif
 
 
 #if 0

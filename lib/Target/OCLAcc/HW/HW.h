@@ -7,13 +7,13 @@
 
 #include "typedefs.h"
 #include "Identifiable.h"
-#include "Visitor/Base.h"
+#include "Visitor/Visitable.h"
 
 using namespace llvm;
 
 namespace oclacc {
 
-class HW : public Identifiable, public BaseVisitable
+class HW : public Identifiable, public Visitable
 {
   protected:
     size_t Bitwidth;
@@ -65,43 +65,22 @@ class HW : public Identifiable, public BaseVisitable
     virtual const std::string dump(const std::string &Indent="") const;
 };
 
-/// \brief 
-///   Make std::shared_pointer to HW object and set mapping to IR object
-template<class HW, class ...Args> 
-std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
-  std::shared_ptr<HW> P = std::make_shared<HW>(args...);
-  P->setIR(IR);
-  return P;
-}
-
-enum DataType {
+enum Datatype {
+  Half,
   Float,
+  Double,
   Signed,
   Unsigned,
+  Invalid,
 };
 
-static const char * const Strings_DataType[] {
+static const char * const Strings_Datatype[] {
+  "Half",  // 0
   "Float",  // 0
   "Signed",   // 1
   "Unsigned" // 2
+  "Invalid" // 2
 };
-
-#if 0
-static class DataType 
-{
-};
-static class Float : public DataType 
-{
-};
-static class Signed : public DataType
-{
-  public:
-};
-static class Unsigned : public DataType 
-{
-  public:
-};
-#endif
 
 
 } //ns oclacc

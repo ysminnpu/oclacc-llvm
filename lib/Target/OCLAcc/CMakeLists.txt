@@ -5,7 +5,6 @@ add_public_tablegen_target(OCLAccCommonTableGen)
 add_llvm_target(OCLAccCodeGen
   OCLAccHWPass.cpp
   OCLAccSPIRCheckVisitor.cpp
-  OCLAccHWVisitor.cpp
   OCLAccTargetMachine.cpp
   OCLAccSubtarget.cpp
   CreateBlocksPass.cpp

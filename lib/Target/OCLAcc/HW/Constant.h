@@ -3,16 +3,17 @@
 
 #include "HW.h"
 
+
 namespace oclacc {
 
 class ConstVal : public HW
 {
   public:
-    const DataType T;
+    const Datatype T;
     const uint64_t V;
 
     ConstVal(const std::string &Name, uint64_t V, size_t W);
-    ConstVal(const std::string &Name, DataType T, uint64_t V, size_t W);
+    ConstVal(const std::string &Name, Datatype T, uint64_t V, size_t W);
 
     const std::string dump(const std::string &Indent) const;
 
