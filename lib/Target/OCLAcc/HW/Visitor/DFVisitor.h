@@ -218,7 +218,7 @@ class DFVisitor : public BaseVisitor
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( streamindex_p P : r.getIndices() ) {
+      for ( streamindex_p P : r.getIndexList() ) {
         P->accept(*this);
       }
       return 0;

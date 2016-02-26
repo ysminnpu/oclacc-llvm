@@ -46,23 +46,26 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
     typedef ValueMapType::iterator ValueMapIt;
     typedef ValueMapType::const_iterator ValueMapConstIt;
 
-    typedef std::map<const Value *, oclacc::kernel_p> KernelMapType;
+    typedef std::map<const Function *, oclacc::kernel_p> KernelMapType;
     typedef KernelMapType::iterator KernelMapIt;
     typedef KernelMapType::const_iterator KernelMapConstIt;
 
-    typedef std::map<const Value *, oclacc::block_p> BlockMapType;
+    typedef std::map<const BasicBlock *, oclacc::block_p> BlockMapType;
     typedef BlockMapType::iterator BlockMapIt;
     typedef BlockMapType::const_iterator BlockMapConstIt;
 
     static char ID;
 
     oclacc::DesignUnit &getDesign() {
-      return Design;
+      return HWDesign;
     }
 
 
     // Visitor Methods
     void visitBinaryOperator(Instruction &I);
+    void visitLoadInst(LoadInst &I);
+    void visitStoreInst(StoreInst &I);
+    void visitGetElementPtrInst(GetElementPtrInst &I);
 
   private:
     ValueMapType ValueMap;
@@ -70,7 +73,9 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
     BlockMapType BlockMap;
     
     // FIXME Instantiate Design independent of Pass
-    oclacc::DesignUnit Design;
+    oclacc::DesignUnit HWDesign;
+
+    oclacc::const_p createConstant(Constant *, BasicBlock *B, oclacc::Datatype);
 
     template<class HW, class ...Args> 
     std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
@@ -81,14 +86,14 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
     }
 
     template<class ...Args> 
-    std::shared_ptr<oclacc::Kernel> makeKernel(const Value *IR, Args&& ...args) {
+    std::shared_ptr<oclacc::Kernel> makeKernel(const Function *IR, Args&& ...args) {
       std::shared_ptr<oclacc::Kernel> P = std::make_shared<oclacc::Kernel>(args...);
       KernelMap[IR] = P;
       return P;
     }
 
     template<class ...Args> 
-    std::shared_ptr<oclacc::Block> makeBlock(const Value *IR, Args&& ...args) {
+    std::shared_ptr<oclacc::Block> makeBlock(const BasicBlock *IR, Args&& ...args) {
       std::shared_ptr<oclacc::Block> P = std::make_shared<oclacc::Block>(args...);
       BlockMap[IR] = P;
       return P;
@@ -102,23 +107,24 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
         llvm_unreachable("No HW");
       }
       
-      std::shared_ptr<HW> P = std::dynamic_pointer_cast<HW>(VI->second);
+      std::shared_ptr<HW> P = std::static_pointer_cast<HW>(VI->second);
       return P;
     }
-    std::shared_ptr<oclacc::Block> getBlock(const Value *IR) const {
-      BlockMapConstIt VI = BlockMap.find(IR);
+
+    std::shared_ptr<oclacc::Block> getBlock(const BasicBlock *B) const {
+      BlockMapConstIt VI = BlockMap.find(B);
       if (VI == BlockMap.end()) {
-        errs() << IR->getName() << "\n";
+        errs() << B->getName() << "\n";
         llvm_unreachable("No Block");
       }
       
       return VI->second;
     }
 
-    std::shared_ptr<oclacc::Kernel> getKernel(const Value *IR) const {
-      KernelMapConstIt VI = KernelMap.find(IR);
+    std::shared_ptr<oclacc::Kernel> getKernel(const Function *F) const {
+      KernelMapConstIt VI = KernelMap.find(F);
       if (VI == KernelMap.end()) {
-        errs() << IR->getName() << "\n";
+        errs() << F->getName() << "\n";
         llvm_unreachable("No Kernel");
       }
       

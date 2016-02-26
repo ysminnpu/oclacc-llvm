@@ -102,13 +102,13 @@ class VhdlVisitor : public BFVisitor
       // Scalars have to be declared here, otherwise we have no access to the
       // shared_ptr keeping it.
       for ( scalarport_p p : r.getInScalars() ) {
-        auto S = std::make_shared<VhdlInPort>( p->getUniqueName(), p->getBitwidth() );
+        auto S = std::make_shared<VhdlInPort>( p->getUniqueName(), p->getBitWidth() );
         CurrentKernelEntity->InScalar.push_back( S );
         SignalMap[p.get()] = S;
       }
 
       for ( scalarport_p p : r.getOutScalars() ) {
-        auto S = std::make_shared<VhdlInPort>( p->getUniqueName(), p->getBitwidth() );
+        auto S = std::make_shared<VhdlInPort>( p->getUniqueName(), p->getBitWidth() );
         CurrentKernelEntity->InScalar.push_back(S);
         SignalMap[p.get()] = S;
       }
@@ -136,7 +136,7 @@ class VhdlVisitor : public BFVisitor
           //if ( ! B->Out.empty() ) {
           //  auto It = std::find(r.Out.begin(), r.Out.end(), O );
           //  if ( It != r.Out.end() ) {
-          //    KernelEntity->addSignal(std::make_shared<VhdlSignal>(O->getUniqueName(), O->getBitwidth() ));
+          //    KernelEntity->addSignal(std::make_shared<VhdlSignal>(O->getUniqueName(), O->getBitWidth() ));
           //  }
           //}
         } else {
@@ -177,12 +177,12 @@ class VhdlVisitor : public BFVisitor
 
       bool In = false;
 
-      for (streamindex_p I : r.getIndices()) {
+      for (streamindex_p I : r.getIndexList()) {
         std::shared_ptr<VhdlMemPort> Mem;
         if (In)
-          Mem = std::make_shared<VhdlMemInPort>(I->getUniqueName(), r.getBitwidth());
+          Mem = std::make_shared<VhdlMemInPort>(I->getUniqueName(), r.getBitWidth());
         else
-          Mem = std::make_shared<VhdlMemOutPort>(I->getUniqueName(), r.getBitwidth());
+          Mem = std::make_shared<VhdlMemOutPort>(I->getUniqueName(), r.getBitWidth());
 
         CurrentKernelEntity->InMem.push_back(Mem);
         SignalMap[I.get()] = Mem->getData();
@@ -212,7 +212,7 @@ class VhdlVisitor : public BFVisitor
           if (IndexIt != SignalMap.end())
             Index = IndexIt->second;
           else {
-            Index = std::make_shared<VhdlSignal>(HWIndex->getUniqueName(), HWIndex->getBitwidth());
+            Index = std::make_shared<VhdlSignal>(HWIndex->getUniqueName(), HWIndex->getBitWidth());
             SignalMap[HWIndex.get()] = Index;
             errs() << "Creating new Index Signal " << Index->getUniqueName() << "\n";
           }
@@ -292,7 +292,7 @@ class VhdlVisitor : public BFVisitor
 
       auto It = SignalMap.find(&r);
       if ( It == SignalMap.end() ) {
-          Ops[0] = std::make_shared<VhdlSignal>( r.getUniqueName(), r.getBitwidth());
+          Ops[0] = std::make_shared<VhdlSignal>( r.getUniqueName(), r.getBitWidth());
           SignalMap[&r] = Ops[0];
       } else Ops[0] = It->second;
 
@@ -300,10 +300,10 @@ class VhdlVisitor : public BFVisitor
         auto It = SignalMap.find(HWOps[i].get());
         if ( It == SignalMap.end() ) {
           if (const_p C = std::dynamic_pointer_cast<ConstVal>(HWOps[i])) {
-            Ops[i] = std::make_shared<VhdlSignal>( HWOps[i]->getName(), HWOps[i]->getBitwidth() );
+            Ops[i] = std::make_shared<VhdlSignal>( HWOps[i]->getName(), HWOps[i]->getBitWidth() );
             errs() << "Creating new Constant Signal " << HWOps[i]->getName() << "\n";
           } else {
-            //Ops[i] = std::make_shared<VhdlSignal>( HWOps[i]->getUniqueName(), HWOps[i]->getBitwidth() );
+            //Ops[i] = std::make_shared<VhdlSignal>( HWOps[i]->getUniqueName(), HWOps[i]->getBitWidth() );
             errs() << "Not all Input signals available: " << HWOps[i]->getUniqueName() << "\n" << r.dump("\t") << "\n";
             VISIT_RESET(r);
             return VISIT_AGAIN;
@@ -367,14 +367,14 @@ class VhdlVisitor : public BFVisitor
 #if 0
       auto It = SignalMap.find(HWOp0);
       if ( It == SignalMap.end() ) {
-        Op0 = std::make_shared<VhdlSignal>( HWOp0->getUniqueName(), HWOp0->getBitwidth() );
+        Op0 = std::make_shared<VhdlSignal>( HWOp0->getUniqueName(), HWOp0->getBitWidth() );
         SignalMap[ HWOp0 ] = Op0;
       } else Op0 = It->second;
 
       It = SignalMap.find( HWOp1 );
       if ( It == SignalMap.end() ) {
         if (ConstVal C = std::dynamic_pointer_cast<ConstVal>(r.In.
-        Op1 = std::make_shared<VhdlSignal>(HWOp1->getUniqueName(), HWOpt1->getBitwidth());
+        Op1 = std::make_shared<VhdlSignal>(HWOp1->getUniqueName(), HWOpt1->getBitWidth());
         SignalMap[ HWOp1 ] = Op1;
       } else Op1 = It->second;
 
@@ -382,7 +382,7 @@ class VhdlVisitor : public BFVisitor
 
       It = SignalMap.find( HWT );
       if ( It == SignalMap.end() ) {
-        T = std::make_shared<VhdlSignal>(HWT->getUniqueName(), HWT->getBitwidth());
+        T = std::make_shared<VhdlSignal>(HWT->getUniqueName(), HWT->getBitWidth());
         SignalMap[ HWT ] = T;
       } else T = It->second;
 #endif
@@ -395,12 +395,12 @@ class VhdlVisitor : public BFVisitor
         if ( C  ) {
           KAdd->In.push_back( ;
         } else {
-          KAdd->In.push_back( std::make_shared<VhdlInPort>( I->getUniqueName(), I->getBitwidth() ) );
+          KAdd->In.push_back( std::make_shared<VhdlInPort>( I->getUniqueName(), I->getBitWidth() ) );
         }
       }
 
       for (auto &O : r.Out ) {
-        auto *std::make_shared<VhdlOutPort>(r.getUniqueName(), I->getBitwidth() ) );
+        auto *std::make_shared<VhdlOutPort>(r.getUniqueName(), I->getBitWidth() ) );
       }
 
          auto KAdd = std::make_shared<VhdlIntAdd>( );

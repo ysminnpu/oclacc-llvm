@@ -10,7 +10,7 @@ Identifiable::Identifiable(const std::string &Name) : UID(currUID), Name(Name)
   currUID++;
 }
 
-unsigned Identifiable::getUID() const {
+Identifiable::UIDType Identifiable::getUID() const {
   return UID;;
 }
 

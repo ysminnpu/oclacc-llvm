@@ -31,6 +31,10 @@ class DotVisitor : public DFVisitor
     DotVisitor(const DotVisitor &) = delete;
     DotVisitor &operator =(const  DotVisitor &V) = delete;
 
+    std::string nodeOutStream(const std::string &Label) {
+      return "[shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" + Label + "\"]";
+    }
+
   public:
     DotVisitor() {
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n" );
@@ -189,7 +193,7 @@ class DotVisitor : public DFVisitor
       VISIT_ONCE(r)
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      (*F) << "n" << r.getUID() << " [shape=box3d,fillcolor=\"/reds9/4\",style=filled,tailport=n,label=\"" << r.getUniqueName() << "\\n" << "W=" << r.getBitwidth() << " D="<< r.D << "\"];" << "\n";
+      (*F) << "n" << r.getUID() << " [shape=box3d,fillcolor=\"/reds9/4\",style=filled,tailport=n,label=\"" << r.getUniqueName() << "\\n" << "W=" << r.getBitWidth() << " D="<< r.D << "\"];" << "\n";
       super::visit(r);
 
       for ( base_p p : r.getOuts() ) {
@@ -315,37 +319,26 @@ class DotVisitor : public DFVisitor
       return 0;
     }
 
+    /// \brief Create Node for StreamPort.
+    ///
+    /// Each StreamIndex points to that Node. By using invisible edges between
+    /// separate Loads and Stores to the Port, they are hierarchically ordered
+    /// in the graph.
     virtual int visit(StreamPort &r)
     {
       VISIT_ONCE(r)
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
 
- //     RankOutStream << "n" << r.getUID() << " ";
+      const StreamPort::IndexListType &IndexList = r.getIndexList();
 
-      // Handle Indices here to separate Input and Output
-#if 0
-      for ( streamindex_p P : r.getIndices() ) {
-        base_p Index  = r.getIndex();
-        if (!Index)
-          llvm_unreachable("StreamIndex has no Index");
+      for (StreamPort::IndexListConstIt I=IndexList.begin(), E=IndexList.end(); I != E; I++) {
+        if (I+1 != E) {
+          (*F) << "n" << (*I)->getUID() << " -> " << "n" << (*(std::next(I,1)))->getUID() << " [style=invis];\n";
+        }
       }
-#endif
 
-      super::visit(r);
-
-      return 0;
-    }
-
-    virtual int visit(StreamIndex &r)
-    {
-      VISIT_ONCE(r)
-      DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-      base_p Stream = r.getStream();
-
-      if (!Stream)
-        llvm_unreachable("StreamIndex has no Stream");
+      (*F) << "n" << r.getUID() << " " << nodeOutStream(r.getUniqueName()) << ";\n";
 
       super::visit(r);
 
@@ -360,21 +353,13 @@ class DotVisitor : public DFVisitor
       base_p Index  = r.getIndex();
       streamport_p Stream = r.getStream();
 
-
-      if (!Index)
-        llvm_unreachable("StreamIndex has no Index");
-      if (!Stream)
-        llvm_unreachable("StreamIndex has no Stream");
-
-        //(*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[]" << "\"];" << "\n";
-        //RankInStream << "n" << r.getUID() << " ";
-
-      // Edge already drawn by Index-Node itself.
-      //(*F) << "n" << Index->getUID() << " -> " << "n" << r.getUID() << " [headlabel=\"Idx\"];" << "\n";
+      (*F) << "n" << r.getUID() << " [shape=rarrow,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[" << Index->getUniqueName() << "]" << "\"];" << "\n";
 
       for ( base_p p : r.getOuts() ) {
         (*F) << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
       }
+
+      (*F) << "n" << r.getUID() << " -> " << "n" << Stream->getUID() << ";\n";
 
       super::visit(r);
 
@@ -388,10 +373,9 @@ class DotVisitor : public DFVisitor
 
       streamport_p Stream = r.getStream();
 
-      if (!Stream)
-        llvm_unreachable("StreamIndex has no Stream");
+      (*F) << "n" << r.getUID() << " [shape=rarrow,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[" << r.getIndex() << "]" << "\"];" << "\n";
 
-//      (*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/10\",style=filled,tailport=n,label=\"" << Stream->getUniqueName() << "[" << r.getIndex() << "]" << "\"];" << "\n";
+      (*F) << "n" << r.getUID() << " -> " << "n" << Stream->getUID() << ";\n";
 
       for ( base_p p : r.getOuts() ) {
         (*F) << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
@@ -407,15 +391,9 @@ class DotVisitor : public DFVisitor
       VISIT_ONCE(r)
       DEBUG_WITH_TYPE("DotVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-#if 0
-      (*F) << "n" << r.getUID() << " [shape=invhouse,fillcolor=\"/set312/8\",style=filled,tailport=n,label=\"" << r.getName() << "\"];" << "\n";
-
-      RankInStream << "n" << r.getUID() << " ";
-
       for ( base_p p : r.getOuts() ) {
         (*F) << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
       }
-#endif
 
       super::visit(r);
       return 0;

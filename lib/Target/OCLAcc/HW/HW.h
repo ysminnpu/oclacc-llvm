@@ -16,7 +16,7 @@ namespace oclacc {
 class HW : public Identifiable, public Visitable
 {
   protected:
-    size_t Bitwidth;
+    size_t BitWidth;
     const llvm::Value *IR;
     block_p Block;
 
@@ -24,7 +24,7 @@ class HW : public Identifiable, public Visitable
     std::vector<base_p> Outs;
 
   public:
-    HW(const std::string &Name, size_t Bitwidth, llvm::Value *IR=nullptr) : Identifiable(Name), Bitwidth(Bitwidth), IR(IR) { 
+    HW(const std::string &Name, size_t BitWidth, llvm::Value *IR=nullptr) : Identifiable(Name), BitWidth(BitWidth), IR(IR) { 
     }
 
     virtual ~HW() = default;
@@ -56,8 +56,8 @@ class HW : public Identifiable, public Visitable
     virtual const std::vector<base_p> &getIns() const { return Ins; }
     virtual const std::vector<base_p> &getOuts() const { return Outs;  }
 
-    virtual size_t getBitwidth() const { return Bitwidth; }
-    virtual void setBitwidth(const size_t W) { Bitwidth=W; }
+    virtual size_t getBitWidth() const { return BitWidth; }
+    virtual void setBitWidth(const size_t W) { BitWidth=W; }
 
     const llvm::Value * getIR() const { return IR; }
     void setIR(const llvm::Value *P) { IR=P; }

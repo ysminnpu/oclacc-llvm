@@ -1,7 +1,8 @@
 #ifndef STREAMS_H
 #define STREAMS_H
 
-#include <unordered_set>
+#include <vector>
+#include <iterator>
 
 #include "Visitor/Visitable.h"
 #include "typedefs.h"
@@ -25,149 +26,79 @@ class ScalarPort : public Port {
     bool isScalar() { return true; }
 };
 
+/// \brief Represents a Load and Store Port.
+///
+/// To preserve correct Load and Store order, all index operations are in the
+/// same list. 
+///
+/// FIXME Load/Store cannot be an attribute of StreamIndex because address
+/// generation happens before the actual access. Durthermore, the same address
+/// can be used for load and store. We do not want to compute it multiple times.
 class StreamPort : public Port {
+  public:
+    enum AccessType {
+      Load,
+      Store
+    };
+
+    typedef std::vector<streamindex_p> IndexListType;
+    typedef IndexListType::iterator IndexListIt;
+    typedef IndexListType::const_iterator IndexListConstIt;
+    typedef std::vector<AccessType> AccessListType;
+
   private:
-    std::unordered_set<streamindex_p> Indices;
+    // must be a ordered list of indices to preserve correct store order.
+    // Instead of a single list we use separate lists for the Index and the
+    // access type.
+    IndexListType IndexList;
+    AccessListType AccessList;
 
   public:
+
     StreamPort(const std::string &Name, size_t W, ocl::AddressSpace) : Port(Name, W) { }
     DECLARE_VISIT
 
     bool isScalar() { return false; }
 
-    void appIndex(streamindex_p Index) {
-      Indices.insert(Index);
+    void addLoad(streamindex_p I) {
+      IndexList.push_back(I);
+      AccessList.push_back(Load);
     }
 
-    const std::unordered_set<streamindex_p> &getIndices() const {
-      return Indices;
+    bool isLoad(streamindex_p I) const {
+      bool ret = false;
+      IndexListConstIt It = std::find(IndexList.begin(), IndexList.end(), I);
+      if (It != IndexList.end()) {
+        unsigned index = std::distance(IndexList.begin(), It);
+        ret = AccessList.at(index) == Load;
+      }
+
+      return ret;
     }
 
-    ///
-    // hasIndex - Return true if Stream already contains given Index 
-    //
-    bool hasIndex(streamindex_p I) const {
-      return (Indices.count(I) != 0);
+    void addStore(streamindex_p I) {
+      IndexList.push_back(I);
+      AccessList.push_back(Store);
+    }
+
+    bool isStore(streamindex_p I) const {
+      bool ret = false;
+      IndexListConstIt It = std::find(IndexList.begin(), IndexList.end(), I);
+      if (It != IndexList.end()) {
+        unsigned index = std::distance(IndexList.begin(), It);
+        ret = AccessList.at(index) == Store;
+      }
+      
+      return ret;
+    }
+
+    const IndexListType &getIndexList() const {
+      return IndexList;
+    }
+    const AccessListType &getAccessList() const {
+      return AccessList;
     }
 };
-
-
-#if 0
-class InScalar;
-
-class Input : public HW
-{
-  public:
-    virtual bool isScalar() = 0;
-
-  protected:
-    Input (const std::string &Name, size_t W) : HW(Name, W)
-    {
-    }
-
-  private:
-//    using HW::appIn;
-};
-
-class InScalar : public Input
-{
-  public:
-    InScalar (const std::string &Name, Datatype T, size_t W) : Input(Name, W)
-    {
-    }
-
-    bool isScalar() {
-      return true;
-    }
-
-    DECLARE_VISIT
-
-
-};
-
-class Output : public HW
-{
-
-//  private:
-//    using HW::appOut;
-
-  protected:
-    Output (const std::string &Name, size_t W) : HW(Name, W) { }
-
-
-  public:
-    Output(const Output&) = delete;
-    Output& operator=(const Output&) = delete;
-
-    virtual bool isScalar() = 0;
-
-    virtual void appIn(base_p P) {
-      In=P;
-    }
-
-    base_p getIn() const {
-      return In;
-    }
-
-  protected:
-    base_p In;
-
-  private:
-    using HW::getIn;
-    using HW::getIns;
-
-};
-
-class OutScalar : public Output
-{
-  public:
-    OutScalar (const std::string &Name, Datatype T, size_t W ) : Output(Name, W)
-    {
-    }
-
-    OutScalar(const OutScalar&) = delete;
-    OutScalar& operator=(const OutScalar&) = delete;
-
-    bool isScalar() { return true; }
-
-    DECLARE_VISIT
-
-};
-
-class Stream : public HW {
-  private:
-    std::unordered_set<streamindex_p> Indices;
-
-  protected:
-    Stream(const std::string &Name, size_t W) : HW(Name, W) { }
-
-  public:
-    Stream(const Stream &) = delete;
-    Stream& operator=(const Stream&) = delete;
-
-    bool isScalar() { return false; }
-
-    virtual bool isInStream() = 0;
-    virtual bool isOutStream() = 0;
-
-    void appIndex(streamindex_p Index) {
-      Indices.insert(Index);
-    }
-
-    const std::unordered_set<streamindex_p> &getIndices() const {
-      return Indices;
-    }
-
-    ///
-    // hasIndex - Return true if Stream already contains given Index 
-    //
-    bool hasIndex(streamindex_p I) const {
-      return (Indices.count(I) != 0);
-    }
-
-    DECLARE_VISIT;
-};
-#endif
 
 class StreamIndex : public HW {
   private:
@@ -203,32 +134,35 @@ class DynamicStreamIndex : public StreamIndex {
     DynamicStreamIndex& operator=(const DynamicStreamIndex&) = delete;
 
 
-    virtual void appIndex(base_p I) {
+    virtual void setIndex(base_p I) {
       Index = I;
     }
 
     base_p getIndex() const { return Index; }
 
-    bool isStatic() const {return false;}
+    bool isStatic() const { return false;}
 
     DECLARE_VISIT
 };
 
+/// \brief Stream Index known at compile time.
+/// The index is not represented as ConstantVal object to simplify offset
+/// analysis for stream optimization.
 class StaticStreamIndex : public StreamIndex {
   private:
-    size_t Index;
+    int64_t Index;
   public:
-    StaticStreamIndex(const std::string &Name, streamport_p Stream, size_t Index, size_t W) : StreamIndex(Name, Stream), Index(Index) {
-      setBitwidth(W);
+    StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t W) : StreamIndex(Name, Stream), Index(Index) {
+      setBitWidth(W);
     }
 
     StaticStreamIndex(const StaticStreamIndex&) = delete;
     StaticStreamIndex& operator=(const StaticStreamIndex&) = delete;
 
-    virtual void appIndex(size_t I) {
+    virtual void setIndex(int64_t I) {
       Index = I;
     }
-    size_t getIndex() const { return Index; }
+    int64_t getIndex() const { return Index; }
 
     bool isStatic() const {return true;}
 
@@ -239,102 +173,6 @@ class StaticStreamIndex : public StreamIndex {
     DECLARE_VISIT;
 };
 
-#if 0
-
-class InStream : public Stream
-{
-  public:
-
-    InStream (const std::string &Name, size_t W) : Stream(Name, W) { }
-    InStream(const InStream&) = delete;
-    InStream& operator=(const InStream&) = delete;
-
-    bool isInStream() { return true; }
-    bool isOutStream() { return false; }
-
-    DECLARE_VISIT;
-};
-
-class OutStream : public Stream
-{
-  public:
-    OutStream (const std::string &Name, size_t W) : Stream(Name, W) { }
-    OutStream(const OutStream&) = delete;
-    OutStream& operator=(const OutStream&) = delete;
-
-    bool isInStream() { return false; }
-    bool isOutStream() { return true; }
-
-    DECLARE_VISIT;
-};
-#endif
-
-
-#if 0
-class InOutStream : public InStream, public OutStream
-{
-
-  public:
-    using HW::appOut;
-
-    InOutStream (const std::string &Name, size_t W ) : HW(Name), InStream(Name, W), OutStream(Name, W)
-    {
-    }
-
-    virtual void appIn(base_p p) {
-      In=p;
-    }
-    DECLARE_VISIT;
-};
-#endif
-
-
-#if 0
-class OutStreamIndex : public StreamIndex {
-  private:
-    virtual void appOut(base_p O) {};
-
-  
-  public:
-    outstream_p Out;
-    base_p Idx;
-    base_p In;
-
-    OutStreamIndex(const std::string &Name, base_p Idx ) : StreamIndex(Name), Idx(Idx) { }
-
-    OutStreamIndex(const OutStreamIndex&) = delete;
-    OutStreamIndex& operator=(const OutStreamIndex&) = delete;
-
-    virtual void appIn( base_p I ) {
-      In = I;
-    }; 
-
-    void appOut(outstream_p O) {
-      Out = O;
-    }
-
-    DECLARE_VISIT;
-};
-
-class InStreamIndex : public StreamIndex {
-  private:
-    using HW::appIn;
-
-  public:
-
-    instream_p In;
-    base_p Idx;
-
-    InStreamIndex (const std::string &Name, instream_p In, base_p Idx ) : StreamIndex(Name), In(In), Idx(Idx)
-    {
-    }
-    DECLARE_VISIT
-
-  private:
-    void appIn( base_p p ) {}; 
-};
-#endif
-
-}
+} // end ns oclacc
 
 #endif /* STREAMS_H */

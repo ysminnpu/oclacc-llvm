@@ -200,7 +200,7 @@ class BFVisitor : public BaseVisitor
         ToVisit.push_back(P);
       }
       for ( streamport_p P : R.getInStreams() ) {
-        for (streamindex_p SI : P->getIndices()) {
+        for (streamindex_p SI : P->getIndexList()) {
           ToVisit.push_back(SI);
         }
         ToVisit.push_back(P);
@@ -236,7 +236,7 @@ class BFVisitor : public BaseVisitor
     {
       DEBUG_CALL(R);
 
-      for ( streamindex_p P : R.getIndices() ) {
+      for ( streamindex_p P : R.getIndexList() ) {
         ToVisit.push_back(P);
       }
       return VISIT_OK;
