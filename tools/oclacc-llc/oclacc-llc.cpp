@@ -98,7 +98,8 @@ static cl::opt<bool> AsmVerbose("asm-verbose",
  * OCLAcc Options
  */
 
-static cl::opt<std::string> ModuleName("module", cl::init("-"), cl::desc("Module Name if other than file's or if using stdin.") );
+static cl::opt<std::string> OutputDir("oclacc-dir", cl::desc("Output directory. Module Name if not set.") );
+static cl::opt<std::string> ModuleName("oclacc-module", cl::desc("Module Name. Must be set if using stdin.") );
 
 static cl::opt<bool> DotCFG("dot-cfg", cl::desc("Write Dot CFG"), cl::init(false));
 
@@ -325,62 +326,65 @@ static int compileModule(char **argv, LLVMContext &Context) {
     FloatABIForCalls = FloatABI::Soft;
 
   //OCLAcc change directory for output according to Module
-  StringRef MN = ModuleName;
+  StringRef MN = M->getName();
 
-  if (MN.equals("-")) {
-    MN = M->getName();
-
-    if (MN.endswith(".bc") ||
-        MN.endswith(".ll"))
-      MN = MN.drop_back(3);
-  }
-
-  if (MN.equals("<stdin>")) {
-    errs() << "No valid output directory. Use --module for stdin\n";
-    return -1;
-  }
-
-
-  ModuleName = MN;
-
-  std::string WorkDir = ModuleName;
-  M->setModuleIdentifier(ModuleName);
-
-  if (mkdir(WorkDir.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH)) {
-    if (errno == EEXIST)
-      errs() << "Using existing output directory " << WorkDir << "\n";
-    else {
-      errs() << "Could not create missing directory " << WorkDir <<": " << strerror(errno) << "\n";
+  if (!MN.compare("<stdin>")) {
+    if (!ModuleName.compare("")) {
+      errs() << "No valid module name. Use --oclacc-module for stdin\n";
       return -1;
-    }
+    } else 
+      MN = ModuleName;
   }
 
-  char CurrentDir[PATH_MAX];
-  getcwd(CurrentDir, PATH_MAX);
+  if (MN.endswith(".bc") || MN.endswith(".ll"))
+    MN = MN.drop_back(3);
 
-  if (chdir(WorkDir.c_str())) {
-    errs() << "Failed to change to " << CurrentDir << ": " << strerror(errno) << "\n";
-    return -1;
-  }
+  if (!OutputDir.compare("")) 
+    OutputDir = MN;
 
+  M->setModuleIdentifier(MN);
 
-  //OCLAcc
+  std::string WorkDir = OutputDir;
+
+  errs() << "ModuleName: " << MN << "\n";
+  errs() << "WorkDir: " << WorkDir << "\n";
 
   std::error_code EC;
-  // Open the file.
-  sys::fs::OpenFlags OpenFlags = sys::fs::F_Text;
 
-  std::unique_ptr<tool_output_file> Out =
-    llvm::make_unique<tool_output_file>(ModuleName+".log", EC, OpenFlags);
+  EC = sys::fs::create_directories(WorkDir);
   if (EC) {
     errs() << "Failed to open logfile: " << EC.message() << '\n';
     return -1;
   }
 
+  SmallVector<char, PATH_MAX> CurrentDir;
+  EC = sys::fs::current_path(CurrentDir);
+  if (EC) {
+    errs() << "Failed to change dir: " << EC.message() << '\n';
+    return -1;
+  }
+
+  if (chdir(WorkDir.data())) {
+    errs() << "Failed to change to " << CurrentDir.data() << ": " << strerror(errno) << "\n";
+    return -1;
+  }
+
+  //OCLAcc
+
+  // Open the file.
+
+  //auto Out = llvm::make_unique<tool_output_file>(MN.str()+".log", EC, sys::fs::F_Text);
+  auto Log = make_unique<raw_fd_ostream>(MN.str()+".log", EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+  if (EC) {
+    errs() << "Failed to open logfile: " << EC.message() << '\n';
+    return -1;
+  }
+  auto FLog = make_unique<formatted_raw_ostream>(*Log);
+
   // FIXME: Declare success. 
   // Might be done only at the end but for now it is
   // better to keep output.
-  Out->keep();
+  //Out->keep();
 
   // Build up all of the passes that we want to do to the module.
   PassManager PM;
@@ -402,8 +406,6 @@ static int compileModule(char **argv, LLVMContext &Context) {
              << ": warning: ignoring -mc-relax-all because filetype != obj";
 
   {
-    formatted_raw_ostream FOS(Out->os());
-
     AnalysisID StartAfterID = nullptr;
     AnalysisID StopAfterID = nullptr;
     const PassRegistry *PR = PassRegistry::getPassRegistry();
@@ -425,14 +427,13 @@ static int compileModule(char **argv, LLVMContext &Context) {
     }
 
     //OCLAcc Passes
-    //
-    std::string NamedIRFileName(ModuleName+"_named.ll");
-    std::error_code Err;
 
-    std::unique_ptr<raw_fd_ostream> NamedIRFile;
-    NamedIRFile = make_unique<raw_fd_ostream>(NamedIRFileName, Err, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
-    if (Err)
-      llvm_unreachable("File could not be opened.");
+    std::string NamedFile = MN.str()+"_named.ll";
+    auto NamedIRFile = make_unique<raw_fd_ostream>(NamedFile, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+    if (EC) {
+      errs() << "Failed to create " << NamedFile << "(" << __LINE__ << "): " << EC.message() << "\n";
+      return -1;
+    }
 
     /* Name Instructions to allow mapping of source to generated objects */
     PM.add(createInstructionNamerPass());
@@ -456,7 +457,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
 #endif
 
     // Ask the target to add backend passes as necessary.
-    if (Target->addPassesToEmitFile(PM, FOS, FileType, NoVerify,
+    if (Target->addPassesToEmitFile(PM, *FLog, FileType, NoVerify,
           StartAfterID, StopAfterID)) {
       errs() << argv[0] << ": target does not support generation of this"
         << " file type!\n";
@@ -472,8 +473,8 @@ static int compileModule(char **argv, LLVMContext &Context) {
   }
 
 
-  if (chdir(CurrentDir)) {
-    errs() << "Failed to change back to " << CurrentDir << ": " << strerror(errno) << "\n";
+  if (chdir(CurrentDir.data())) {
+    errs() << "Failed to change back to " << CurrentDir.data() << ": " << strerror(errno) << "\n";
     return -1;
   }
 

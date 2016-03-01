@@ -8,7 +8,7 @@
 #define VISIT_ONCE(x) \
   do { unsigned UID=x.getUID(); \
   if ( UID >= already_visited.size() ) {                     \
-  already_visited.resize(already_visited.size() * 2, false); } \
+    already_visited.resize(already_visited.size() * 2, false); } \
   if ( already_visited[UID] ) return 0;                      \
   else already_visited[UID] = true; \
   } while (0);
@@ -17,8 +17,6 @@
   do { unsigned UID=x.getUID(); \
   already_visited[UID] = false; \
   } while (0);
-
-
 
 namespace oclacc {
 
@@ -44,7 +42,7 @@ class SRem;
 class FRem;
 
 class Shl;
-class LSHr;
+class LShr;
 class AShr;
 class And;
 class Or;
@@ -57,13 +55,11 @@ class Ram;
 class Fifo;
 class ConstVal;
 //class InStreamIndex;
-class InScalar;
+class Port;
+class ScalarPort;
 //class OutStreamIndex;
-class OutScalar;
+class StreamPort;
 //class InOutStream;
-class Stream;
-class InStream;
-class OutStream;
 class StreamIndex;
 class DynamicStreamIndex;
 class StaticStreamIndex;

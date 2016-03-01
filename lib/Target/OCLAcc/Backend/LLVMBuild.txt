@@ -8,17 +8,9 @@
 ;
 ;===------------------------------------------------------------------------===;
 
-[common]
-subdirectories = TargetInfo HW Backend
-
 [component_0]
-type = TargetGroup
-name = OCLAcc
-parent = Target
-
-[component_1]
 type = Library
-name = OCLAccCodeGen
+name = OCLAccBackend
 parent = OCLAcc
-required_libraries = Core Support Target OCLAccInfo OCLAccHW OCLAccBackend
+required_libraries = MC Support Target
 add_to_library_groups = OCLAcc

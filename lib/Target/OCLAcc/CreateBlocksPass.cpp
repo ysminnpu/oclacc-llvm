@@ -39,6 +39,7 @@ bool CreateBlocksPass::isDefInCurrentBB(Value *V) {
     if (ValBB == CurrentBB) 
       ret = true;
   }
+
   return ret;
 }
 

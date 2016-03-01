@@ -38,7 +38,6 @@
 #include <unistd.h>
 
 #include "OCLAccHWPass.h"
-#include "CreateBlocksPass.h"
 #include "OCLAccTargetMachine.h"
 #include "OCLAccGenSubtargetInfo.inc"
 #include "OpenCLDefines.h"

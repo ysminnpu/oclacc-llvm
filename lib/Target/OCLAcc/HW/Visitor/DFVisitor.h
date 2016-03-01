@@ -4,15 +4,17 @@
 #include "llvm/Support/Debug.h"
 
 #include "BaseVisitor.h"
-#include "../typedefs.h"
-#include "../HW.h"
-#include "../Arith.h"
-#include "../Control.h"
-#include "../Streams.h"
-#include "../Memory.h"
-#include "../Constant.h"
-#include "../Kernel.h"
-#include "../Compare.h"
+#include "HW/typedefs.h"
+#include "HW/HW.h"
+#include "HW/Arith.h"
+#include "HW/Control.h"
+#include "HW/Streams.h"
+#include "HW/Memory.h"
+#include "HW/Constant.h"
+#include "HW/Kernel.h"
+#include "HW/Compare.h"
+#include "HW/Design.h"
+#include "HW/Kernel.h"
 
 //#define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
 #define TYPENAME(x) x.getName()

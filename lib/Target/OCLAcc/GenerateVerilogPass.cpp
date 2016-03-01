@@ -19,7 +19,8 @@
 #include "HW/Kernel.h"
 #include "HW/Memory.h"
 #include "HW/Streams.h"
-#include "HW/operators.cpp"
+
+#include "Backend/Verilog.h"
 
 #include "GenerateVerilogPass.h"
 #include "OCLAccHWVisitor.h"
@@ -29,6 +30,8 @@
 #include "kernel_builtins.h"
 
 #include "todo.h"
+
+using namespace oclacc;
 
 namespace llvm {
 
@@ -59,6 +62,8 @@ GenerateVerilogPass *createGenerateVerilogPass() {
 bool GenerateVerilogPass::runOnModule(Module &M) {
   OCLAccHWPass &HWP = getAnalysis<OCLAccHWPass>();
   DesignUnit &Design = HWP.getDesign(); 
+
+  Verilog V;
   DEBUG_WITH_TYPE("GenerateVerilogPass", dbgs() << "DesignUnit: " << Design.getName() << "\n");
 
   //VeriloVisitor V;

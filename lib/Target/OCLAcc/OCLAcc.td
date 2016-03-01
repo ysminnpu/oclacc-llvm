@@ -3,6 +3,9 @@ include "llvm/Target/Target.td"
 //Debugging Features
 //name attribute, value, description, implied Features
 
+//At the moment features are not used in any way. It has to be determined if an
+//external HW-description suits better than using LLVM.
+
 def FeatureF1 : SubtargetFeature <"f1", 
   "HasF1", "true", "Feature 1 Explanation", []>;
 

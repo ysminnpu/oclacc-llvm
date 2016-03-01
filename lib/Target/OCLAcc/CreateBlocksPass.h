@@ -36,7 +36,6 @@ class CreateBlocksPass : public FunctionPass, public InstVisitor<CreateBlocksPas
 
     BasicBlock *CurrentBB = nullptr;
 
-
   public:
     CreateBlocksPass();
     ~CreateBlocksPass();

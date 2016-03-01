@@ -13,4 +13,5 @@ add_llvm_target(OCLAccCodeGen
   )
 
 add_subdirectory(TargetInfo)
+add_subdirectory(Backend)
 add_subdirectory(HW)
