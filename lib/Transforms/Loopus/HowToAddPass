@@ -1,0 +1,18 @@
+To add a new Pass:
+	1.	Create the pass:
+				- It needs a static char ID
+				- Add the llvm::create<Name>Pass function (inside llvm namespace)
+				- Add the INITIALIZE_PASS_* macros
+	2.	Adapt the Loopus.cpp file and add a call to
+				initialize<Name>Pass(Registry)
+			in the initializeLoopus function
+	3.	Add the source files to the CMakeLists.txt file.
+	4.	In InitializePasses.h (include/llvm) add a declaration for
+				void initialize<Name>Pass(PassRegistry&)
+			function.
+	5.	In LinkAllPasses.h (include/llvm) add a call to the
+				(void) llvm::create<Name>Pass()
+			function.
+	6.	Adapt the Loopus.h (include/llvm/Transforms) and a declaration for
+				Pass* create<Name>Pass()
+			function.

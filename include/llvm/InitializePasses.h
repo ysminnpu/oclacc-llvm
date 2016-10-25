@@ -62,6 +62,27 @@ void initializeCodeGen(PassRegistry&);
 /// initializeCodeGen - Initialize all passes linked into the CodeGen library.
 void initializeTarget(PassRegistry&);
 
+/// XXX: initializeLoopus - Initialize all passes linked into the Loopus library.
+void initializeLoopus(PassRegistry&);
+
+/// XXX: Direct initialization functions for Loopus passes
+void initializeHDLLoopUnrollPass(PassRegistry&);
+void initializeSimplifyIDCallsPass(PassRegistry&);
+void initializeHDLPromoteIDPass(PassRegistry&);
+void initializeOpenCLMDKernelsPass(PassRegistry&);
+void initializeHDLInlinerPass(PassRegistry&);
+void initializeHDLFlattenCFGPass(PassRegistry&);
+void initializeSplitBarrierBlocksPass(PassRegistry&);
+void initializeDelayStoresPass(PassRegistry&);
+void initializeBitWidthAnalysisPass(PassRegistry&);
+void initializeShiftRegisterDetectionPass(PassRegistry&);
+void initializeRewriteExprPass(PassRegistry&);
+void initializeAggregateLoadsPass(PassRegistry&);
+void initializeInstSimplifyPass(PassRegistry&);
+void initializeArgPromotionTrackerPass(PassRegistry&);
+void initializeCanonicalizePredecessorsPass(PassRegistry&);
+void initializeCFGOptimizerPass(PassRegistry&);
+
 void initializeAAEvalPass(PassRegistry&);
 void initializeAddDiscriminatorsPass(PassRegistry&);
 void initializeADCEPass(PassRegistry&);

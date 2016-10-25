@@ -11,7 +11,7 @@
 
 #include "kernel_builtins.h"
 
-#include "todo.h"
+#include "macros.h"
 
 using namespace oclacc;
 

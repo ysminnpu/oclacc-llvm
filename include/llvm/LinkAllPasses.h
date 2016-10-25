@@ -35,6 +35,7 @@
 #include "llvm/Transforms/Utils/SymbolRewriter.h"
 #include "llvm/Transforms/Utils/UnifyFunctionExitNodes.h"
 #include "llvm/Transforms/Vectorize.h"
+#include "llvm/Transforms/Loopus.h"
 #include <cstdlib>
 
 namespace {
@@ -46,6 +47,24 @@ namespace {
       // to know that getenv() never returns -1, this will do the job.
       if (std::getenv("bar") != (char*) -1)
         return;
+
+			// XXX: Functions for creating loopus passes.
+			(void) llvm::createHDLLoopUnrollPass();
+      (void) llvm::createSimplifyIDCallsPass();
+			(void) llvm::createHDLPromoteIDPass();
+			(void) llvm::createOpenCLMDKernelsPass();
+			(void) llvm::createHDLInlinerPass();
+			(void) llvm::createHDLFlattenCFGPass();
+      (void) llvm::createSplitBarrierBlocksPass();
+      (void) llvm::createDelayStoresPass();
+      (void) llvm::createBitWidthAnalysisPass();
+      (void) llvm::createShiftRegisterDetectionPass();
+      (void) llvm::createRewriteExprPass();
+      (void) llvm::createAggregateLoadsPass();
+      (void) llvm::createInstSimplifyPass();
+      (void) llvm::createArgPromotionTrackerPass();
+      (void) llvm::createCanonicalizePredecessorsPass();
+      (void) llvm::createCFGOptimizerPass();
 
       (void) llvm::createAAEvalPass();
       (void) llvm::createAggressiveDCEPass();

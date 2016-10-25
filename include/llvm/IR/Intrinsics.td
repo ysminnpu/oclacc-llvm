@@ -594,3 +594,20 @@ include "llvm/IR/IntrinsicsHexagon.td"
 include "llvm/IR/IntrinsicsNVVM.td"
 include "llvm/IR/IntrinsicsMips.td"
 include "llvm/IR/IntrinsicsR600.td"
+
+//===----------------------------------------------------------------------===//
+// Loopus intrinsics
+//===----------------------------------------------------------------------===//
+// Should be used to represent a shift register: the original loop performs
+// a left shift on an array (the pointer argument) and has the first and second
+// parameter as loop bounds. The last parameter determines the shift width (the
+// number of arguments each element is moved).
+def int_loopus_shl_reg : Intrinsic<[], [llvm_anyptr_ty, llvm_anyint_ty,
+                                        llvm_anyint_ty, llvm_anyint_ty],
+                                   [NoCapture<0>, IntrReadWriteArgMem],
+                                   "llvm.loopus.shl.reg">;
+def int_loopus_shr_reg : Intrinsic<[], [llvm_anyptr_ty, llvm_anyint_ty,
+                                        llvm_anyint_ty, llvm_anyint_ty],
+                                   [NoCapture<0>, IntrReadWriteArgMem],
+                                   "llvm.loopus.shr.reg">;
+
