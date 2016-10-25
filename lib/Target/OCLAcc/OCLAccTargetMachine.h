@@ -30,50 +30,9 @@ class OCLAccTargetMachine : public TargetMachine {
 
     virtual const OCLAccSubtarget *getSubtargetImpl() const { return &Subtarget; }
 
-    //virtual void addAnalysisPasses(PassManagerBase &PM);
-
     virtual const DataLayout *getDataLayout() const { return &DL; }
-
-//    virtual TargetPassConfig *createPassConfig(PassManagerBase &PM);
 };
 
-class OCLAccVhdlTargetMachine : public OCLAccTargetMachine {
-  private:
-    virtual void anchor();
-  public:
-    OCLAccVhdlTargetMachine(const Target &T, StringRef TT,
-        StringRef CPU, StringRef FS, const TargetOptions &Options,
-        Reloc::Model RM, CodeModel::Model CM,
-        CodeGenOpt::Level OL);
-
-    virtual bool addPassesToEmitFile(PassManagerBase &PM,
-        formatted_raw_ostream &Out,
-        CodeGenFileType FileType,
-        bool DisableVerify,
-        AnalysisID StartAfter,
-        AnalysisID StopAfter);
-};
-
-class OCLAccVerilogTargetMachine : public OCLAccTargetMachine {
-  private:
-    virtual void anchor();
-  public:
-    OCLAccVerilogTargetMachine(const Target &T, StringRef TT,
-        StringRef CPU, StringRef FS, const TargetOptions &Options,
-        Reloc::Model RM, CodeModel::Model CM,
-        CodeGenOpt::Level OL);
-  
-    virtual bool addPassesToEmitFile(PassManagerBase &PM,
-        formatted_raw_ostream &Out,
-        CodeGenFileType FileType,
-        bool DisableVerify,
-        AnalysisID StartAfter,
-        AnalysisID StopAfter);
-};
-
-extern Target TheOCLAccVhdlTarget;
-extern Target TheOCLAccVerilogTarget;
-
-} // end llvm namespace
+} // end namespace llvm
 
 #endif /* OCLACCTARGETMACHINE_H */

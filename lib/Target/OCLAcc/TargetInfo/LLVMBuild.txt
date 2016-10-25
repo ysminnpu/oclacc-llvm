@@ -12,5 +12,5 @@
 type = Library
 name = OCLAccInfo
 parent = OCLAcc
-required_libraries = MC Support Target
+required_libraries = MC Support Target OCLAccVhdlBackend OCLAccVerilogBackend OCLAccDotBackend
 add_to_library_groups = OCLAcc

@@ -99,9 +99,9 @@ static cl::opt<bool> AsmVerbose("asm-verbose",
  */
 
 static cl::opt<std::string> OutputDir("oclacc-dir", cl::desc("Output directory. Module Name if not set.") );
-static cl::opt<std::string> ModuleName("oclacc-module", cl::desc("Module Name. Must be set if using stdin.") );
+static cl::opt<std::string> ModuleName("oclacc-module", cl::desc("Module Name. Must be set if using stdin, otherwise optional.") );
 
-static cl::opt<bool> DotCFG("dot-cfg", cl::desc("Write Dot CFG"), cl::init(false));
+static cl::opt<bool> CfgDot("cfg-dot", cl::desc("Write Dot CFG"), cl::init(false));
 
 static int compileModule(char **, LLVMContext &);
 
@@ -342,11 +342,13 @@ static int compileModule(char **argv, LLVMContext &Context) {
   if (!OutputDir.compare("")) 
     OutputDir = MN;
 
-  M->setModuleIdentifier(MN);
 
   std::string WorkDir = OutputDir;
+  std::string Module = MN;
 
-  errs() << "ModuleName: " << MN << "\n";
+  M->setModuleIdentifier(Module);
+
+  errs() << "ModuleName: " << Module << "\n";
   errs() << "WorkDir: " << WorkDir << "\n";
 
   std::error_code EC;
@@ -374,7 +376,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
   // Open the file.
 
   //auto Out = llvm::make_unique<tool_output_file>(MN.str()+".log", EC, sys::fs::F_Text);
-  auto Log = make_unique<raw_fd_ostream>(MN.str()+".log", EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+  auto Log = make_unique<raw_fd_ostream>(Module+".log", EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
   if (EC) {
     errs() << "Failed to open logfile: " << EC.message() << '\n';
     return -1;
@@ -428,7 +430,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
 
     //OCLAcc Passes
 
-    std::string NamedFile = MN.str()+"_named.ll";
+    std::string NamedFile = Module+".named.ll";
     auto NamedIRFile = make_unique<raw_fd_ostream>(NamedFile, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
     if (EC) {
       errs() << "Failed to create " << NamedFile << "(" << __LINE__ << "): " << EC.message() << "\n";
@@ -439,22 +441,8 @@ static int compileModule(char **argv, LLVMContext &Context) {
     PM.add(createInstructionNamerPass());
     PM.add(createPrintModulePass(*NamedIRFile));
 
-    if (DotCFG)
+    if (CfgDot)
       PM.add(createCFGPrinterPass());
-    //OCLAcc Passes
-    //
-
-    //PM.add(createCreateBlocksPass());
-
-#if 0
-    // SPIR checker must be wrapen in a pass
-    OCLAccSPIRCheckVisitor SPIR;
-    SPIR.visit(*M);
-
-    if ( ! SPIR.isConform()) {
-      FOS << "Module not SPIR conform.\n";
-    }
-#endif
 
     // Ask the target to add backend passes as necessary.
     if (Target->addPassesToEmitFile(PM, *FLog, FileType, NoVerify,

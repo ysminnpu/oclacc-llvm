@@ -19,9 +19,10 @@
 #include "HW/Kernel.h"
 #include "HW/Memory.h"
 #include "HW/Streams.h"
-#include "HW/Visitor/Vhdl.h"
 #include "HW/operators.cpp"
 #include "HW/typedefs.h"
+
+#include "Vhdl.h"
 
 #include "GenerateVhdlPass.h"
 #include "OCLAccHWVisitor.h"
@@ -30,7 +31,7 @@
 
 #include "kernel_builtins.h"
 
-#include "todo.h"
+#include "macros.h"
 
 
 namespace llvm {
@@ -64,7 +65,7 @@ bool GenerateVhdlPass::runOnModule(Module &M) {
   DesignUnit &Design = HWP.getDesign(); 
   DEBUG_WITH_TYPE("GenerateVhdlPass", dbgs() << "DesignUnit: " << Design.getName() << "\n");
 
-  vhdl::VhdlVisitor V;
+  Vhdl V;
   Design.accept(V);
 
   return false;

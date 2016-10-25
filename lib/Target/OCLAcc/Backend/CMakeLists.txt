@@ -1,3 +1,3 @@
-add_llvm_library(LLVMOCLAccBackend
-  Verilog.cpp
-)
+add_subdirectory(Verilog)
+add_subdirectory(Vhdl)
+add_subdirectory(Dot)

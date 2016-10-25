@@ -56,14 +56,16 @@ const auto FUN_WI_E = std::end(FUN_WI);
 
 static const std::string FUN_MATH_M[] {
   "_Z4acosf",
-  "_Z5acoshf"
+  "_Z5acoshf",
+  "_Z4atanf"
 };
 const auto FUN_MATH_M_B = std::begin(FUN_MATH_M);
 const auto FUN_MATH_M_E = std::end(FUN_MATH_M);
 
 static const std::string FUN_MATH[] {
   "acos",
-  "acosh"
+  "acosh",
+  "atan"
 };
 const auto FUN_MATH_B = std::begin(FUN_MATH);
 const auto FUN_MATH_E = std::end(FUN_MATH);
@@ -75,10 +77,49 @@ const auto FUN_INT_M_B = std::begin(FUN_INT_M);
 const auto FUN_INT_M_E = std::end(FUN_INT_M);
 
 static const std::string FUN_INT[] {
-  "abs"
+  "abs",
+//  "abs_diff",
+//  "add_sat",
+//  "hadd",
+//  "clz",
+//  "mad_hi",
+//  "mad_sat",
+//  "max",
+//  "min",
+//  "mul_hi",
+//  "rotate",
+//  "sub_sat",
+//  "upsample",
+//  "mad24"
 };
 const auto FUN_INT_B = std::begin(FUN_INT);
 const auto FUN_INT_E = std::end(FUN_INT);
+
+//TODO common (float and int) builtins.
+
+//FIXME Find a better way do check for builtins
+
+/// \brief 
+/// \param MN Mangled Name
+static bool isArithmeticBuiltIn(const std::string &MN) {
+  auto It = std::find(FUN_MATH_M_B, FUN_MATH_M_E, MN);
+  if (It != FUN_MATH_M_E) 
+    return true;
+
+  It = std::find(FUN_INT_M_B, FUN_INT_M_E, MN);
+  if (It != FUN_INT_M_E) 
+    return true;
+
+  return false;
+}
+
+static bool isWorkItemBuiltIn(const std::string &MN) {
+  auto It = std::find(FUN_WI_M_B, FUN_WI_M_E, MN);
+  if (It != FUN_WI_M_E) 
+    return true;
+
+  return false;
+}
 
 }
 

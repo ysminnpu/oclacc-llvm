@@ -8,5 +8,9 @@
 ;
 ;===------------------------------------------------------------------------===;
 
-[common]
-subdirectories = Verilog Vhdl Dot
+[component_0]
+type = Library
+name = OCLAccVhdlBackend
+parent = OCLAcc
+required_libraries = MC Support Target
+add_to_library_groups = OCLAcc

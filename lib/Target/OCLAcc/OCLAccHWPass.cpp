@@ -34,9 +34,13 @@
 #include <cctype>
 #include <cstdio>
 #include <map>
+#include <list>
 #include <set>
+#include <fstream>
+#include <sstream>
 #include <unistd.h>
 
+#include "macros.h"
 #include "OCLAccHWPass.h"
 #include "OCLAccTargetMachine.h"
 #include "OCLAccGenSubtargetInfo.inc"
@@ -46,14 +50,12 @@
 #include "HW/Arith.h"
 #include "HW/typedefs.h"
 #include "HW/Design.h"
-#include "HW/Visitor/Dot.h"
-#include "HW/Visitor/Vhdl.h"
-#include "HW/Visitor/Latency.h"
+#include "HW/Streams.h"
+#include "HW/Kernel.h"
+#include "HW/Constant.h"
 
 #include <cxxabi.h>
 #define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
-
-namespace llvm {
 
 using namespace oclacc;
 
@@ -80,7 +82,6 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
  * Must be here since results of pass are needed. No need to transfer them to
  * oclacc-llc.
  */
-static cl::opt<bool> GenerateDot("oclacc-dot", cl::init(true), cl::desc("Output .dot-Graph for each Kernel-Function.") );
 
 OCLAccHWPass::OCLAccHWPass() : ModulePass(OCLAccHWPass::ID) {
   DEBUG_WITH_TYPE("OCLAccHWPass", dbgs() << "OCLAccHWPass created\n");
@@ -108,7 +109,7 @@ void OCLAccHWPass::getAnalysisUsage(AnalysisUsage &AU) const {
 
 void OCLAccHWPass::createMakefile() {
   std::ofstream F;
-  F.open("Makefile", std::ios::out | std::ios::app);
+  F.open("Makefile", std::ios::out | std::ios::trunc);
   F << "dot=$(wildcard *.dot)\n";
   F << "png=$(patsubst %.dot,%.png,$(dot))\n";
   F << "svg=$(patsubst %.dot,%.svg,$(dot))\n";
@@ -124,32 +125,27 @@ void OCLAccHWPass::createMakefile() {
 }
 
 
-/// \brief Main HW-Generation Pass
-/// This Pass defines the dependencies to Transform- and Analysis Passes to
-/// generate a HW Design from a given LLVM-IR (SPIR) code.
-///
-/// Expensive Transformations which eventually run in an optimization
-/// loop, e.g. loop unrolling or vectorization, have to be performed earlier.
+/// \brief Main HW generation Pass
 ///
 bool OCLAccHWPass::runOnModule(Module &M) {
 
   StringRef ModuleName = M.getName();
 
-  outs() << "Compile Module " << ModuleName << "\n";
-
   createMakefile();
 
-  //Global variables must be __constant
-  for ( GlobalVariable &G : M.getGlobalList()) {
+  // OpenCL-C 2.0 6.5
+  // __global or __constant
+  for (const GlobalVariable &G : M.getGlobalList()) {
     PointerType *GT = G.getType();
+    const unsigned AS = GT->getAddressSpace();
 
-    if ( GT->getAddressSpace() !=  ocl::AS_CONSTANT )
-      llvm_unreachable( "Global Variable is not constant" );
+    if (AS != ocl::AS_CONSTANT && AS != ocl::AS_GLOBAL)
+      OCL_ERR("Program scope variable not constant or global");
   }
 
   //FIXME: unused debug info
   NamedMDNode *debug = M.getNamedMetadata("llvm.dbg.cu");
-  if ( ! debug ) {
+  if (! debug) {
     outs() << "No debug information for Module " << M.getName() << "\n";
   }
 
@@ -163,13 +159,6 @@ bool OCLAccHWPass::runOnModule(Module &M) {
       continue;
 
     handleKernel(KernelFunction);
-  }
-
-  // Now the HW hierarchy is build for the Design, all Kernels and all Blocks.
-
-  if (GenerateDot) {
-    DotVisitor V;
-    HWDesign.accept(V);
   }
 
   return false;
@@ -201,7 +190,6 @@ void OCLAccHWPass::handleKernel(const Function &F) {
     // FIXME Find a better solution
     visit(const_cast<BasicBlock&>(BB));
   }
-
 }
 
 /// \brief Walk through BBs, set inputs and outputs
@@ -251,7 +239,6 @@ void OCLAccHWPass::handleBBPorts(const BasicBlock &BB) {
 /// Depending on its type, InScalar (int, float) or Streams referencing
 /// global memory references are created and assigned to the kernel.
 ///
-/// FIXME Actual datawidth has to be adapted
 void OCLAccHWPass::handleArgument(const Argument &A) {
   Type *AType = A.getType();
   std::string Name = A.getName().str();
@@ -260,6 +247,7 @@ void OCLAccHWPass::handleArgument(const Argument &A) {
 
   // Arguments are either actual values directly passed to the kernel or
   // references to memory.
+  // OpenCL 2.0 pp 34: allowed address spaces
   if (AType->isIntegerTy()) {
     scalarport_p Scalar = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits());
     HWKernel->addInScalar(Scalar);
@@ -360,7 +348,7 @@ void OCLAccHWPass::visitBinaryOperator(Instruction &I) {
   size_t Bits = IType->getPrimitiveSizeInBits();
 
   if (IType->isVectorTy())
-    TODO("Impelent vector types");
+    llvm_unreachable("Impelent vector types");
 
   // It depends on the Instruction if values have to be interpreted as signed or
   // unsigned.
@@ -549,8 +537,6 @@ void OCLAccHWPass::visitStoreInst(StoreInst &I)
 
   connect(HWData, HWStreamIndex);
   //StoreInst does not produce a HW Node since no value comes out of it
-
-  //HWStreamIndex->setName(HWStream->getName());
 }
 
 // Generate Offset only, Base will be handled by the actual load or store instruction.
@@ -690,15 +676,27 @@ const_p OCLAccHWPass::createConstant(Constant *C, BasicBlock *B, Datatype T) {
   return HWConst;
 }
 
+/// \brief Check if the call is really a built-in
+void OCLAccHWPass::visitCallInst(CallInst &I) {
+  const std::string IN = I.getName();
+  const Value *Callee = I.getCalledValue();
+  std::string CN = Callee->getName().str();
+
+  if (ocl::isArithmeticBuiltIn(CN)) {
+    
+  } else if (ocl::isWorkItemBuiltIn(CN)) {
+    llvm_unreachable("Run pass to inline WorkItem builtins");
+
+  } else {
+    errs() << "Function Name: " << CN << "\n";
+    llvm_unreachable("Invalid Builtin.");
+  }
+}
+
 char OCLAccHWPass::ID = 0;
 
-static RegisterPass<OCLAccHWPass> X("oclacc-hw",
-    "Create HW Tree.");
-
-} // end namespace llvm
+static RegisterPass<OCLAccHWPass> X("oclacc-hw", "Create HW Tree.");
 
 #ifdef TYPENAME
 #undef TYPENAME
 #endif
-
-

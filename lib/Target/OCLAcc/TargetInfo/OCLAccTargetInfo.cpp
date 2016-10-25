@@ -10,10 +10,15 @@
 #include "OCLAccTargetMachine.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/TargetRegistry.h"
+
+#include "../Backend/Vhdl/VhdlTargetMachine.h"
+#include "../Backend/Verilog/VerilogTargetMachine.h"
+#include "../Backend/Dot/DotTargetMachine.h"
 using namespace llvm;
 
-Target llvm::TheOCLAccVhdlTarget;
-Target llvm::TheOCLAccVerilogTarget;
+Target llvm::TheVhdlTarget;
+Target llvm::TheVerilogTarget;
+Target llvm::TheDotTarget;
 
 static bool OCLAcc_TripleMatchQuality(Triple::ArchType Arch) {
   // This class always works, but shouldn't be the default in most cases.
@@ -21,12 +26,16 @@ static bool OCLAcc_TripleMatchQuality(Triple::ArchType Arch) {
 }
 
 extern "C" void LLVMInitializeOCLAccTargetInfo() { 
-  TargetRegistry::RegisterTarget(TheOCLAccVhdlTarget, "oclacc-vhdl",    
-                                  "OCLAcc Accelerator in VHLD",
+  TargetRegistry::RegisterTarget(TheVhdlTarget, "vhdl",    
+                                  "OCLAcc Accelerator in VHDL",
                                   &OCLAcc_TripleMatchQuality);
 
-  TargetRegistry::RegisterTarget(TheOCLAccVerilogTarget, "oclacc-verilog",    
+  TargetRegistry::RegisterTarget(TheVerilogTarget, "verilog",    
                                   "OCLAcc Accelerator in Verilog",
+                                  &OCLAcc_TripleMatchQuality);
+
+  TargetRegistry::RegisterTarget(TheDotTarget, "dot",    
+                                  "OCLAccHW Dot-Graph",
                                   &OCLAcc_TripleMatchQuality);
 }
 

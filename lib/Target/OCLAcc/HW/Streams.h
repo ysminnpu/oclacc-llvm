@@ -32,11 +32,12 @@ class ScalarPort : public Port {
 /// same list. 
 ///
 /// FIXME Load/Store cannot be an attribute of StreamIndex because address
-/// generation happens before the actual access. Durthermore, the same address
+/// generation happens before the actual access. Furthermore, the same address
 /// can be used for load and store. We do not want to compute it multiple times.
 class StreamPort : public Port {
   public:
     enum AccessType {
+      Invalid,
       Load,
       Store
     };
@@ -63,6 +64,24 @@ class StreamPort : public Port {
     void addLoad(streamindex_p I) {
       IndexList.push_back(I);
       AccessList.push_back(Load);
+    }
+
+    const IndexListType get(AccessType A) const {
+      IndexListType L;
+      for (IndexListType::size_type i = 0; i < IndexList.size(); ++i) {
+        if (AccessList[i] == A) {
+          L.push_back(IndexList[i]);
+        }
+      }
+      return L;
+    }
+
+    const IndexListType getLoads() const {
+      return get(Load);
+    }
+
+    const IndexListType getStores() const {
+      return get(Store);
     }
 
     bool isLoad(streamindex_p I) const {

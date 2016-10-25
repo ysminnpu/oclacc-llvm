@@ -20,5 +20,5 @@ parent = Target
 type = Library
 name = OCLAccCodeGen
 parent = OCLAcc
-required_libraries = Core Support Target OCLAccInfo OCLAccHW OCLAccBackend
+required_libraries = Core Support Target
 add_to_library_groups = OCLAcc

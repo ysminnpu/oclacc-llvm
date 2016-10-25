@@ -27,7 +27,7 @@
 
 #include "kernel_builtins.h"
 
-#include "todo.h"
+#include "macros.h"
 
 namespace llvm {
 

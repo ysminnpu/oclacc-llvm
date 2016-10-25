@@ -66,18 +66,19 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
     void visitLoadInst(LoadInst &I);
     void visitStoreInst(StoreInst &I);
     void visitGetElementPtrInst(GetElementPtrInst &I);
+    void visitCallInst(CallInst &I);
 
   private:
     ValueMapType ValueMap;
     KernelMapType KernelMap;
     BlockMapType BlockMap;
-    
+
     // FIXME Instantiate Design independent of Pass
     oclacc::DesignUnit HWDesign;
 
     oclacc::const_p createConstant(Constant *, BasicBlock *B, oclacc::Datatype);
 
-    template<class HW, class ...Args> 
+    template<class HW, class ...Args>
     std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
       std::shared_ptr<HW> P = std::make_shared<HW>(args...);
       P->setIR(IR);
@@ -85,28 +86,28 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
       return P;
     }
 
-    template<class ...Args> 
+    template<class ...Args>
     std::shared_ptr<oclacc::Kernel> makeKernel(const Function *IR, Args&& ...args) {
       std::shared_ptr<oclacc::Kernel> P = std::make_shared<oclacc::Kernel>(args...);
       KernelMap[IR] = P;
       return P;
     }
 
-    template<class ...Args> 
+    template<class ...Args>
     std::shared_ptr<oclacc::Block> makeBlock(const BasicBlock *IR, Args&& ...args) {
       std::shared_ptr<oclacc::Block> P = std::make_shared<oclacc::Block>(args...);
       BlockMap[IR] = P;
       return P;
     }
 
-    template<class HW> 
+    template<class HW>
     std::shared_ptr<HW> getHW(const Value *IR) const {
       ValueMapConstIt VI = ValueMap.find(IR);
       if (VI == ValueMap.end()) {
         errs() << IR->getName() << "\n";
         llvm_unreachable("No HW");
       }
-      
+
       std::shared_ptr<HW> P = std::static_pointer_cast<HW>(VI->second);
       return P;
     }
@@ -117,7 +118,7 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
         errs() << B->getName() << "\n";
         llvm_unreachable("No Block");
       }
-      
+
       return VI->second;
     }
 
@@ -127,7 +128,7 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
         errs() << F->getName() << "\n";
         llvm_unreachable("No Kernel");
       }
-      
+
       return VI->second;
     }
 

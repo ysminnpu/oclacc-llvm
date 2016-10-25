@@ -3,6 +3,7 @@
 
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/raw_ostream.h"
+#include "Macros.h"
 
 namespace oclacc {
 
@@ -38,8 +39,8 @@ class Writeable {
 
   public:
     virtual ~Writeable( ) {};
-    Writeable(const Writeable &) = delete;
-    Writeable &operator =(const Writeable &) = delete;
+
+    NO_COPY_ASSIGN(Writeable)
 
     virtual void write(const std::string &Indent) = 0;
 };

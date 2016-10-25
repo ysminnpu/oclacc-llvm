@@ -20,61 +20,56 @@
 #include "HW/Memory.h"
 #include "HW/Streams.h"
 
-#include "Backend/Verilog.h"
+#include "Backend/Dot/Dot.h"
 
-#include "GenerateVerilogPass.h"
+#include "GenerateDotPass.h"
 #include "OCLAccHWVisitor.h"
 #include "OCLAccHWPass.h"
 #include "OpenCLDefines.h"
 
 #include "kernel_builtins.h"
 
-#include "todo.h"
+#include "macros.h"
 
 using namespace oclacc;
 
 namespace llvm {
 
-GenerateVerilogPass::GenerateVerilogPass() : ModulePass(GenerateVerilogPass::ID) {
-  DEBUG_WITH_TYPE("GenerateVerilogPass", dbgs() << "GenerateVerilogPass created\n");
+GenerateDotPass::GenerateDotPass() : ModulePass(GenerateDotPass::ID) {
+  DEBUG_WITH_TYPE("GenerateDotPass", dbgs() << "GenerateDotPass created\n");
 }
 
-GenerateVerilogPass::~GenerateVerilogPass() {
+GenerateDotPass::~GenerateDotPass() {
 }
 
-bool GenerateVerilogPass::doInitialization(Module &M) {
+bool GenerateDotPass::doInitialization(Module &M) {
   return false;
 }
 
-bool GenerateVerilogPass::doFinalization(Module &M) {
+bool GenerateDotPass::doFinalization(Module &M) {
   return false;
 }
 
-void GenerateVerilogPass::getAnalysisUsage(AnalysisUsage &AU) const {
+void GenerateDotPass::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<OCLAccHWPass>();
   AU.setPreservesAll();
 } 
 
-GenerateVerilogPass *createGenerateVerilogPass() {
-  return new GenerateVerilogPass();
+GenerateDotPass *createGenerateDotPass() {
+  return new GenerateDotPass();
 }
 
-bool GenerateVerilogPass::runOnModule(Module &M) {
+bool GenerateDotPass::runOnModule(Module &M) {
   OCLAccHWPass &HWP = getAnalysis<OCLAccHWPass>();
   DesignUnit &Design = HWP.getDesign(); 
 
-  Verilog V;
-  DEBUG_WITH_TYPE("GenerateVerilogPass", dbgs() << "DesignUnit: " << Design.getName() << "\n");
-
-  //VeriloVisitor V;
-  //Design.accept(V);
+  DEBUG_WITH_TYPE("GenerateDotPass", dbgs() << "DesignUnit: " << Design.getName() << "\n");
 
   return false;
 }
 
-char GenerateVerilogPass::ID = 0;
+char GenerateDotPass::ID = 0;
 
-static RegisterPass<GenerateVerilogPass> X("oclacc-generate-verilog", 
-    "Generate Verilog");
+static RegisterPass<GenerateDotPass> X("oclacc-generate-dot", "Generate Dot");
 
 } //end namespace llvm
