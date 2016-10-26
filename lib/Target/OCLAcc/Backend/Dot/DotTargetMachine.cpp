@@ -1,5 +1,5 @@
 #include "DotTargetMachine.h"
-#include "GenerateDotPass.h"
+#include "GenerateDot.h"
 
 #include "llvm/PassManager.h"
 
@@ -20,7 +20,7 @@ bool DotTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   if (FileType != TargetMachine::CGFT_AssemblyFile)
     return true;
 
-  PM.add(new GenerateDotPass());
+  PM.add(createGenerateDotPass());
 
   return false;
 }

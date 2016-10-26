@@ -1,7 +1,7 @@
 #ifndef GENERATEVHDLPASS_H
 #define GENERATEVHDLPASS_H
 
-#include "llvm/IR/Instruction.h"
+#include "llvm/Pass.h"
 
 #include "Macros.h"
 
@@ -10,26 +10,24 @@ namespace llvm {
 /// \brief Walk through BasicBlocks and add all Values defined in others as
 /// output and input.
 ///
-class GenerateVhdlPass : public ModulePass {
+class GenerateVhdl : public ModulePass {
   public:
     static char ID;
 
   private:
 
   public:
-    GenerateVhdlPass();
-    ~GenerateVhdlPass();
+    GenerateVhdl();
+    ~GenerateVhdl();
 
-    NO_COPY_ASSIGN(GenerateVhdlPass)
-
-    virtual const char *getPassName() const { return "OCLAcc GenerateVhdlPass"; }
+    virtual const char *getPassName() const { return "OCLAcc GenerateVhdl"; }
     virtual bool doInitialization(Module &);
     virtual bool doFinalization(Module &);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;
     virtual bool runOnModule(Module &);
 };
 
-GenerateVhdlPass *createGenerateVhdlPass();
+Pass *createGenerateVhdlPass();
 
 } //end namespace llvm
 

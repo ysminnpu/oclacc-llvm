@@ -83,6 +83,12 @@ void initializeArgPromotionTrackerPass(PassRegistry&);
 void initializeCanonicalizePredecessorsPass(PassRegistry&);
 void initializeCFGOptimizerPass(PassRegistry&);
 
+/// XXX: Direct initialization functions for OCLAcc passes
+void initializeOCLAccHWPass(PassRegistry&);
+void initializeGenerateDotPass(PassRegistry&);
+void initializeGenerateVerilogPass(PassRegistry&);
+void initializeGenerateVhdlPass(PassRegistry&);
+
 void initializeAAEvalPass(PassRegistry&);
 void initializeAddDiscriminatorsPass(PassRegistry&);
 void initializeADCEPass(PassRegistry&);

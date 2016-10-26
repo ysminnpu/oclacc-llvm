@@ -1,5 +1,5 @@
 # include "VhdlTargetMachine.h"
-#include "GenerateVhdlPass.h"
+#include "GenerateVhdl.h"
 
 #include "llvm/PassManager.h"
 
@@ -20,7 +20,7 @@ bool VhdlTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   if (FileType != TargetMachine::CGFT_AssemblyFile)
     return true;
 
-  PM.add(new GenerateVhdlPass());
+  PM.add(createGenerateVhdlPass());
 
   return false;
 }

@@ -1,6 +1,7 @@
 #include "VerilogTargetMachine.h"
-#include "GenerateVerilogPass.h"
+#include "GenerateVerilog.h"
 
+#include "llvm/Pass.h"
 #include "llvm/PassManager.h"
 
 using namespace llvm;
@@ -20,7 +21,7 @@ bool VerilogTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   if (FileType != TargetMachine::CGFT_AssemblyFile)
     return true;
 
-  PM.add(new GenerateVerilogPass());
+  PM.add(createGenerateVerilogPass());
 
   return false;
 }

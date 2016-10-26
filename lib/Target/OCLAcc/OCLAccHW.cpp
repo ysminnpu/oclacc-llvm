@@ -44,7 +44,7 @@
 #include <unistd.h>
 
 #include "macros.h"
-#include "OCLAccHWPass.h"
+#include "OCLAccHW.h"
 #include "OCLAccTargetMachine.h"
 #include "OCLAccGenSubtargetInfo.inc"
 #include "OpenCLDefines.h"
@@ -86,32 +86,40 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
  * oclacc-llc.
  */
 
-OCLAccHWPass::OCLAccHWPass() : ModulePass(OCLAccHWPass::ID) {
-  DEBUG_WITH_TYPE("OCLAccHWPass", dbgs() << "OCLAccHWPass created\n");
+INITIALIZE_PASS_BEGIN(OCLAccHW, "OCLAccHW", "foo",  false, false)
+INITIALIZE_PASS_DEPENDENCY(OpenCLMDKernels);
+INITIALIZE_PASS_END(OCLAccHW, "OCLAccHW", "foo",  false, false)
+
+char OCLAccHW::ID = 0;
+
+namespace llvm {
+  ModulePass *createOCLAccHWPass() { 
+    return new OCLAccHW(); 
+  }
 }
 
-OCLAccHWPass::~OCLAccHWPass() {
+OCLAccHW::OCLAccHW() : ModulePass(OCLAccHW::ID) {
+  DEBUG_WITH_TYPE("OCLAccHW", dbgs() << "OCLAccHW created\n");
 }
 
-OCLAccHWPass *OCLAccHWPass::createOCLAccHWPass() {
-  return new OCLAccHWPass();
+OCLAccHW::~OCLAccHW() {
 }
 
-bool OCLAccHWPass::doInitialization(Module &M) {
+bool OCLAccHW::doInitialization(Module &M) {
   return false;
 }
 
-bool OCLAccHWPass::doFinalization(Module &M) {
+bool OCLAccHW::doFinalization(Module &M) {
   return false;
 }
 
-void OCLAccHWPass::getAnalysisUsage(AnalysisUsage &AU) const {
+void OCLAccHW::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<OpenCLMDKernels>();
   //AU.addRequired<CreateBlocksPass>();
   AU.setPreservesAll();
 }
 
-void OCLAccHWPass::createMakefile() {
+void OCLAccHW::createMakefile() {
   std::ofstream F;
   F.open("Makefile", std::ios::out | std::ios::trunc);
   F << "dot=$(wildcard *.dot)\n";
@@ -131,7 +139,7 @@ void OCLAccHWPass::createMakefile() {
 
 /// \brief Main HW generation Pass
 ///
-bool OCLAccHWPass::runOnModule(Module &M) {
+bool OCLAccHW::runOnModule(Module &M) {
 
   StringRef ModuleName = M.getName();
 
@@ -156,13 +164,12 @@ bool OCLAccHWPass::runOnModule(Module &M) {
   HWDesign.setName(ModuleName);
 
   // Process all kernel functions
+  OpenCLMDKernels &CLK = getAnalysis<OpenCLMDKernels>();
   for (const Function &KernelFunction: M.getFunctionList()) {
 
     // Omit declarations, e.g. to built-in functions.
-    if (KernelFunction.isDeclaration())
-      continue;
-
-    handleKernel(KernelFunction);
+    if (CLK.isKernel(&KernelFunction))
+      handleKernel(KernelFunction);
   }
 
   return false;
@@ -171,7 +178,7 @@ bool OCLAccHWPass::runOnModule(Module &M) {
 /// \breif For each Kernel Function create Arguments and BasicBlocks.
 ///
 /// TODO Handle Work Item Kernels correctly using KernelMDPass
-void OCLAccHWPass::handleKernel(const Function &F) {
+void OCLAccHW::handleKernel(const Function &F) {
   bool isWorkItemKernel=true;
   std::string KernelName = F.getName();
 
@@ -200,7 +207,7 @@ void OCLAccHWPass::handleKernel(const Function &F) {
 ///
 /// Walk through all instructions, visit their uses and check if they were
 /// defined in that BB
-void OCLAccHWPass::handleBBPorts(const BasicBlock &BB) {
+void OCLAccHW::handleBBPorts(const BasicBlock &BB) {
   block_p HWBB = makeBlock(&BB,BB.getName());
 
   llvm::SmallPtrSet<const Value *, 1024> VS;
@@ -243,7 +250,7 @@ void OCLAccHWPass::handleBBPorts(const BasicBlock &BB) {
 /// Depending on its type, InScalar (int, float) or Streams referencing
 /// global memory references are created and assigned to the kernel.
 ///
-void OCLAccHWPass::handleArgument(const Argument &A) {
+void OCLAccHW::handleArgument(const Argument &A) {
   Type *AType = A.getType();
   std::string Name = A.getName().str();
 
@@ -322,12 +329,12 @@ void OCLAccHWPass::handleArgument(const Argument &A) {
       if (isWritten) {
         streamport_p S = makeHW<StreamPort>(&A, Name, SizeInBits, AS);
         HWKernel->addOutStream(S);
-        DEBUG_WITH_TYPE("OCLAccHWPass", dbgs() << Name << " is OutStream of size " <<  SizeInBits << "\n");
+        DEBUG_WITH_TYPE("OCLAccHW", dbgs() << Name << " is OutStream of size " <<  SizeInBits << "\n");
       }
       if (isRead) {
         streamport_p S = makeHW<StreamPort>(&A, Name, SizeInBits, AS);
         HWKernel->addInStream(S);
-        DEBUG_WITH_TYPE("OCLAccHWPass", dbgs() << Name << " is InStream of size " <<  SizeInBits << "\n");
+        DEBUG_WITH_TYPE("OCLAccHW", dbgs() << Name << " is InStream of size " <<  SizeInBits << "\n");
       }
     }
   }
@@ -335,7 +342,7 @@ void OCLAccHWPass::handleArgument(const Argument &A) {
     llvm_unreachable("Unknown Argument Type");
 }
 
-void OCLAccHWPass::visitBinaryOperator(Instruction &I) {
+void OCLAccHW::visitBinaryOperator(Instruction &I) {
   Value *IVal = &I;
   Type *IType = I.getType();
 
@@ -450,7 +457,7 @@ void OCLAccHWPass::visitBinaryOperator(Instruction &I) {
   }
 }
 
-void OCLAccHWPass::visitLoadInst(LoadInst  &I)
+void OCLAccHW::visitLoadInst(LoadInst  &I)
 {
   std::string Name = I.getName().str();
   Value *AddrVal = I.getPointerOperand();
@@ -487,7 +494,7 @@ void OCLAccHWPass::visitLoadInst(LoadInst  &I)
 /// 3. If Value: Could be getElementPtrInst
 /// 4. If getElementPtrInst: Connect Base and Index
 /// 
-void OCLAccHWPass::visitStoreInst(StoreInst &I)
+void OCLAccHW::visitStoreInst(StoreInst &I)
 {
   //errs() << __PRETTY_FUNCTION__ << "\n";
 
@@ -544,7 +551,7 @@ void OCLAccHWPass::visitStoreInst(StoreInst &I)
 }
 
 // Generate Offset only, Base will be handled by the actual load or store instruction.
-void OCLAccHWPass::visitGetElementPtrInst(GetElementPtrInst &I)
+void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
 {
   Value *InstValue = &I;
   Value *BaseValue = I.getPointerOperand();
@@ -623,7 +630,7 @@ void OCLAccHWPass::visitGetElementPtrInst(GetElementPtrInst &I)
 /// multiple instructions, leading to conflicts in the ValueMap.
 ///
 /// FIXME Use actually required datatypes
-const_p OCLAccHWPass::createConstant(Constant *C, BasicBlock *B, Datatype T) {
+const_p OCLAccHW::createConstant(Constant *C, BasicBlock *B, Datatype T) {
   std::stringstream CName;
   const_p HWConst;
   block_p HWBlock = getBlock(B);
@@ -681,7 +688,7 @@ const_p OCLAccHWPass::createConstant(Constant *C, BasicBlock *B, Datatype T) {
 }
 
 /// \brief Check if the call is really a built-in
-void OCLAccHWPass::visitCallInst(CallInst &I) {
+void OCLAccHW::visitCallInst(CallInst &I) {
   const std::string IN = I.getName();
   const Value *Callee = I.getCalledValue();
   std::string CN = Callee->getName().str();
@@ -697,9 +704,6 @@ void OCLAccHWPass::visitCallInst(CallInst &I) {
   }
 }
 
-char OCLAccHWPass::ID = 0;
-
-static RegisterPass<OCLAccHWPass> X("oclacc-hw", "Create HW Tree.");
 
 #ifdef TYPENAME
 #undef TYPENAME

@@ -7,7 +7,7 @@ add_llvm_target(OCLAccCodeGen
   OCLAccSPIRCheckVisitor.cpp
   OCLAccTargetMachine.cpp
   OCLAccSubtarget.cpp
-  OCLAccHWPass.cpp
+  OCLAccHW.cpp
   )
 
 add_subdirectory(TargetInfo)

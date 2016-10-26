@@ -22,7 +22,7 @@
 
 #include "CreateBlocksPass.h"
 #include "OCLAccHWVisitor.h"
-#include "OCLAccHWPass.h"
+#include "OCLAccHW.h"
 #include "OpenCLDefines.h"
 
 #include "kernel_builtins.h"

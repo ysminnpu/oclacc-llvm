@@ -1,7 +1,7 @@
-#ifndef GENERATEVERILOGPASS_H
-#define GENERATEVERILOGPASS_H
+#ifndef GENERATEDOTPASS_H
+#define GENERATEDOTPASS_H
 
-#include "llvm/IR/Instruction.h"
+#include "llvm/Pass.h"
 
 #include "Macros.h"
 
@@ -10,27 +10,27 @@ namespace llvm {
 /// \brief Walk through BasicBlocks and add all Values defined in others as
 /// output and input.
 ///
-class GenerateVerilogPass : public ModulePass {
+class GenerateDot : public ModulePass {
   public:
     static char ID;
 
   private:
 
   public:
-    GenerateVerilogPass();
-    ~GenerateVerilogPass();
+    GenerateDot();
+    ~GenerateDot();
 
-    NO_COPY_ASSIGN(GenerateVerilogPass)
+    NO_COPY_ASSIGN(GenerateDot)
 
-    virtual const char *getPassName() const { return "OCLAcc GenerateVerilogPass"; }
+    virtual const char *getPassName() const { return "OCLAcc GenerateDot"; }
     virtual bool doInitialization(Module &);
     virtual bool doFinalization(Module &);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;
     virtual bool runOnModule(Module &);
 };
 
-GenerateVerilogPass *createGenerateVerilogPass();
+Pass *createGenerateDotPass();
 
 } //end namespace llvm
 
-#endif /* GENERATEVERILOGPASS_H */
+#endif /* GENERATEDOTPASS_H */

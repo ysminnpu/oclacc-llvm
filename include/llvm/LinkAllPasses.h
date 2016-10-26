@@ -65,6 +65,11 @@ namespace {
       (void) llvm::createArgPromotionTrackerPass();
       (void) llvm::createCanonicalizePredecessorsPass();
       (void) llvm::createCFGOptimizerPass();
+      // XXX: Functions for oclacc passes;
+      (void) llvm::createOCLAccHWPass();
+      (void) llvm::createGenerateDotPass();
+      (void) llvm::createGenerateVerilogPass();
+      (void) llvm::createGenerateVhdlPass();
 
       (void) llvm::createAAEvalPass();
       (void) llvm::createAggressiveDCEPass();

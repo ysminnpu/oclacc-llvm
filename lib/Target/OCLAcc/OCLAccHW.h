@@ -15,7 +15,7 @@ class AnalysisUsage;
 
 class OCLAccHWVisitor;
 
-class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
+class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
   private:
     void createMakefile();
@@ -25,15 +25,10 @@ class OCLAccHWPass : public ModulePass, public InstVisitor<OCLAccHWPass>{
     void handleBBPorts(const BasicBlock &B);
 
   public:
-    OCLAccHWPass();
-    ~OCLAccHWPass();
+    OCLAccHW();
+    ~OCLAccHW();
 
-    OCLAccHWPass (const OCLAccHWPass &) = delete;
-    OCLAccHWPass &operator =(const OCLAccHWPass &) = delete;
-
-    OCLAccHWPass *createOCLAccHWPass();
-
-    virtual const char *getPassName() const { return "OCLAcc OCLAccHWPass"; }
+    virtual const char *getPassName() const { return "OCLAcc OCLAccHW"; }
 
     virtual bool doInitialization(Module &);
     virtual bool doFinalization(Module &);
