@@ -30,6 +30,9 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetRegistry.h"
 
+#include "llvm/Transforms/Loopus.h"
+#include "../../../lib/Transforms/Loopus/OpenCLMDKernels.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
@@ -103,7 +106,8 @@ bool OCLAccHWPass::doFinalization(Module &M) {
 }
 
 void OCLAccHWPass::getAnalysisUsage(AnalysisUsage &AU) const {
- // AU.addRequired<CreateBlocksPass>();
+  AU.addRequired<OpenCLMDKernels>();
+  //AU.addRequired<CreateBlocksPass>();
   AU.setPreservesAll();
 }
 
