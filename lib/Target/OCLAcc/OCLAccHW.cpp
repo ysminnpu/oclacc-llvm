@@ -19,6 +19,8 @@
 #include "llvm/IR/InstVisitor.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -26,12 +28,14 @@
 #include "llvm/Pass.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetRegistry.h"
 
 #include "llvm/Transforms/Loopus.h"
 #include "../../../lib/Transforms/Loopus/OpenCLMDKernels.h"
+#include "../../../lib/Transforms/Loopus/HDLPromoteID.h"
 
 #include <algorithm>
 #include <cctype>
@@ -60,6 +64,8 @@
 #include <cxxabi.h>
 #define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
 
+#define DEBUG_TYPE "OCLAccHW"
+
 using namespace oclacc;
 
 /*
@@ -87,6 +93,7 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
  */
 
 INITIALIZE_PASS_BEGIN(OCLAccHW, "OCLAccHW", "foo",  false, false)
+INITIALIZE_PASS_DEPENDENCY(HDLPromoteID);
 INITIALIZE_PASS_DEPENDENCY(OpenCLMDKernels);
 INITIALIZE_PASS_END(OCLAccHW, "OCLAccHW", "foo",  false, false)
 
@@ -114,9 +121,9 @@ bool OCLAccHW::doFinalization(Module &M) {
 }
 
 void OCLAccHW::getAnalysisUsage(AnalysisUsage &AU) const {
+  AU.addRequired<HDLPromoteID>();
   AU.addRequired<OpenCLMDKernels>();
   //AU.addRequired<CreateBlocksPass>();
-  AU.setPreservesAll();
 }
 
 void OCLAccHW::createMakefile() {
@@ -141,7 +148,7 @@ void OCLAccHW::createMakefile() {
 ///
 bool OCLAccHW::runOnModule(Module &M) {
 
-  StringRef ModuleName = M.getName();
+  const std::string ModuleName = M.getName();
 
   createMakefile();
 
@@ -163,6 +170,17 @@ bool OCLAccHW::runOnModule(Module &M) {
 
   HWDesign.setName(ModuleName);
 
+  // Print current state of optimization
+  std::error_code EC;
+  std::string FileName = ModuleName+".oclacchw.ll";
+  raw_fd_ostream File(FileName, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+  if (EC) {
+    errs() << "Failed to create " << FileName << "(" << __LINE__ << "): " << EC.message() << "\n";
+    return -1;
+  }
+  PrintModulePass PrintPass(File);
+  PrintPass.run(M);
+
   // Process all kernel functions
   OpenCLMDKernels &CLK = getAnalysis<OpenCLMDKernels>();
   for (const Function &KernelFunction: M.getFunctionList()) {
@@ -177,10 +195,18 @@ bool OCLAccHW::runOnModule(Module &M) {
 
 /// \breif For each Kernel Function create Arguments and BasicBlocks.
 ///
-/// TODO Handle Work Item Kernels correctly using KernelMDPass
 void OCLAccHW::handleKernel(const Function &F) {
-  bool isWorkItemKernel=true;
-  std::string KernelName = F.getName();
+  OpenCLMDKernels &CLK = getAnalysis<OpenCLMDKernels>();
+
+  bool isWorkItemKernel=CLK.isWorkitemFunction(&F);
+
+  const std::string KernelName = F.getName();
+
+  DEBUG(dbgs() << "Function " << KernelName);
+  if (isWorkItemKernel)
+    DEBUG(dbgs() << " WorkItemKernel\n");
+  else
+    DEBUG(dbgs() << " Single\n");
 
   // Set the new Kernel as global Kernel for all visit functions
   kernel_p HWKernel = makeKernel(&F, KernelName, isWorkItemKernel);
@@ -708,3 +734,5 @@ void OCLAccHW::visitCallInst(CallInst &I) {
 #ifdef TYPENAME
 #undef TYPENAME
 #endif
+
+#undef DEBUG_TYPE
