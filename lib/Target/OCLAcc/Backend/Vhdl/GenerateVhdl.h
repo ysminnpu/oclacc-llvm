@@ -20,7 +20,6 @@ class GenerateVhdl : public ModulePass {
     GenerateVhdl();
     ~GenerateVhdl();
 
-    virtual const char *getPassName() const { return "OCLAcc GenerateVhdl"; }
     virtual bool doInitialization(Module &);
     virtual bool doFinalization(Module &);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;

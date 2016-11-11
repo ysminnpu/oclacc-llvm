@@ -31,12 +31,14 @@
 
 #include "macros.h"
 
+#define DEBUG_TYPE "gen-dot"
+
 using namespace llvm;
 using namespace oclacc;
 
-INITIALIZE_PASS_BEGIN(GenerateDot, "GenerateDot", "foo",  false, false)
+INITIALIZE_PASS_BEGIN(GenerateDot, "oclacc-dot", "Generate Dot from OCLAccHW",  false, true)
 INITIALIZE_PASS_DEPENDENCY(OCLAccHW);
-INITIALIZE_PASS_END(GenerateDot, "GenerateDot", "foo",  false, false)
+INITIALIZE_PASS_END(GenerateDot, "oclacc-dot", "Generate Dot from OCLAccHW",  false, true)
 
 char GenerateDot::ID = 0;
 
@@ -48,7 +50,6 @@ namespace llvm {
 
 GenerateDot::GenerateDot() : ModulePass(GenerateDot::ID) {
   initializeGenerateDotPass(*PassRegistry::getPassRegistry());
-  DEBUG_WITH_TYPE("GenerateDot", dbgs() << "GenerateDot created\n");
 }
 
 GenerateDot::~GenerateDot() {
@@ -75,7 +76,11 @@ bool GenerateDot::runOnModule(Module &M) {
   OCLAccHW &HWP = getAnalysis<OCLAccHW>();
   DesignUnit &Design = HWP.getDesign(); 
 
-  DEBUG_WITH_TYPE("GenerateDot", dbgs() << "DesignUnit: " << Design.getName() << "\n");
+  DEBUG(dbgs() << "DesignUnit: " << Design.getName() << "\n");
+  Dot D;
+  Design.accept(D);
 
   return false;
 }
+
+#undef DEBUG_TYPE

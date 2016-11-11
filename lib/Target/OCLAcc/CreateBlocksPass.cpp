@@ -18,7 +18,6 @@
 #include "HW/Kernel.h"
 #include "HW/Memory.h"
 #include "HW/Streams.h"
-#include "HW/operators.cpp"
 
 #include "CreateBlocksPass.h"
 #include "OCLAccHWVisitor.h"

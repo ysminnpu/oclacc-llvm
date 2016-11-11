@@ -22,7 +22,7 @@ class ConstVal : public HW
     DECLARE_VISIT
 
   private:
-    virtual void appIn(base_p p) {};
+    virtual void addIn(base_p p) {};
 
 };
 

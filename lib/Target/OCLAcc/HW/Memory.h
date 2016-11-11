@@ -23,7 +23,7 @@ class Ram : public HW
 
     Ram(const std::string &Name, base_p index, size_t W, size_t D) : HW(Name, W), D(D), index(index)
     {
-      index->appOut(base_p(this));
+      index->addOut(base_p(this));
     }
     DECLARE_VISIT
 };

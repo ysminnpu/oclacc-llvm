@@ -23,6 +23,9 @@ typedef std::shared_ptr<Kernel> kernel_p;
 class Block;
 typedef std::shared_ptr<Block> block_p;
 
+class Component;
+typedef std::shared_ptr<Component> component_p;
+
 class Add;
 typedef std::shared_ptr<Add> add_p;
 

@@ -22,7 +22,6 @@ class GenerateDot : public ModulePass {
 
     NO_COPY_ASSIGN(GenerateDot)
 
-    virtual const char *getPassName() const { return "OCLAcc GenerateDot"; }
     virtual bool doInitialization(Module &);
     virtual bool doFinalization(Module &);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;

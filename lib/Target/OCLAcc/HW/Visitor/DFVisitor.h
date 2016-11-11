@@ -31,54 +31,55 @@ class DFVisitor : public BaseVisitor
     DFVisitor() {};
 
   public:
-    virtual int visit(Visitable &r) {
+    virtual int visit(Visitable &R) {
       return 0;
     }
 
-    virtual int visit(FPArith &r) {
+    virtual int visit(FPArith &R) {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for (base_p p : r.getOuts()) {
+      for (base_p p : R.getOuts()) {
         p->accept(*this);
       }
       return 0;
     }
 
-    virtual int visit(Arith &r)
+    virtual int visit(Arith &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for (base_p p : r.getOuts()) {
+      for (base_p p : R.getOuts()) {
         p->accept(*this);
       }
       return 0;
     }
 
-    virtual int visit(Add &r)  { return visit(static_cast<Arith &>(r));}
-    virtual int visit(FAdd &r) { return visit(static_cast<Arith &>(r));}
-    virtual int visit(Sub &r)  { return visit(static_cast<Arith &>(r));}
-    virtual int visit(FSub &r) { return visit(static_cast<FPArith &>(r));}
-    virtual int visit(Mul &r)  { return visit(static_cast<Arith &>(r));}
-    virtual int visit(FMul &r) { return visit(static_cast<FPArith &>(r));}
-    virtual int visit(UDiv &r) { return visit(static_cast<Arith &>(r));}
-    virtual int visit(SDiv &r) { return visit(static_cast<Arith &>(r));}
-    virtual int visit(FDiv &r) { return visit(static_cast<FPArith &>(r));}
-    virtual int visit(URem &r) { return visit(static_cast<Arith &>(r));}
-    virtual int visit(SRem &r) { return visit(static_cast<Arith &>(r));}
-    virtual int visit(FRem &r) { return visit(static_cast<FPArith &>(r));}
+    virtual int visit(Add &R)  { return visit(static_cast<Arith &>(R));}
+    virtual int visit(Sub &R)  { return visit(static_cast<Arith &>(R));}
+    virtual int visit(Mul &R)  { return visit(static_cast<Arith &>(R));}
+    virtual int visit(UDiv &R) { return visit(static_cast<Arith &>(R));}
+    virtual int visit(SDiv &R) { return visit(static_cast<Arith &>(R));}
+    virtual int visit(URem &R) { return visit(static_cast<Arith &>(R));}
+    virtual int visit(SRem &R) { return visit(static_cast<Arith &>(R));}
 
-    virtual int visit(Shl &r)  { return visit(static_cast<Arith &>(r));}
-    virtual int visit(LShr &r)   { return visit(static_cast<Arith &>(r)); }
-    virtual int visit(AShr &r)  { return visit(static_cast<Arith &>(r));}
-    virtual int visit(And &r)   { return visit(static_cast<Arith &>(r)); }
-    virtual int visit(Or &r)  { return visit(static_cast<Arith &>(r));}
-    virtual int visit(Xor &r)   { return visit(static_cast<Arith &>(r)); }
+    virtual int visit(FAdd &R) { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FSub &R) { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FMul &R) { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FDiv &R) { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FRem &R) { return visit(static_cast<FPArith &>(R));}
 
-    virtual int visit(Compare &r)
+    virtual int visit(Shl &R)  { return visit(static_cast<Arith &>(R));}
+    virtual int visit(LShr &R) { return visit(static_cast<Arith &>(R)); }
+    virtual int visit(AShr &R) { return visit(static_cast<Arith &>(R));}
+    virtual int visit(And &R)  { return visit(static_cast<Arith &>(R)); }
+    virtual int visit(Or &R)   { return visit(static_cast<Arith &>(R));}
+    virtual int visit(Xor &R)  { return visit(static_cast<Arith &>(R)); }
+
+    virtual int visit(Compare &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( base_p p : r.getOuts() ) {
+      for ( base_p p : R.getOuts() ) {
         p->accept(*this);
       }
       return 0;
@@ -87,11 +88,11 @@ class DFVisitor : public BaseVisitor
     //
     //Mux
     //
-    virtual int visit(Mux &r)
+    virtual int visit(Mux &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( base_p p : r.getOuts() ) {
+      for ( base_p p : R.getOuts() ) {
         p->accept(*this);
       }
 
@@ -101,33 +102,33 @@ class DFVisitor : public BaseVisitor
     //
     //Mem
     //
-    virtual int visit(Reg &r)
+    virtual int visit(Reg &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
       
-      for ( base_p p : r.getOuts() ) {
+      for ( base_p p : R.getOuts() ) {
         p->accept(*this);
       }
 
       return 0;
     }
-    virtual int visit(Ram &r)
+    virtual int visit(Ram &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      r.index->accept(*this);
+      R.index->accept(*this);
 
-      for ( base_p p : r.getOuts() ) {
+      for ( base_p p : R.getOuts() ) {
         p->accept(*this);
       }
 
       return 0;
     }
-    virtual int visit(Fifo &r)
+    virtual int visit(Fifo &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( base_p p : r.getOuts() ) {
+      for ( base_p p : R.getOuts() ) {
         p->accept(*this);
       }
 
@@ -137,11 +138,11 @@ class DFVisitor : public BaseVisitor
     //
     //Constants
     //
-    virtual int visit(ConstVal &r)
+    virtual int visit(ConstVal &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
       
-      for ( base_p p : r.getOuts() ) {
+      for ( base_p p : R.getOuts() ) {
         p->accept(*this);
       }
       return 0;
@@ -150,11 +151,11 @@ class DFVisitor : public BaseVisitor
     //
     //Design Unit
     //
-    virtual int visit(DesignUnit &r)
+    virtual int visit(DesignUnit &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( kernel_p p : r.Kernels ) {
+      for ( kernel_p p : R.Kernels ) {
         p->accept(*this);
       }
 
@@ -190,6 +191,8 @@ class DFVisitor : public BaseVisitor
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
+      R.dump();
+
       for ( base_p P : R.getIns() ) {
         P->accept(*this);
       }
@@ -204,66 +207,66 @@ class DFVisitor : public BaseVisitor
     }
 
 
-    virtual int visit(ScalarPort &r) { 
+    virtual int visit(ScalarPort &R) { 
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for (base_p P : r.getIns())
+      for (base_p P : R.getIns())
         P->accept(*this);
 
-      for (base_p P : r.getOuts())
+      for (base_p P : R.getOuts())
         P->accept(*this);
 
       return 0;
     }
 
-    virtual int visit(StreamPort &r)
+    virtual int visit(StreamPort &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( streamindex_p P : r.getIndexList() ) {
+      for ( streamindex_p P : R.getIndexList() ) {
         P->accept(*this);
       }
       return 0;
     }
 
-    virtual int visit(StreamIndex &r)
+    virtual int visit(StreamIndex &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      r.getStream()->accept(*this);
+      R.getStream()->accept(*this);
 
-      for (base_p P : r.getIns())
+      for (base_p P : R.getIns())
         P->accept(*this);
 
-      for (base_p P : r.getOuts())
+      for (base_p P : R.getOuts())
         P->accept(*this);
 
       return 0;
     }
 
-    virtual int visit(DynamicStreamIndex &r)
+    virtual int visit(DynamicStreamIndex &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      r.getIndex()->accept(*this);
-      r.getStream()->accept(*this);
+      R.getIndex()->accept(*this);
+      R.getStream()->accept(*this);
 
-      for (base_p P : r.getOuts())
+      for (base_p P : R.getOuts())
         P->accept(*this);
 
       return 0;
     }
 
-    virtual int visit(StaticStreamIndex &r)
+    virtual int visit(StaticStreamIndex &R)
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      r.getStream()->accept(*this);
+      R.getStream()->accept(*this);
 
-      for (base_p P : r.getIns())
+      for (base_p P : R.getIns())
         P->accept(*this);
 
-      for (base_p P : r.getOuts())
+      for (base_p P : R.getOuts())
         P->accept(*this);
 
       return 0;

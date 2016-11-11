@@ -29,6 +29,8 @@ namespace Loopus {
     OneExt,             // Extend by prepending ones
     FPNoExt             // FP number => no extension needed
   };
+
+  typedef std::pair<int, Loopus::ExtKind> BitWidthRetTy;
 }
 
 class BitWidthAnalysis : public llvm::FunctionPass {
@@ -142,7 +144,7 @@ class BitWidthAnalysis : public llvm::FunctionPass {
     void printAllDBG(const llvm::Function &F);
 
   public:
-    std::pair<int, Loopus::ExtKind> getBitWidth(const llvm::Value *V,
+    Loopus::BitWidthRetTy getBitWidth(const llvm::Value *V,
         const llvm::Instruction *OwningI = 0);
 
   public:

@@ -13,17 +13,27 @@ namespace oclacc {
 
 class Port : public HW {
   protected:
-    Port(const std::string &Name, size_t W) : HW(Name, W) { }
+    Port(const std::string &Name, size_t W, const Datatype &T) : HW(Name, W), PortType(T) {
+    }
+
     virtual bool isScalar()=0;
 
-    DECLARE_VISIT
+
+  private:
+    const Datatype &PortType;
+  public:
+    const Datatype &getPortType() {
+      return PortType;
+    }
 };
 
 class ScalarPort : public Port {
   public:
-    ScalarPort(const std::string &Name, size_t W) : Port(Name, W) { }
-    DECLARE_VISIT
+    ScalarPort(const std::string &Name, size_t W, const Datatype &T) : Port(Name, W, T) { }
+
     bool isScalar() { return true; }
+
+    DECLARE_VISIT;
 };
 
 /// \brief Represents a Load and Store Port.
@@ -31,9 +41,10 @@ class ScalarPort : public Port {
 /// To preserve correct Load and Store order, all index operations are in the
 /// same list. 
 ///
-/// FIXME Load/Store cannot be an attribute of StreamIndex because address
-/// generation happens before the actual access. Furthermore, the same address
-/// can be used for load and store. We do not want to compute it multiple times.
+/// Load/Store cannot be an attribute of StreamIndex because address
+/// generation happens before the actual access and a single StreamIndex may be
+/// used for both.
+///
 class StreamPort : public Port {
   public:
     enum AccessType {
@@ -56,8 +67,8 @@ class StreamPort : public Port {
 
   public:
 
-    StreamPort(const std::string &Name, size_t W, ocl::AddressSpace) : Port(Name, W) { }
-    DECLARE_VISIT
+    StreamPort(const std::string &Name, size_t W, ocl::AddressSpace, const Datatype &T) : Port(Name, W, T) { }
+    DECLARE_VISIT;
 
     bool isScalar() { return false; }
 
@@ -119,6 +130,10 @@ class StreamPort : public Port {
     }
 };
 
+/// \brief StreamIndex
+///
+/// In and Out used for data while the index depends on the actual subcalss
+/// type.
 class StreamIndex : public HW {
   private:
     streamport_p Stream;
@@ -141,6 +156,7 @@ class StreamIndex : public HW {
 
 };
 
+
 class DynamicStreamIndex : public StreamIndex {
 
   private:
@@ -161,10 +177,11 @@ class DynamicStreamIndex : public StreamIndex {
 
     bool isStatic() const { return false;}
 
-    DECLARE_VISIT
+    DECLARE_VISIT;
 };
 
-/// \brief Stream Index known at compile time.
+/// \brief Stream with compile-time constant Index 
+///
 /// The index is not represented as ConstantVal object to simplify offset
 /// analysis for stream optimization.
 class StaticStreamIndex : public StreamIndex {

@@ -18,7 +18,7 @@ class HW : public Identifiable, public Visitable
   protected:
     size_t BitWidth;
     const llvm::Value *IR;
-    block_p Block;
+    component_p Parent;
 
     std::vector<base_p> Ins;
     std::vector<base_p> Outs;
@@ -31,20 +31,20 @@ class HW : public Identifiable, public Visitable
 
     NO_COPY_ASSIGN(HW)
 
-    void setBlock(block_p P) {
-      Block = P;
+    void setParent(component_p P) {
+      Parent = P;
     }
 
-    block_p getBlock(void) const {
-      return Block;
+    component_p getParent(void) const {
+      return Parent;
     }
 
-    virtual void appIn(base_p P) {
+    virtual void addIn(base_p P) {
       if (P)
         Ins.push_back(P);
     }
 
-    virtual void appOut(base_p P) {
+    virtual void addOut(base_p P) {
       if (P)
         if (std::find(Outs.begin(), Outs.end(), P) == Outs.end())
           Outs.push_back(P);
@@ -71,6 +71,7 @@ enum Datatype {
   Double,
   Signed,
   Unsigned,
+  Integer,
   Invalid,
 };
 

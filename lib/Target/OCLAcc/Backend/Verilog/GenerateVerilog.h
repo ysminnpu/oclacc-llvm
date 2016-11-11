@@ -20,7 +20,6 @@ class GenerateVerilog : public ModulePass {
     GenerateVerilog();
     ~GenerateVerilog();
 
-    virtual const char *getPassName() const { return "OCLAcc GenerateVerilog"; }
     virtual bool doInitialization(Module &);
     virtual bool doFinalization(Module &);
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;

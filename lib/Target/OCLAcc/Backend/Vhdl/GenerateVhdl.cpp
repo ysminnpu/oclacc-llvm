@@ -19,7 +19,6 @@
 #include "HW/Kernel.h"
 #include "HW/Memory.h"
 #include "HW/Streams.h"
-#include "HW/operators.cpp"
 #include "HW/typedefs.h"
 
 #include "Vhdl.h"
@@ -36,9 +35,9 @@
 using namespace llvm;
 using namespace oclacc;
 
-INITIALIZE_PASS_BEGIN(GenerateVhdl, "GenerateVhdl", "foo",  false, false)
+INITIALIZE_PASS_BEGIN(GenerateVhdl, "oclacc-vhdl", "Generate VHDL from OCLAccHW",  false, true)
 INITIALIZE_PASS_DEPENDENCY(OCLAccHW);
-INITIALIZE_PASS_END(GenerateVhdl, "GenerateVhdl", "foo",  false, false)
+INITIALIZE_PASS_END(GenerateVhdl, "oclacc-vhdl", "Generate VHDL from OCLAccHW",  false, true)
 
 char GenerateVhdl::ID = 0;
 

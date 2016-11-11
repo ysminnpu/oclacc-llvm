@@ -376,12 +376,12 @@ static int compileModule(char **argv, LLVMContext &Context) {
   // Open the file.
 
   //auto Out = llvm::make_unique<tool_output_file>(MN.str()+".log", EC, sys::fs::F_Text);
-  auto Log = make_unique<raw_fd_ostream>(Module+".log", EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+  auto Log = std::make_unique<raw_fd_ostream>(Module+".log", EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
   if (EC) {
     errs() << "Failed to open logfile: " << EC.message() << '\n';
     return -1;
   }
-  auto FLog = make_unique<formatted_raw_ostream>(*Log);
+  auto FLog = std::make_unique<formatted_raw_ostream>(*Log);
 
   // FIXME: Declare success. 
   // Might be done only at the end but for now it is
@@ -431,7 +431,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
     //OCLAcc Passes
 
     std::string NamedFile = Module+".named.ll";
-    auto NamedIRFile = make_unique<raw_fd_ostream>(NamedFile, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+    auto NamedIRFile = std::make_unique<raw_fd_ostream>(NamedFile, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
     if (EC) {
       errs() << "Failed to create " << NamedFile << "(" << __LINE__ << "): " << EC.message() << "\n";
       return -1;

@@ -34,9 +34,9 @@
 using namespace llvm;
 using namespace oclacc;
 
-INITIALIZE_PASS_BEGIN(GenerateVerilog, "GenerateVerilog", "foo",  false, false)
+INITIALIZE_PASS_BEGIN(GenerateVerilog, "oclacc-verilog", "Generate Verilog from OCLAccHW",  false, true)
 INITIALIZE_PASS_DEPENDENCY(OCLAccHW);
-INITIALIZE_PASS_END(GenerateVerilog, "GenerateVerilog", "foo",  false, false)
+INITIALIZE_PASS_END(GenerateVerilog, "oclacc-verilog", "Generate Verilog from OCLAccHW",  false, true)
 
 char GenerateVerilog::ID = 0;
 

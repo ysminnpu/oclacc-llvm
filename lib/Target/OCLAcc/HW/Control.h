@@ -20,7 +20,7 @@ class Tmp : public HW
 
     DECLARE_VISIT
 
-    virtual void appIn(base_p p)
+    virtual void addIn(base_p p)
     {
       in=p;
     }
@@ -35,7 +35,7 @@ class Mux : public HW
   private:
     muxinput_list Ins;
 
-    using HW::appIn;
+    using HW::addIn;
 
   public:
     Mux(const std::string &Name) : HW(Name,0) {
