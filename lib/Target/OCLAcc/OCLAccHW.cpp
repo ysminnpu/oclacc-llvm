@@ -37,6 +37,7 @@
 #include "../../../lib/Transforms/Loopus/OpenCLMDKernels.h"
 #include "../../../lib/Transforms/Loopus/HDLPromoteID.h"
 #include "../../../lib/Transforms/Loopus/BitWidthAnalysis.h"
+#include "../../../lib/Transforms/Loopus/FindAllPaths.h"
 
 #include <algorithm>
 #include <cctype>
@@ -61,6 +62,7 @@
 #include "HW/Streams.h"
 #include "HW/Kernel.h"
 #include "HW/Constant.h"
+#include "HW/Compare.h"
 
 #include <cxxabi.h>
 #define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
@@ -97,6 +99,7 @@ INITIALIZE_PASS_BEGIN(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
 INITIALIZE_PASS_DEPENDENCY(HDLPromoteID);
 INITIALIZE_PASS_DEPENDENCY(OpenCLMDKernels);
 INITIALIZE_PASS_DEPENDENCY(BitWidthAnalysis);
+INITIALIZE_PASS_DEPENDENCY(FindAllPaths);
 INITIALIZE_PASS_END(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
 
 char OCLAccHW::ID = 0;
@@ -126,6 +129,7 @@ void OCLAccHW::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<HDLPromoteID>();
   AU.addRequired<OpenCLMDKernels>();
   AU.addRequired<BitWidthAnalysis>();
+  AU.addRequired<FindAllPaths>();
 }
 
 void OCLAccHW::createMakefile() {
@@ -246,6 +250,8 @@ void OCLAccHW::handleKernel(const Function &F) {
 void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
   block_p HWBB = makeBlock(&BB,BB.getName());
 
+  FindAllPaths &AP = getAnalysis<FindAllPaths>(*(BB.getParent()));
+
   std::vector<const Value *> VS;
   for (const Instruction &I : BB.getInstList()) {
     for (const Use &U : I.operands()) {
@@ -270,27 +276,51 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       if (DefBB == &BB)
         continue;
 
-      // Foreign value
-      // - Create ScalarPort SP
-      // - Add SP as OutScalar in DefBB
-      // - Add SP as InScalar in BB
-      // - Connect OutScalar with InScalar
-      // - BlockValueMap entry BB:V:ScalarPort
+      // The current block BB uses a value defined in a different block. We have
+      // to:
+      // - find the complete path from the definition's block to the current
+      // - create a single ScalarPort SP to connect both
+      // - add SP as OutScalar in DefBB
+      // - add SP as InScalar in BB
+      // - connect the defining value with the OutScalar
+      // - connect the user with the InScalar
+      // - create a blockValueMap entry BB->(V->ScalarPort)
 
       base_p HWI = getHW<HW>(I);
       block_p HWDef = getBlock(DefBB);
 
       Type *VT = V->getType();
 
-      scalarport_p HWP = makeHWBB<ScalarPort>(&BB, I, I->getName(), VT->getScalarSizeInBits(), getDatatype(VT));
+      // Find all possible paths from DefBB to BB
+      DEBUG(dbgs() << "-----------------\n");
+      DEBUG(dbgs() << "Paths from '" << DefBB->getName() << "' to '" << BB.getName() << ":'\n");
+      int i = 0;
 
-      connect(HWI, HWP);
+      for (const FindAllPaths::SinglePathTy P : AP.getPathFromTo(DefBB, &BB)) {
+        DEBUG(dbgs() << "Path" << i << "\n");
 
-      //TODO find all possible ways from DefBB to BB
+        for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
+            ToBBIt != P.end(); 
+            FromBBIt = ToBBIt, ++ToBBIt ) 
+        {
+          DEBUG(dbgs() << "  '" << (*FromBBIt)->getName() << " -> " << (*ToBBIt)->getName() << "'\n");
+          
+          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, I, I->getName(), VT->getScalarSizeInBits(), getDatatype(VT));
+          connect(HWI, HWP);
 
-      // Add Port to defining and using Block
-      HWDef->addOutScalar(HWP);
-      HWBB->addInScalar(HWP);
+          // Proceed HWI to connect potential next blocks port to
+          HWI = HWP;
+
+          // Add Port to defining and using Block
+          HWDef->addOutScalar(HWP);
+          HWBB->addInScalar(HWP);
+        }
+
+        ++i;
+        DEBUG(dbgs() << "  ---------------\n");
+      }
+      DEBUG(dbgs() << "-----------------\n");
+
     } 
     else if (const Argument *A = dyn_cast<Argument>(V)) {
       // get Kernel
@@ -426,7 +456,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
 // Visit Functions
 //////////////////////////////////////////////////////////////////////////////
 
-void OCLAccHW::visitBinaryOperator(Instruction &I) {
+void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
   Value *IVal = &I;
   Type *IType = I.getType();
 
@@ -444,69 +474,94 @@ void OCLAccHW::visitBinaryOperator(Instruction &I) {
   if (IType->isVectorTy())
     TODO("Implent vector types");
 
-  // It depends on the Instruction if values have to be interpreted as signed or
-  // unsigned.
+  if (IType->isFloatingPointTy()) {
+    unsigned E=0;
+    unsigned M=0;
 
-  switch ( I.getOpcode() ) {
-    case Instruction::Add:
-      HWOp = makeHW<Add>(IVal, IName,Bits);
-      break;
-    case Instruction::FAdd:
-      HWOp = makeHW<FAdd>(IVal, IName,Bits);
-      break;
-    case Instruction::Sub:
-      HWOp = makeHW<Sub>(IVal,IName,Bits);
-      break;
-    case Instruction::FSub:
-      HWOp = makeHW<FSub>(IVal,IName,Bits);
-      break;
-    case Instruction::Mul:
-      HWOp = makeHW<Mul>(IVal,IName,Bits);
-      break;
-    case Instruction::FMul:
-      HWOp = makeHW<FMul>(IVal,IName,Bits);
-      break;
-    case Instruction::UDiv:
-      HWOp = makeHW<UDiv>(IVal,IName,Bits);
-      break;
-    case Instruction::SDiv:
-      HWOp = makeHW<SDiv>(IVal,IName,Bits);
-      break;
-    case Instruction::FDiv:
-      HWOp = makeHW<FDiv>(IVal,IName,Bits);
-      break;
-    case Instruction::URem:
-      HWOp = makeHW<URem>(IVal,IName,Bits);
-      break;
-    case Instruction::SRem:
-      HWOp = makeHW<SRem>(IVal,IName,Bits);
-      break;
-    case Instruction::FRem:
-      HWOp = makeHW<FRem>(IVal,IName,Bits);
-      break;
-      //Logical
-    case Instruction::Shl:
-      HWOp = makeHW<Shl>(IVal,IName,Bits);
-      break;
-    case Instruction::LShr:
-      HWOp = makeHW<LShr>(IVal,IName,Bits);
-      break;
-    case Instruction::AShr:
-      HWOp = makeHW<AShr>(IVal,IName,Bits);
-      break;
-    case Instruction::And:
-      HWOp = makeHW<And>(IVal,IName,Bits);
-      break;
-    case Instruction::Or:
-      HWOp = makeHW<Or>(IVal,IName,Bits);
-      break;
-    case Instruction::Xor:
-      HWOp = makeHW<Xor>(IVal,IName,Bits);
-      break;
-
-    default:
+    if (IType->isHalfTy()) {
+      M=10;
+      E=5;
+    } else if (IType->isFloatTy()) {
+      M=23;
+      E=8;
+    } else if (IType->isDoubleTy()) {
+      M=52;
+      E=11;
+    } else if (IType->isFP128Ty()) {
+      M=112;
+      E=15;
+    } else {
       I.dump();
-      llvm_unreachable("Unknown Binary Operator");
+      llvm_unreachable("Invalid FP Type");
+    }
+
+
+    switch (I.getOpcode()) {
+      case Instruction::FAdd:
+        HWOp = makeHW<FAdd>(IVal, IName, M, E);
+        break;
+      case Instruction::FMul:
+        HWOp = makeHW<FMul>(IVal,IName, M, E);
+        break;
+      case Instruction::FRem:
+        HWOp = makeHW<FRem>(IVal,IName, M, E);
+        break;
+      case Instruction::FSub:
+        HWOp = makeHW<FSub>(IVal,IName, M, E);
+        break;
+      case Instruction::FDiv:
+        HWOp = makeHW<FDiv>(IVal,IName, M, E);
+        break;
+    }
+  } else {
+    // It depends on the Instruction if values have to be interpreted as signed or
+    // unsigned.
+    switch ( I.getOpcode() ) {
+      case Instruction::Add:
+        HWOp = makeHW<Add>(IVal, IName,Bits);
+        break;
+      case Instruction::Sub:
+        HWOp = makeHW<Sub>(IVal,IName,Bits);
+        break;
+      case Instruction::Mul:
+        HWOp = makeHW<Mul>(IVal,IName,Bits);
+        break;
+      case Instruction::UDiv:
+        HWOp = makeHW<UDiv>(IVal,IName,Bits);
+        break;
+      case Instruction::SDiv:
+        HWOp = makeHW<SDiv>(IVal,IName,Bits);
+        break;
+      case Instruction::URem:
+        HWOp = makeHW<URem>(IVal,IName,Bits);
+        break;
+      case Instruction::SRem:
+        HWOp = makeHW<SRem>(IVal,IName,Bits);
+        break;
+        //Logical
+      case Instruction::Shl:
+        HWOp = makeHW<Shl>(IVal,IName,Bits);
+        break;
+      case Instruction::LShr:
+        HWOp = makeHW<LShr>(IVal,IName,Bits);
+        break;
+      case Instruction::AShr:
+        HWOp = makeHW<AShr>(IVal,IName,Bits);
+        break;
+      case Instruction::And:
+        HWOp = makeHW<And>(IVal,IName,Bits);
+        break;
+      case Instruction::Or:
+        HWOp = makeHW<Or>(IVal,IName,Bits);
+        break;
+      case Instruction::Xor:
+        HWOp = makeHW<Xor>(IVal,IName,Bits);
+        break;
+
+      default:
+        I.dump();
+        llvm_unreachable("Unknown Binary Operator");
+    }
   }
 
   for (Value *OpVal : I.operand_values() ) {
@@ -515,6 +570,8 @@ void OCLAccHW::visitBinaryOperator(Instruction &I) {
 
       connect(HWConst,HWOp);
     } else {
+      errs() << "get Operand\n";
+      OpVal->dump();
       base_p HWOperand = getHW<HW>(OpVal);
 
       connect(HWOperand,HWOp);
@@ -777,6 +834,10 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   }
 }
 
+void OCLAccHW::visitCmpInst(CmpInst &I) {
+  // FIXME
+  cmp_p C = makeHW<Compare>(&I, "Fixme");
+}
 
 #ifdef TYPENAME
 #undef TYPENAME

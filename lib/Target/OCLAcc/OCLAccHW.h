@@ -69,11 +69,14 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
     // Visitor Methods
     void visitBasicBlock(BasicBlock &);
-    void visitBinaryOperator(Instruction &);
+    void visitBinaryOperator(BinaryOperator &);
     void visitLoadInst(LoadInst &);
     void visitStoreInst(StoreInst &);
     void visitGetElementPtrInst(GetElementPtrInst &);
     void visitCallInst(CallInst &);
+    void visitCmpInst(CmpInst &);
+    //void visitICmpInst(ICmpInst &);
+    //void visitFCmpInst(FCmpInst &);
 
   private:
     KernelMapTy KernelMap;

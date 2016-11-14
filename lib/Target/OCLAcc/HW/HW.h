@@ -16,7 +16,7 @@ namespace oclacc {
 class HW : public Identifiable, public Visitable
 {
   protected:
-    size_t BitWidth;
+    unsigned BitWidth;
     const llvm::Value *IR;
     component_p Parent;
 
@@ -24,7 +24,7 @@ class HW : public Identifiable, public Visitable
     std::vector<base_p> Outs;
 
   public:
-    HW(const std::string &Name, size_t BitWidth, llvm::Value *IR=nullptr) : Identifiable(Name), BitWidth(BitWidth), IR(IR) { 
+    HW(const std::string &Name, unsigned BitWidth, llvm::Value *IR=nullptr) : Identifiable(Name), BitWidth(BitWidth), IR(IR) { 
     }
 
     virtual ~HW() = default;
@@ -50,14 +50,14 @@ class HW : public Identifiable, public Visitable
           Outs.push_back(P);
     }
 
-    virtual base_p getIn(size_t I) const { return I < Ins.size() ? Ins[I] : NULL;  }
-    virtual base_p getOut(size_t I) const { return  I < Outs.size() ? Outs[I] : NULL; }
+    virtual base_p getIn(unsigned I) const { return I < Ins.size() ? Ins[I] : NULL;  }
+    virtual base_p getOut(unsigned I) const { return  I < Outs.size() ? Outs[I] : NULL; }
 
     virtual const std::vector<base_p> &getIns() const { return Ins; }
     virtual const std::vector<base_p> &getOuts() const { return Outs;  }
 
-    virtual size_t getBitWidth() const { return BitWidth; }
-    virtual void setBitWidth(const size_t W) { BitWidth=W; }
+    virtual unsigned getBitWidth() const { return BitWidth; }
+    virtual void setBitWidth(const unsigned W) { BitWidth=W; }
 
     const llvm::Value * getIR() const { return IR; }
     void setIR(const llvm::Value *P) { IR=P; }

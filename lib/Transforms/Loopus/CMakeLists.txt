@@ -19,6 +19,7 @@ add_llvm_library(LLVMLoopus
   ArgPromotionTracker.cpp
   CanonicalizePredecessors.cpp
   CFGOptimizer.cpp
+  FindAllPaths.cpp
 )
 
 add_dependencies(LLVMLoopus intrinsics_gen)
