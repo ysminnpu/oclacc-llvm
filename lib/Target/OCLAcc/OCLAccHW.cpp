@@ -63,11 +63,12 @@
 #include "HW/Kernel.h"
 #include "HW/Constant.h"
 #include "HW/Compare.h"
+#include "HW/Control.h"
 
 #include <cxxabi.h>
 #define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
 
-#define DEBUG_TYPE "OCLAccHW"
+#define DEBUG_TYPE "oclacchw"
 
 using namespace oclacc;
 
@@ -202,6 +203,9 @@ bool OCLAccHW::runOnModule(Module &M) {
     }
 
     handleKernel(*KF);
+
+    FindAllPaths &AP = getAnalysis<FindAllPaths>(*KF);
+    AP.dump();
   }
 
   return false;
@@ -241,6 +245,7 @@ void OCLAccHW::handleKernel(const Function &F) {
     block_p HWB = getBlock(&BB);
     HWB->dump();
   }
+
 }
 
 /// \brief Walk through BBs, set inputs and outputs
@@ -292,19 +297,12 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       Type *VT = V->getType();
 
       // Find all possible paths from DefBB to BB
-      DEBUG(dbgs() << "-----------------\n");
-      DEBUG(dbgs() << "Paths from '" << DefBB->getName() << "' to '" << BB.getName() << ":'\n");
-      int i = 0;
-
       for (const FindAllPaths::SinglePathTy P : AP.getPathFromTo(DefBB, &BB)) {
-        DEBUG(dbgs() << "Path" << i << "\n");
 
         for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
             ToBBIt != P.end(); 
             FromBBIt = ToBBIt, ++ToBBIt ) 
         {
-          DEBUG(dbgs() << "  '" << (*FromBBIt)->getName() << " -> " << (*ToBBIt)->getName() << "'\n");
-          
           scalarport_p HWP = makeHWBB<ScalarPort>(&BB, I, I->getName(), VT->getScalarSizeInBits(), getDatatype(VT));
           connect(HWI, HWP);
 
@@ -315,11 +313,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           HWDef->addOutScalar(HWP);
           HWBB->addInScalar(HWP);
         }
-
-        ++i;
-        DEBUG(dbgs() << "  ---------------\n");
       }
-      DEBUG(dbgs() << "-----------------\n");
 
     } 
     else if (const Argument *A = dyn_cast<Argument>(V)) {
@@ -460,6 +454,8 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
   Value *IVal = &I;
   Type *IType = I.getType();
 
+  errs() << I.getName() << " in block " << I.getParent()->getName() << "\n";
+
   std::string IName = I.getName();
 
   Function *F = I.getParent()->getParent();
@@ -570,8 +566,6 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
 
       connect(HWConst,HWOp);
     } else {
-      errs() << "get Operand\n";
-      OpVal->dump();
       base_p HWOperand = getHW<HW>(OpVal);
 
       connect(HWOperand,HWOp);
@@ -745,11 +739,8 @@ const_p OCLAccHW::makeConstant(Constant *C, Instruction *I) {
   BitWidthAnalysis &BWA = getAnalysis<BitWidthAnalysis>(*F);
   Loopus::BitWidthRetTy BW = BWA.getBitWidth(C, I);
 
-  errs() << "BW Analysis " << I->getName() << ": " << BW.first << " " << BW.second << "\n";
-  
   std::stringstream CName;
   const_p HWConst;
-
 
   Type *CType = C->getType();
 
@@ -836,7 +827,22 @@ void OCLAccHW::visitCallInst(CallInst &I) {
 
 void OCLAccHW::visitCmpInst(CmpInst &I) {
   // FIXME
-  cmp_p C = makeHW<Compare>(&I, "Fixme");
+  cmp_p C = makeHW<Compare>(&I, "Compare");
+}
+
+void OCLAccHW::visitPHINode(PHINode &I) {
+  mux_p HWM = makeHW<Mux>(&I, I.getName());
+
+  for (unsigned i = 0; i < I.getNumIncomingValues(); ++i) {
+    const BasicBlock *BB = I.getIncomingBlock(i);
+    const Value *V = I.getIncomingValue(i);
+
+    port_p HWP = getHW<Port>(I.getParent(), V);
+    block_p HWB = getBlock(BB);
+
+    HWM->addIn(HWP, HWB);
+    connect(HWP, HWM);
+  }
 }
 
 #ifdef TYPENAME

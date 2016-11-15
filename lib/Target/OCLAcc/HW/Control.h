@@ -18,7 +18,7 @@ class Tmp : public HW
       //pass
     }
 
-    DECLARE_VISIT
+    DECLARE_VISIT;
 
     virtual void addIn(base_p p)
     {
@@ -29,11 +29,11 @@ class Tmp : public HW
 class Mux : public HW
 {
   public:
-    typedef std::pair<base_p, block_p> muxinput;
-    typedef std::list<muxinput> muxinput_list;
+    typedef std::pair<port_p, block_p> MuxInputTy;
+    typedef std::list<MuxInputTy> MuxInputsTy;
 
   private:
-    muxinput_list Ins;
+    MuxInputsTy Ins;
 
     using HW::addIn;
 
@@ -44,16 +44,15 @@ class Mux : public HW
     Mux (const Mux &) = delete;
     Mux &operator =(const Mux &) = delete;
 
-    void addMuxIn(base_p P, block_p B) {
+    void addIn(port_p P, block_p B) {
       Ins.push_back(std::make_pair(P, B));
     }
 
-    muxinput_list &getMuxIns() {
+    MuxInputsTy &getns() {
       return Ins;
     }
 
-    DECLARE_VISIT
-
+    DECLARE_VISIT;
 };
 
 }

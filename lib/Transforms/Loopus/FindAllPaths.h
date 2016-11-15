@@ -33,7 +33,8 @@ class FindAllPaths : public llvm::FunctionPass {
     typedef WorkListTy::iterator WorkListItTy;
     typedef WorkListTy::const_iterator WorkListConstItTy;
 
-    const PathTy getPathFromTo(const llvm::BasicBlock *F, const llvm::BasicBlock *T);
+    const PathTy getPathFromTo(const llvm::BasicBlock *F, const llvm::BasicBlock *T) const;
+    void dump(void) const;
 
   private:
     PathTy Paths;

@@ -191,8 +191,6 @@ class DFVisitor : public BaseVisitor
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      R.dump();
-
       for ( base_p P : R.getIns() ) {
         P->accept(*this);
       }
@@ -210,11 +208,11 @@ class DFVisitor : public BaseVisitor
     virtual int visit(ScalarPort &R) { 
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for (base_p P : R.getIns())
-        P->accept(*this);
+      //for (base_p P : R.getIns())
+      //  P->accept(*this);
 
-      for (base_p P : R.getOuts())
-        P->accept(*this);
+      //for (base_p P : R.getOuts())
+      //  P->accept(*this);
 
       return 0;
     }
@@ -235,11 +233,11 @@ class DFVisitor : public BaseVisitor
 
       R.getStream()->accept(*this);
 
-      for (base_p P : R.getIns())
-        P->accept(*this);
+      //for (base_p P : R.getIns())
+      //  P->accept(*this);
 
-      for (base_p P : R.getOuts())
-        P->accept(*this);
+      //for (base_p P : R.getOuts())
+      //  P->accept(*this);
 
       return 0;
     }
