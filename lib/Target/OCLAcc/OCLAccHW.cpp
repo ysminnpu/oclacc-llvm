@@ -36,6 +36,7 @@
 #include "llvm/Transforms/Loopus.h"
 #include "../../../lib/Transforms/Loopus/OpenCLMDKernels.h"
 #include "../../../lib/Transforms/Loopus/HDLPromoteID.h"
+#include "../../../lib/Transforms/Loopus/ArgPromotionTracker.h"
 #include "../../../lib/Transforms/Loopus/BitWidthAnalysis.h"
 #include "../../../lib/Transforms/Loopus/FindAllPaths.h"
 
@@ -98,6 +99,7 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
 
 INITIALIZE_PASS_BEGIN(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
 INITIALIZE_PASS_DEPENDENCY(HDLPromoteID);
+INITIALIZE_PASS_DEPENDENCY(ArgPromotionTracker);
 INITIALIZE_PASS_DEPENDENCY(OpenCLMDKernels);
 INITIALIZE_PASS_DEPENDENCY(BitWidthAnalysis);
 INITIALIZE_PASS_DEPENDENCY(FindAllPaths);
@@ -128,6 +130,7 @@ bool OCLAccHW::doFinalization(Module &M) {
 
 void OCLAccHW::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<HDLPromoteID>();
+  AU.addRequired<ArgPromotionTracker>();
   AU.addRequired<OpenCLMDKernels>();
   AU.addRequired<BitWidthAnalysis>();
   AU.addRequired<FindAllPaths>();
@@ -228,19 +231,26 @@ void OCLAccHW::handleKernel(const Function &F) {
   kernel_p HWKernel = makeKernel(&F, KernelName, isWorkItemKernel);
   HWDesign.addKernel(HWKernel);
 
-  // Arguments must be represented by ScalarPorts and StreamPorts
+  // We first create blocks for each BasicBlock, so we can handle the Kernel
+  // Arguments.
+  for (const BasicBlock &BB : F.getBasicBlockList()) {
+    block_p HWBB = makeBlock(&BB,BB.getName());
+  }
+
+  // Create Arguments, assign them to the Kernel and the first BasicBlock.
   for (const Argument &Arg : F.getArgumentList()) {
     handleArgument(Arg);
   }
 
-  // For each BasicBlock, create Ports where required and generate all HWNodes
-  // for the instructions.
+  // Generate all Ports needed by the BasicBlock and visit all containing
+  // Instructions.
   for (const BasicBlock &BB : F.getBasicBlockList()) {
     visit(const_cast<BasicBlock&>(BB));
   }
 
   HWKernel->dump();
 
+  // Print all Ports of all Blocks.
   for (const BasicBlock &BB : F.getBasicBlockList()) {
     block_p HWB = getBlock(&BB);
     HWB->dump();
@@ -253,57 +263,192 @@ void OCLAccHW::handleKernel(const Function &F) {
 /// Walk through all instructions, visit their uses and check if they were
 /// defined in that BB
 void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
-  block_p HWBB = makeBlock(&BB,BB.getName());
-
   FindAllPaths &AP = getAnalysis<FindAllPaths>(*(BB.getParent()));
 
-  std::vector<const Value *> VS;
+  block_p HWBB = getBlock(&BB);
+
+  std::vector<const Argument *> AS;
+  std::vector<const Instruction *> VS;
+
+  // Collect all foreign Instructions and Arguments used by this BasicBlock
+  // to add them as Ports.
   for (const Instruction &I : BB.getInstList()) {
     for (const Use &U : I.operands()) {
       const Value *V = U.get();
-      if (isa<Constant>(V)
-          || isa<BasicBlock>(V)
-          ) continue;
 
-      VS.push_back(V);
+      // Do we already have a Mapping Value->HW valid in this BB?
+      if (existsHW(&BB, V)) 
+        continue;
+
+      // Constants are created when they are used, BasicBlocks are PHINode
+      // Operands and can be skipped.
+      //
+      if (isa<Constant>(V) || isa<BasicBlock>(V)) 
+        continue;
+
+      // We handle Arguments and Instructions separately. Instructions can be
+      // safely connected as their definition has already been visited.
+      //
+      if (const Instruction *I = dyn_cast<Instruction>(V)) {
+
+        // Only handle Instructions not defined in BB
+        if (I->getParent() == &BB)
+          continue;
+
+        VS.push_back(I); 
+      } else if (const Argument *A = dyn_cast<Argument>(V))
+        AS.push_back(A);
+      else {
+        V->dump();
+        llvm_unreachable("unknown value");
+      }
     }
   }
 
+  // Multiple uses of a single Value should result in a single Port. So we
+  // eliminate duplicates.
   std::sort(VS.begin(), VS.end());
   VS.erase(std::unique(VS.begin(), VS.end()), VS.end());
 
-  // Find values not being defined in BB
-  for (const Value *V : VS) {
-    if (const Instruction *I = dyn_cast<Instruction>(V)) {
-      const BasicBlock *DefBB = I->getParent();
-      
-      // Local value
-      if (DefBB == &BB)
-        continue;
+  std::sort(AS.begin(), AS.end());
+  AS.erase(std::unique(AS.begin(), AS.end()), AS.end());
 
-      // The current block BB uses a value defined in a different block. We have
-      // to:
-      // - find the complete path from the definition's block to the current
-      // - create a single ScalarPort SP to connect both
-      // - add SP as OutScalar in DefBB
-      // - add SP as InScalar in BB
-      // - connect the defining value with the OutScalar
-      // - connect the user with the InScalar
-      // - create a blockValueMap entry BB->(V->ScalarPort)
+  for (const Instruction *I : VS) {
+    // The current block BB uses a value defined in a different block. We have
+    // to:
+    // - find the complete path from the definition's block to the current
+    // - between each two blocks, create a single ScalarPort SP to connect both
+    // - add SP as OutScalar in DefBB
+    // - add SP as InScalar in BB
+    // - connect the definition with the OutScalar
+    // - connect the user with the InScalar
+    // - create a blockValueMap entry BB->(I->ScalarPort) for each newly created
+    // Port
+    //
+    // We can be sure that all blocks from definition to use exist because only
+    // values defined before in the source file can be used as operand.
 
-      base_p HWI = getHW<HW>(I);
-      block_p HWDef = getBlock(DefBB);
+    const BasicBlock *DefBB = I->getParent();
 
-      Type *VT = V->getType();
+    block_p HWDefBB = getBlock(DefBB);
+    base_p HWI = getHW<HW>(DefBB, I);
 
-      // Find all possible paths from DefBB to BB
-      for (const FindAllPaths::SinglePathTy P : AP.getPathFromTo(DefBB, &BB)) {
+    // The type will be the same for all newly created ports
+    Type *IT = I->getType();
+    const std::string Name = I->getName();
+
+    const FindAllPaths::PathTy &Paths = AP.getPathFromTo(DefBB, &BB);
+
+    if (IT->isIntegerTy() || IT->isFloatingPointTy()) { 
+      for (const FindAllPaths::SinglePathTy P : Paths) {
 
         for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
             ToBBIt != P.end(); 
             FromBBIt = ToBBIt, ++ToBBIt ) 
         {
-          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, I, I->getName(), VT->getScalarSizeInBits(), getDatatype(VT));
+
+          block_p HWFrom = getBlock(*FromBBIt);
+          block_p HWTo = getBlock(*ToBBIt);
+          // TODO: use BitWidthAnalysis
+
+          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT));
+          connect(HWI, HWP);
+
+          // Add Port to defining and using Block
+          HWFrom->addOutScalar(HWP);
+          HWTo->addInScalar(HWP);
+
+          // Proceed HWI to connect potential next blocks port to
+          HWI = HWP;
+        }
+      }
+    } 
+    else if (IT->isPointerTy()) {
+      IT->dump();
+      llvm_unreachable("pointer operand in code. fixme.");
+    }
+  }
+
+  ArgPromotionTracker &AT = getAnalysis<ArgPromotionTracker>();
+
+  // Arguments have to be handles twofold. Propagated WI-Arguments have to be
+  // passed from BB to BB, real arguments are static for all BBs.
+  //
+  const BasicBlock *EntryBB = &(BB.getParent()->getEntryBlock());
+
+  for (const Argument *A : AS) {
+    // Only WI functions have to be passed from block to block. Other Arguments
+    // are static and can be used directly. There must exist a ScalarPort for
+    // the Argument as they are created before visiting the BasicBlocks.
+    //
+    if (AT.isPromotedArgument(A)) {
+      base_p HWI = getHW<ScalarPort>(&BB, A);
+      const Type *AType = A->getType();
+      
+      if (!AType->isIntegerTy()) {
+        A->dump();
+        AType->dump();
+        llvm_unreachable("stop");
+      }
+
+      const FindAllPaths::PathTy &Paths = AP.getPathFromTo(EntryBB, &BB);
+
+      for (const FindAllPaths::SinglePathTy P : Paths) {
+
+        for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
+            ToBBIt != P.end(); 
+            FromBBIt = ToBBIt, ++ToBBIt ) 
+        {
+
+          block_p HWFrom = getBlock(*FromBBIt);
+          block_p HWTo = getBlock(*ToBBIt);
+          // TODO: use BitWidthAnalysis
+
+          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, A, A->getName(), AType->getScalarSizeInBits(), getDatatype(AType));
+          connect(HWI, HWP);
+
+          // Add Port to defining and using Block
+          HWFrom->addOutScalar(HWP);
+          HWTo->addInScalar(HWP);
+
+          // Proceed HWI to connect potential next blocks port to
+          HWI = HWP;
+        }
+      }
+    } else {
+      // Nothing has to be done right now. We will connect the Argument with its
+      // user when the user is visited.
+    }
+  }
+}
+#if 0
+      Type *ElementType = IT->getPointerElementType();
+      //TODO Use Bitwidth from analysis
+      unsigned Bits = ElementType->getScalarSizeInBits();
+
+      // Check Address Space
+      unsigned LAS = ElementType->getPointerAddressSpace();
+      ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(LAS);
+
+      switch (AS) {
+        case ocl::AS_GLOBAL:
+          break;
+        case ocl::AS_LOCAL:
+          break;
+        default:
+          llvm_unreachable("Invalid AddressSpace");
+      }
+
+    // Find all possible paths from DefBB to BB
+    for (const FindAllPaths::SinglePathTy P : AP.getPathFromTo(DefBB, &BB)) {
+
+      for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
+          ToBBIt != P.end(); 
+          FromBBIt = ToBBIt, ++ToBBIt ) 
+      {
+        // Do we have a Scalar or StreamPort?
+        if (VT->isIntegerTy() || VT->isFloatingPointTy()) { 
+          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, V, V->getName(), VT->getScalarSizeInBits(), getDatatype(VT));
           connect(HWI, HWP);
 
           // Proceed HWI to connect potential next blocks port to
@@ -312,50 +457,39 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           // Add Port to defining and using Block
           HWDef->addOutScalar(HWP);
           HWBB->addInScalar(HWP);
-        }
-      }
+        } 
+        else if (VT->isPointerTy()) {
+          Type *ElementType   = VT->getPointerElementType();
+          //TODO Use Bitwidth from analysis
+          unsigned Bits = ElementType->getScalarSizeInBits();
 
-    } 
-    else if (const Argument *A = dyn_cast<Argument>(V)) {
-      // get Kernel
-      kernel_p HWK = getKernel(A->getParent());
+          // Check Address Space
+          unsigned LAS = ElementType->getPointerAddressSpace();
+          ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(LAS);
 
-      //inputs
-      for (const scalarport_p HWP : HWK->getInScalars() ) {
-        if (HWP->getIR() == A) {
-          HWBB->addInScalar(HWP);
-          BlockValueMap[&BB][A] = HWP ;
-        }
-      }
-      for (const streamport_p HWP : HWK->getInStreams() ) {
-        if (HWP->getIR() == A) {
-          HWBB->addInStream(HWP);
-          BlockValueMap[&BB][A] = HWP ;
-        }
-      }
+          switch (AS) {
+            case ocl::AS_GLOBAL:
+              break;
+            case ocl::AS_LOCAL:
+              break;
+            default:
+              llvm_unreachable("Invalid AddressSpace");
+          }
 
-      // outputs
-      for (const scalarport_p HWP : HWK->getOutScalars() ) {
-        if (HWP->getIR() == A) {
-          HWBB->addOutScalar(HWP);
-          BlockValueMap[&BB][A] = HWP ;
-        }
+          const Datatype D = getDatatype(ElementType);
+          streamport_p HWS = makeHWBB<StreamPort>(&BB, V, Name, Bits, AS, D);
+
+          connect(HWI, HWS);
+
+          HWDef->addOutStream(HWS);
+          HWBB->addInStream(HWS);
+        } else 
+          llvm_unreachable("stop");
       }
-      for (const streamport_p HWP : HWK->getOutStreams() ) {
-        if (HWP->getIR() == A) {
-          HWBB->addOutStream(HWP);
-          BlockValueMap[&BB][A] = HWP ;
-        }
-      }
-    } 
-    else if (const Constant *C = dyn_cast<Constant>(V)) {
-        TODO("handle constant");
-    } else {
-        errs() << "Value " << V->getName() << " :" << TYPENAME(V) << " no Instruction/Argument\n";
-        llvm_unreachable("stop.");
     }
   }
 }
+#endif
 
 /// \brief Create ScalarInput/InputStream for Kernel
 ///
@@ -366,26 +500,45 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
 /// Arguments are either actual values directly passed to the kernel or
 /// references to memory.
 ///
+/// Argument types are later handled differently:
+///  - Actual scalars: same for all WIs, no propagation between BBs
+///  - Eliminated WI functions: propagate them from block to block.
+///  - Streams: same for all WIs
+///
+/// The separation between WI and static scalars is respected when used. Their 
+/// generation only depends on their type.
+///
 /// OpenCL 2.0 pp 34: allowed address space for variables is _private,
 /// pointers may be global, local or constant
 void OCLAccHW::handleArgument(const Argument &A) {
-  Type *AType = A.getType();
+  const Type *AType = A.getType();
   const std::string Name = A.getName();
 
-  kernel_p HWKernel = getKernel(A.getParent());
+  const Function *F = A.getParent();
+
+  kernel_p HWKernel = getKernel(F);
+
+  const BasicBlock *EB = &(F->getEntryBlock());
+  block_p HWEB = getBlock(EB);
+
+  // TODO Use BitWdith Analysis
+  BitWidthAnalysis &BW = getAnalysis<BitWidthAnalysis>(const_cast<Function &>(*F));
+  std::pair<int, Loopus::ExtKind> W = BW.getBitWidth(&A);
+  unsigned Bits = W.first;
+
+  errs() << "Argument " << A.getName() << " uses " << Bits << " Bits\n";
 
   if (AType->isIntegerTy() || AType->isFloatingPointTy()) {
     scalarport_p S = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType));
     HWKernel->addInScalar(S);
+    ArgMap[&A] = S;
   } 
-  else if (AType->isPointerTy()) {
+  else if (const PointerType *PType = dyn_cast<PointerType>(AType)) {
     bool isRead = false;
     bool isWritten = false;
 
-    PointerType *PType = static_cast<PointerType*>(AType);
-    unsigned LAS = PType->getAddressSpace();
+    unsigned AS = PType->getAddressSpace();
 
-    ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(LAS);
     switch (AS) {
       case ocl::AS_GLOBAL:
         break;
@@ -421,24 +574,22 @@ void OCLAccHW::handleArgument(const Argument &A) {
       }
     }
 
-    Type *ElementType   = AType->getPointerElementType();
-    unsigned SizeInBits = ElementType->getScalarSizeInBits();
+    const Type *ElementType   = AType->getPointerElementType();
 
     if (!isWritten && !isRead)
       DEBUG(dbgs() << "omitting unused Argument " << A.getName() << "\n");
     else {
       const Datatype D = getDatatype(ElementType);
+      streamport_p S = makeHW<StreamPort>(&A, Name, Bits, static_cast<ocl::AddressSpace>(AS), D);
+      ArgMap[&A] = S;
+
       if (isWritten) {
-        streamport_p S = makeHW<StreamPort>(&A, Name, SizeInBits, AS, D);
-        S->setParent(HWKernel);
         HWKernel->addOutStream(S);
-        DEBUG(dbgs() << "Argument '" << Name << "' is OutStream (" << Strings_Datatype[D] << ":" <<  SizeInBits << ")\n");
+        DEBUG(dbgs() << "Argument '" << Name << "' is OutStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
       }
       if (isRead) {
-        streamport_p S = makeHW<StreamPort>(&A, Name, SizeInBits, AS, D);
         HWKernel->addInStream(S);
-        S->setParent(HWKernel);
-        DEBUG(dbgs() << "Argument '" << Name << "' is InStream (" << Strings_Datatype[D] << ":" <<  SizeInBits << ")\n");
+        DEBUG(dbgs() << "Argument '" << Name << "' is InStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
       }
     }
   }
@@ -453,6 +604,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
 void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
   Value *IVal = &I;
   Type *IType = I.getType();
+  const BasicBlock *BB = I.getParent();
 
   errs() << I.getName() << " in block " << I.getParent()->getName() << "\n";
 
@@ -460,12 +612,7 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
 
   Function *F = I.getParent()->getParent();
 
-  BitWidthAnalysis &BW = getAnalysis<BitWidthAnalysis>(*F);
-  std::pair<int, Loopus::ExtKind> W = BW.getBitWidth(&I);
-
   base_p HWOp;
-
-  unsigned Bits = W.first;
 
   if (IType->isVectorTy())
     TODO("Implent vector types");
@@ -494,64 +641,69 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
 
     switch (I.getOpcode()) {
       case Instruction::FAdd:
-        HWOp = makeHW<FAdd>(IVal, IName, M, E);
+        HWOp = makeHWBB<FAdd>(BB, IVal, IName, M, E);
         break;
       case Instruction::FMul:
-        HWOp = makeHW<FMul>(IVal,IName, M, E);
+        HWOp = makeHWBB<FMul>(BB, IVal,IName, M, E);
         break;
       case Instruction::FRem:
-        HWOp = makeHW<FRem>(IVal,IName, M, E);
+        HWOp = makeHWBB<FRem>(BB, IVal,IName, M, E);
         break;
       case Instruction::FSub:
-        HWOp = makeHW<FSub>(IVal,IName, M, E);
+        HWOp = makeHWBB<FSub>(BB, IVal,IName, M, E);
         break;
       case Instruction::FDiv:
-        HWOp = makeHW<FDiv>(IVal,IName, M, E);
+        HWOp = makeHWBB<FDiv>(BB, IVal,IName, M, E);
         break;
     }
   } else {
+
+    BitWidthAnalysis &BW = getAnalysis<BitWidthAnalysis>(*F);
+    std::pair<int, Loopus::ExtKind> W = BW.getBitWidth(&I);
+    unsigned Bits = W.first;
+
     // It depends on the Instruction if values have to be interpreted as signed or
     // unsigned.
     switch ( I.getOpcode() ) {
       case Instruction::Add:
-        HWOp = makeHW<Add>(IVal, IName,Bits);
+        HWOp = makeHWBB<Add>(BB, IVal, IName,Bits);
         break;
       case Instruction::Sub:
-        HWOp = makeHW<Sub>(IVal,IName,Bits);
+        HWOp = makeHWBB<Sub>(BB, IVal,IName,Bits);
         break;
       case Instruction::Mul:
-        HWOp = makeHW<Mul>(IVal,IName,Bits);
+        HWOp = makeHWBB<Mul>(BB, IVal,IName,Bits);
         break;
       case Instruction::UDiv:
-        HWOp = makeHW<UDiv>(IVal,IName,Bits);
+        HWOp = makeHWBB<UDiv>(BB, IVal,IName,Bits);
         break;
       case Instruction::SDiv:
-        HWOp = makeHW<SDiv>(IVal,IName,Bits);
+        HWOp = makeHWBB<SDiv>(BB, IVal,IName,Bits);
         break;
       case Instruction::URem:
-        HWOp = makeHW<URem>(IVal,IName,Bits);
+        HWOp = makeHWBB<URem>(BB, IVal,IName,Bits);
         break;
       case Instruction::SRem:
-        HWOp = makeHW<SRem>(IVal,IName,Bits);
+        HWOp = makeHWBB<SRem>(BB, IVal,IName,Bits);
         break;
         //Logical
       case Instruction::Shl:
-        HWOp = makeHW<Shl>(IVal,IName,Bits);
+        HWOp = makeHWBB<Shl>(BB, IVal,IName,Bits);
         break;
       case Instruction::LShr:
-        HWOp = makeHW<LShr>(IVal,IName,Bits);
+        HWOp = makeHWBB<LShr>(BB, IVal,IName,Bits);
         break;
       case Instruction::AShr:
-        HWOp = makeHW<AShr>(IVal,IName,Bits);
+        HWOp = makeHWBB<AShr>(BB, IVal,IName,Bits);
         break;
       case Instruction::And:
-        HWOp = makeHW<And>(IVal,IName,Bits);
+        HWOp = makeHWBB<And>(BB, IVal,IName,Bits);
         break;
       case Instruction::Or:
-        HWOp = makeHW<Or>(IVal,IName,Bits);
+        HWOp = makeHWBB<Or>(BB, IVal,IName,Bits);
         break;
       case Instruction::Xor:
-        HWOp = makeHW<Xor>(IVal,IName,Bits);
+        HWOp = makeHWBB<Xor>(BB, IVal,IName,Bits);
         break;
 
       default:
@@ -566,7 +718,7 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
 
       connect(HWConst,HWOp);
     } else {
-      base_p HWOperand = getHW<HW>(OpVal);
+      base_p HWOperand = getHW<HW>(I.getParent(), OpVal);
 
       connect(HWOperand,HWOp);
     }
@@ -575,16 +727,20 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
 
 void OCLAccHW::visitLoadInst(LoadInst  &I)
 {
-  std::string Name = I.getName().str();
-  Value *AddrVal = I.getPointerOperand();
+  const std::string Name = I.getName().str();
+  const Value *AddrVal = I.getPointerOperand();
 
   unsigned AddrSpace = I.getPointerAddressSpace();
 
   if ( AddrSpace != ocl::AS_GLOBAL && AddrSpace != ocl::AS_LOCAL )
     llvm_unreachable("NOT_IMPLEMENTED: Only global and local address space supported.");
 
-  //Get Address to store at
-  streamindex_p HWStreamIndex = getHW<StreamIndex>(AddrVal);
+  //Get Address to load from
+  const GetElementPtrInst * P = dyn_cast<GetElementPtrInst>(AddrVal);
+  if (!P)
+    llvm_unreachable("stop");
+
+  streamindex_p HWStreamIndex = getHW<StreamIndex>(I.getParent(), P);
   if (!HWStreamIndex) {
     llvm_unreachable("Index base address only streams.");
   }
@@ -599,7 +755,7 @@ void OCLAccHW::visitLoadInst(LoadInst  &I)
 
   BlockValueMap[I.getParent()][&I] = HWStreamIndex;
 
-  HWStreamIndex->setName(HWStream->getName());
+  HWStreamIndex->setName(HWStream->getName()+"_Index");
 }
 
 ///
@@ -615,12 +771,11 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
 {
   const std::string Name = I.getName();
 
-  Value *DataVal = I.getValueOperand();
-  Value *AddrVal = I.getPointerOperand();
+  const Value *DataVal = I.getValueOperand();
+  const Value *AddrVal = I.getPointerOperand();
 
   // Check Address Space
-  unsigned LAS = I.getPointerAddressSpace();
-  ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(LAS);
+  unsigned AS = I.getPointerAddressSpace();
 
   switch (AS) {
     case ocl::AS_GLOBAL:
@@ -636,15 +791,15 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
 
   //Get Data to store
   
-  if ( Constant *ConstValue = dyn_cast<Constant>(DataVal) ) {
+  if (const Constant *ConstValue = dyn_cast<Constant>(DataVal) ) {
     const_p HWConst = makeConstant(ConstValue, &I);
     HWData = HWConst;
   } else {
-    HWData = getHW<HW>(DataVal);
+    HWData = getHW<HW>(I.getParent(), DataVal);
   }
 
   //Get Address to store at
-  HWOut = getHW<HW>(AddrVal);
+  HWOut = getHW<HW>(I.getParent(), AddrVal);
 
   streamport_p HWStream;
   streamindex_p HWStreamIndex;
@@ -688,7 +843,7 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
   if ( BaseAddressSpace != ocl::AS_GLOBAL && BaseAddressSpace != ocl::AS_LOCAL )
     llvm_unreachable( "Only global and local address space supported." );
 
-  streamport_p HWBase = getHW<StreamPort>(BaseValue);
+  streamport_p HWBase = getHW<StreamPort>(I.getParent(), BaseValue);
 
   // Handle index on the base address
   if ( I.getNumIndices() != 1 )
@@ -711,12 +866,12 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
       llvm_unreachable("Unknown Constant Type");
 
     int64_t C = IntConst->getSExtValue();
-    HWStreamIndex = makeHW<StaticStreamIndex>(&I, Name, HWBase, C, IntConst->getValue().getActiveBits());
+    HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), &I, Name, HWBase, C, IntConst->getValue().getActiveBits());
   } else {
     HWIndex = getHW<HW>(I.getParent(), IndexValue);
 
     // No need to add StreamIndex to BlockValueMap so create object directly
-    HWStreamIndex = makeHW<DynamicStreamIndex>(&I, Name, HWBase, HWIndex);
+    HWStreamIndex = makeHWBB<DynamicStreamIndex>(I.getParent(), &I, Name, HWBase, HWIndex);
 
     HWIndex->addOut(HWStreamIndex);
   }
@@ -731,22 +886,22 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
 /// Do not use makeHW to create Constants. A single Constant objects might be used by
 /// multiple instructions, leading to conflicts in the ValueMap.
 ///
-const_p OCLAccHW::makeConstant(Constant *C, Instruction *I) {
-  BasicBlock * BB = I->getParent();
+const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
+  const BasicBlock * BB = I->getParent();
   block_p HWBlock = getBlock(BB);
-  Function *F = BB->getParent();
+  const Function *F = BB->getParent();
 
-  BitWidthAnalysis &BWA = getAnalysis<BitWidthAnalysis>(*F);
+  BitWidthAnalysis &BWA = getAnalysis<BitWidthAnalysis>(const_cast<Function &>(*F));
   Loopus::BitWidthRetTy BW = BWA.getBitWidth(C, I);
 
   std::stringstream CName;
   const_p HWConst;
 
-  Type *CType = C->getType();
+  const Type *CType = C->getType();
 
   int Bits = BW.first;
 
-  if (ConstantInt *IConst = dyn_cast<ConstantInt>(C)) {
+  if (const ConstantInt *IConst = dyn_cast<ConstantInt>(C)) {
     switch (BW.second) {
       case Loopus::SExt:
         {
@@ -775,7 +930,7 @@ const_p OCLAccHW::makeConstant(Constant *C, Instruction *I) {
         llvm_unreachable("Invalid sign extention type");
     }
   } 
-  else if (ConstantFP *FConst = dyn_cast<ConstantFP>(C)) {
+  else if (const ConstantFP *FConst = dyn_cast<ConstantFP>(C)) {
     assert(BW.second != Loopus::FPNoExt && "Constant is FP Type but FPNoExt is not set");
 
     const APFloat &Float = FConst->getValueAPF();
@@ -827,11 +982,11 @@ void OCLAccHW::visitCallInst(CallInst &I) {
 
 void OCLAccHW::visitCmpInst(CmpInst &I) {
   // FIXME
-  cmp_p C = makeHW<Compare>(&I, "Compare");
+  cmp_p C = makeHWBB<Compare>(I.getParent(), &I, "Compare");
 }
 
 void OCLAccHW::visitPHINode(PHINode &I) {
-  mux_p HWM = makeHW<Mux>(&I, I.getName());
+  mux_p HWM = makeHWBB<Mux>(I.getParent(), &I, I.getName());
 
   for (unsigned i = 0; i < I.getNumIncomingValues(); ++i) {
     const BasicBlock *BB = I.getIncomingBlock(i);

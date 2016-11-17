@@ -10,6 +10,7 @@
 #include "HW/typedefs.h"
 #include "HW/Design.h"
 #include "HW/Kernel.h"
+#include "HW/Streams.h"
 
 namespace llvm {
 
@@ -82,64 +83,48 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
   private:
     KernelMapTy KernelMap;
     BlockMapTy BlockMap;
+    
+    // Normal Instructions and propagated Arguments.
     BlockValueMapTy BlockValueMap;
+    
+    // Store Kernel Arguments. No mapping for propagated Arguments.
     ArgMapTy ArgMap;
 
     oclacc::DesignUnit HWDesign;
 
-    oclacc::const_p makeConstant(Constant *, Instruction *);
+    oclacc::const_p makeConstant(const Constant *, const Instruction *);
 
+    /// Create shared_ptr to HW object and return requested pointer type.
+    ///
     template<class HW, class ...Args>
-    std::shared_ptr<HW> makeHWBB(const BasicBlock *BB, const Value *IR, Args&& ...args) {
+    std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
 
       // A single Constant value might be used by
       // multiple instructions, leading to conflicts in the Map.
       if (isa<Constant>(IR))
         llvm_unreachable("Do not use makeHW to create constants.");
 
-      // Arguments have no  matching BasicBlock, they must not be added to the
-      // BlockValueMap but to the ArgMap.
-      if (isa<Argument>(IR))
-        llvm_unreachable("Do not use makeHW to create arguments.");
-
       std::shared_ptr<HW> HWP = std::make_shared<HW>(args...);
+      errs() << "make " << HWP->getUniqueName() << "\n";
       HWP->setIR(IR);
-      BlockValueMap[BB][IR] = HWP;
-
-      // Add new HW object to current Block
-      BlockMapIt BI = BlockMap.find(BB);
-      if (BI == BlockMap.end()) {
-        BB->dump();
-        IR->dump();
-        llvm_unreachable("No Block");
-      }
-      oclacc::block_p HWB = BI->second;
-      HWB->addOp(HWP);
-      HWP->setParent(HWB);
 
       return HWP;
     }
 
     template<class HW, class ...Args>
-    std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
-      if (const Instruction *I = dyn_cast<Instruction>(IR))
-        return makeHWBB<HW>(I->getParent(), IR, args...);
+    std::shared_ptr<HW> makeHWBB(const BasicBlock *BB, const Value *IR, Args&& ...args) {
 
-      // Arguments have no BasicBlock. 
-      // No need to assign them to the kernel. This is done by handleArgument(),
-      // as we do not know if it is an In or Out Port.
-      else if (const Argument *I = dyn_cast<Argument>(IR)) {
-        std::shared_ptr<HW> HWP = std::make_shared<HW>(args...);
-        HWP->setIR(IR);
-        ArgMap[I] = HWP;
-        return HWP;
-      }
-      else {
-        IR->dump();
-        llvm_unreachable("Called makeHW on non-Instruction, non-Argument value");
-      }
+      std::shared_ptr<HW> HWP = makeHW<HW>(IR, args...);
+      oclacc::block_p HWB = getBlock(BB);
+      HWP->setParent(HWB);
+
+      BlockValueMap[BB][IR] = HWP;
+
+      // Only add operations (Instructions) to Blocks.
+      if (!std::is_base_of<oclacc::Port, HW>::value) HWB->addOp(HWP);
+
+      return HWP;
     }
-
 
     /// \brief Make new kernel and add to KernelMap
     template<class ...Args>
@@ -169,28 +154,57 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
       return HWB;
     }
 
-    template<class HW>
-    std::shared_ptr<HW> getHW(const BasicBlock *BB, const Value *IR) const {
-      assert(! isa<Argument>(IR) && "Arguments are not assigned to a BasicBlock");
-
+    bool existsHW(const BasicBlock *BB, const Value *IR) const {
       BlockValueMapConstIt BI = BlockValueMap.find(BB);
-      if (BI == BlockValueMap.end()) {
-        BB->dump();
-        IR->dump(); 
-        llvm_unreachable("No BB");
-      }
+
+      if (BI == BlockValueMap.end()) return false;
 
       ValueMapConstIt VI = BI->second.find(IR);
-      if (VI == BI->second.end()) {
-        BB->dump();
-        IR->dump(); 
-        llvm_unreachable("No HW");
-      }
 
-      std::shared_ptr<HW> P = std::static_pointer_cast<HW>(VI->second);
-      return P;
+      if (VI == BI->second.end()) return false;
+
+      return true;
+
     }
 
+    template<class HW>
+    std::shared_ptr<HW> getHW(const BasicBlock *BB, const Value *IR) const {
+
+      BlockValueMapConstIt BI = BlockValueMap.find(BB);
+      ValueMapConstIt VI;
+
+      if (BI != BlockValueMap.end())
+        VI = BI->second.find(IR);
+      
+
+      // The block may not exist yet in BlockValueMap though the block itself
+      // exists in BlockMap.
+      //
+      if (BI == BlockValueMap.end() || VI == BI->second.end()) {
+        // Real Arguments are valid in every BasicBlock and thus are not listed in
+        // the BlockValueMap. Propagated WI functions however should have been
+        // added to the BlockValueMap, so we can be sure that we can directly
+        // use the Argument port
+        //
+        if (const Argument *A = dyn_cast<Argument>(IR)) {
+          ArgMapConstIt AI = ArgMap.find(A);
+          if (AI == ArgMap.end()) {
+            IR->dump();
+            llvm_unreachable("No Arg");
+          }
+
+          return std::static_pointer_cast<HW>(AI->second);
+        } 
+        else {
+          BB->dump();
+          IR->dump(); 
+          llvm_unreachable("No HW, No Arg");
+        }
+      } else
+        return std::static_pointer_cast<HW>(VI->second);
+    }
+
+#if 0
     /// \brief Return HW object for initial definition of IR.
     /// Generally use getHW(const BasicBlock *BB, ...) 
     template<class HW> std::shared_ptr<HW> getHW(const Value *IR) const {
@@ -211,6 +225,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
         llvm_unreachable("Called getHW on non-Instruction, non-Argument value");
       }
     }
+#endif
 
     oclacc::block_p getBlock(const BasicBlock *BB) const {
       BlockMapConstIt VI = BlockMap.find(BB);
@@ -237,7 +252,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
       HWTo->addIn(HWFrom);
     }
 
-    oclacc::Datatype getDatatype(Type *T) {
+    oclacc::Datatype getDatatype(const Type *T) const {
       oclacc::Datatype DT=oclacc::Invalid;
       if (T->isIntegerTy()) DT=oclacc::Integer;
       else if (T->isHalfTy()) DT=oclacc::Half;
