@@ -1,7 +1,8 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
-#include <set>
+#include <map>
+#include <vector>
 
 #include "Identifiable.h"
 #include "Visitor/Visitable.h"
@@ -21,17 +22,29 @@ class Component : public Identifiable, public Visitable {
   protected:
     const llvm::Value *IR;
 
-    typedef std::vector<port_p> PortsType;
+    typedef std::vector<port_p> PortsTy;
+    typedef std::vector<streamport_p> StreamsTy;
+    typedef std::vector<scalarport_p> ScalarsTy;
 
-    typedef std::set<streamport_p> StreamsType;
-    StreamsType InStreams;
-    StreamsType OutStreams;
+    // We often have to be able to look for a specific Value, so we store them
+    // in a map AND a list to avoid having to look up every single item's
+    // IR pointer when a new one is to be inserted.
+    typedef std::map<const llvm::Value *, streamport_p> StreamMapTy;
+    typedef std::map<const llvm::Value *, scalarport_p> ScalarMapTy;
 
-    typedef std::set<scalarport_p> ScalarsType;
-    ScalarsType InScalars;
-    ScalarsType OutScalars;
+    StreamsTy InStreams;
+    StreamMapTy InStreamsMap;
 
-    typedef std::set<const_p> ConstantsType;
+    StreamsTy OutStreams;
+    StreamMapTy OutStreamsMap;
+
+    ScalarsTy InScalars;
+    ScalarMapTy InScalarsMap;
+
+    ScalarsTy OutScalars;
+    ScalarMapTy OutScalarsMap;
+
+    typedef std::vector<const_p> ConstantsType;
     ConstantsType ConstVals;
 
     virtual bool isBlock() = 0;
@@ -41,47 +54,88 @@ class Component : public Identifiable, public Visitable {
     const llvm::Value * getIR() const { return IR; }
     void setIR(const llvm::Value *P) { IR=P; }
 
-    void addInScalar(scalarport_p p) { InScalars.insert(p); }
-    const ScalarsType &getInScalars() const { return InScalars; }
+    // InScalars
+    void addInScalar(scalarport_p P) { 
+      assert(P->getIR() != nullptr);
+      InScalarsMap[P->getIR()] = P; 
+      InScalars.push_back(P);
+    }
 
-    void addInStream(streamport_p p) { InStreams.insert(p); }
-    const StreamsType &getInStreams() const { return InStreams; }
+    const ScalarsTy &getInScalars() const { 
+      return InScalars; 
+    }
+    
+    bool containsInScalarForValue(const Value *V) {
+      ScalarMapTy::const_iterator IT = InScalarsMap.find(V);
+      return IT != InScalarsMap.end();
+    }
 
-    void addOutScalar(scalarport_p p) { OutScalars.insert(p); }
-    const ScalarsType &getOutScalars() const { return OutScalars; }
+    scalarport_p getInScalarForValue(const Value *V) {
+      ScalarMapTy::const_iterator IT = InScalarsMap.find(V);
+      if (IT != InScalarsMap.end())
+        return IT->second;
+      else return nullptr;
+    }
 
-    const PortsType getOuts(void) const {
-      PortsType Outs;
+    // InStreams
+    void addInStream(streamport_p P) { 
+      assert(P->getIR() != nullptr);
+      InStreamsMap[P->getIR()] = P;
+      InStreams.push_back(P);
+    }
+    const StreamsTy getInStreams() const { 
+      return InStreams; 
+    }
+
+    // OutScalars
+    void addOutScalar(scalarport_p P) { 
+      assert(P->getIR() != nullptr);
+      OutScalarsMap[P->getIR()] = P;
+      OutScalars.push_back(P);
+    }
+
+    const ScalarsTy &getOutScalars() const { 
+      return OutScalars;
+    }
+
+    bool containsOutScalarForValue(const Value *V) {
+      ScalarMapTy::const_iterator IT = OutScalarsMap.find(V);
+      return IT != OutScalarsMap.end();
+    }
+
+    scalarport_p getOutScalarForValue(const Value *V) {
+      ScalarMapTy::const_iterator IT = OutScalarsMap.find(V);
+      if (IT != OutScalarsMap.end())
+        return IT->second;
+      else return nullptr;
+    }
+
+    // OutStreams
+    void addOutStream(streamport_p P) { 
+      assert(P->getIR() != nullptr);
+      OutStreamsMap[P->getIR()] = P;
+      OutStreams.push_back(P);
+    }
+
+    const StreamsTy &getOutStreams() const { 
+      return OutStreams;
+    }
+
+    PortsTy getOuts(void) const {
+      PortsTy Outs;
       Outs.insert(Outs.end(), OutStreams.begin(), OutStreams.end());
       Outs.insert(Outs.end(), OutScalars.begin(), OutScalars.end());
       return Outs;
     }
 
-    const ScalarsType &getOutScalars(void) {
-      return OutScalars;
-    }
-    const StreamsType &getOutStreams(void) {
-      return OutStreams;
-    }
-
-    const PortsType getIns(void) const {
-      PortsType Ins;
+    PortsTy getIns(void) const {
+      PortsTy Ins;
       Ins.insert(Ins.end(), InStreams.begin(), InStreams.end());
       Ins.insert(Ins.end(), InScalars.begin(), InScalars.end());
       return Ins;
     }
 
-    const ScalarsType &getInScalars(void) {
-      return InScalars;
-    }
-    const StreamsType &getInStreams(void) {
-      return InStreams;
-    }
-
-    void addOutStream(streamport_p p) { OutStreams.insert(p); }
-    const StreamsType &getOutStreams() const { return OutStreams; }
-
-    void addConstVal(const_p p) { ConstVals.insert(p); }
+    void addConstVal(const_p p) { ConstVals.push_back(p); }
     const ConstantsType &getConstVals() const { return ConstVals; }
 
     void dump() {
@@ -115,6 +169,7 @@ class Component : public Identifiable, public Visitable {
 
   protected: 
     Component(const std::string &Name) : Identifiable(Name) { }
+    virtual ~Component() { }
 
 };
 
@@ -153,6 +208,7 @@ class Kernel : public Component {
     bool WorkItem;
 
     std::vector<block_p> Blocks;
+
   protected:
     bool isBlock() { return false; }
     bool isKernel() { return true; }

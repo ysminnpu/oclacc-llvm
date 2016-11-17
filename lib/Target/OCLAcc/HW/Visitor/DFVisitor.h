@@ -173,10 +173,10 @@ class DFVisitor : public BaseVisitor
         P->accept(*this);
       }
 
-      for ( base_p P : R.getIns() ) {
+      for ( port_p P : R.getIns() ) {
         P->accept(*this);
       }
-      for ( base_p P : R.getOuts() ) {
+      for ( port_p P : R.getOuts() ) {
         P->accept(*this);
       }
 
@@ -191,10 +191,10 @@ class DFVisitor : public BaseVisitor
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( base_p P : R.getIns() ) {
+      for ( port_p P : R.getIns() ) {
         P->accept(*this);
       }
-      for ( base_p P : R.getOuts() ) {
+      for ( port_p P : R.getOuts() ) {
         P->accept(*this);
       }
       for ( base_p P : R.getOps() ) {

@@ -346,20 +346,33 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
             ToBBIt != P.end(); 
             FromBBIt = ToBBIt, ++ToBBIt ) 
         {
-
           block_p HWFrom = getBlock(*FromBBIt);
           block_p HWTo = getBlock(*ToBBIt);
+
+          scalarport_p HWOut;
+          scalarport_p HWIn;
+
+          if (!HWFrom->containsOutScalarForValue(I)) {
+            HWOut = makeHWBB<ScalarPort>(*FromBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT));
+            HWFrom->addOutScalar(HWOut);
+            connect(HWI, HWOut);
+          } else
+            HWOut = HWFrom->getOutScalarForValue(I);
+
+          if (!HWTo->containsInScalarForValue(I)) {
+            HWIn = makeHWBB<ScalarPort>(*ToBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT));
+            HWTo->addInScalar(HWOut);
+          } else
+            HWIn = HWTo->getInScalarForValue(I);
+
+          assert(HWOut != nullptr && HWIn != nullptr);
+
           // TODO: use BitWidthAnalysis
 
-          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT));
-          connect(HWI, HWP);
-
-          // Add Port to defining and using Block
-          HWFrom->addOutScalar(HWP);
-          HWTo->addInScalar(HWP);
+          connect(HWOut, HWIn);
 
           // Proceed HWI to connect potential next blocks port to
-          HWI = HWP;
+          HWI = HWIn;
         }
       }
     } 
@@ -399,7 +412,6 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
             ToBBIt != P.end(); 
             FromBBIt = ToBBIt, ++ToBBIt ) 
         {
-
           block_p HWFrom = getBlock(*FromBBIt);
           block_p HWTo = getBlock(*ToBBIt);
           // TODO: use BitWidthAnalysis
