@@ -29,10 +29,6 @@ class FindAllPaths : public llvm::FunctionPass {
 
     typedef std::vector<SinglePathTy> PathTy;
 
-    typedef std::list<const llvm::BasicBlock *> WorkListTy;
-    typedef WorkListTy::iterator WorkListItTy;
-    typedef WorkListTy::const_iterator WorkListConstItTy;
-
     const PathTy getPathFromTo(const llvm::BasicBlock *F, const llvm::BasicBlock *T) const;
     void dump(void) const;
 
