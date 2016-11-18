@@ -16,8 +16,7 @@ Dot::~Dot() {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");;
 }
 
-int Dot::visit(DesignUnit &R)
-{
+int Dot::visit(DesignUnit &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");;
 
   super::visit(R);
@@ -70,19 +69,9 @@ int Dot::visit(Kernel &R) {
     RankOutStream << "n" << P->getUID() << " ";
   }
 
-  // connect Kernel Ports with containing Block Ports.
-  // Block's Ports must exist in the Kernel as well, no further check needed for
-  // connection.
-  for (block_p B : R.getBlocks()) {
-    for (port_p P : B->getIns()) {
-      F() << "n" << P->getUID() << " -> " << "n" << B->getName() << P->getUID() << ";\n";
-    }
-    for (port_p P : B->getOuts()) {
-      F() << "n" << B->getName() << P->getUID() << " -> " << "n" << P->getUID() << ";\n";
-    }
-  }
-
   super::visit(R);
+
+  F() << Connections.str();
 
   F() << "{ rank=source; " << RankInStream.str() << "}\n";
   F() << "{ rank=sink; " << RankOutStream.str() << "}\n";
@@ -114,27 +103,18 @@ int Dot::visit(Block &R) {
 
 
   for (port_p P : R.getInScalars()) {
-    F() << "n" << R.getName() << P->getUID() << " [shape=box,fillcolor=\"/purples9/4\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
-    RankInStream << "n" << R.getName() << P->getUID() << " ";
+    F() << "n" << P->getUID() << " [shape=box,fillcolor=\"/purples9/4\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
+    RankInStream << "n" << P->getUID() << " ";
   }
   for (port_p P : R.getInStreams()) {
-    F() << "n" << R.getName() << P->getUID() << nodeInStream(P->getUniqueName()) << ";\n";
-    RankInStream << "n" << R.getName() << P->getUID() << " ";
+    F() << "n" << P->getUID() << nodeInStream(P->getUniqueName()) << ";\n";
   }
   for (port_p P : R.getOutScalars()) {
-    F() << "n" << R.getName() << P->getUID() << " [shape=box,fillcolor=\"/purples9/4\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
-    RankOutStream << "n" << R.getName() << P->getUID() << " ";
+    F() << "n" << P->getUID() << " [shape=box,fillcolor=\"/purples9/4\",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
+    RankOutStream << "n" << P->getUID() << " ";
   }
   for (port_p P : R.getOutStreams()) {
-    F() << "n" << R.getName() << P->getUID() << nodeOutStream(P->getUniqueName()) << ";\n";
-    RankOutStream << "n" << R.getName() << P->getUID() << " ";
-  }
-
-  // Draw connections from Ports to Users.
-  for (port_p P : R.getInScalars()) {
-    for (base_p O : P->getOuts()) {
-      F() << "n" << R.getName() << P->getUID() << " -> " << "n" << O->getUID() << ";\n";
-    }
+    F() << "n" << P->getUID() << nodeOutStream(P->getUniqueName()) << ";\n";
   }
 
   F() << "{ rank=source; " << RankInStream.str() << "}\n";
@@ -154,7 +134,7 @@ int Dot::visit(Arith &R) {
   F() << "n" << R.getUID() << " [shape=pentagon,fillcolor=\"/blues9/5\",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
   super::visit(R);
   for ( base_p p : R.getOuts() ) {
-    F() << "n" << R.getUID() << " -> " << "n" << p->getUID() << ";\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << ";\n";
   }
   return 0;
 }
@@ -168,7 +148,7 @@ int Dot::visit(FPArith &R) {
   super::visit(R);
 
   for ( base_p p : R.getOuts() ) {
-    F() << "n" << R.getUID() << " -> " << "n" << p->getUID() << ";\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << ";\n";
   }
   return 0;
 }
@@ -181,7 +161,7 @@ int Dot::visit(Compare &R) {
   F() << "n" << R.getUID() << " [shape=square,fillcolor=\"/blues9/7\",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
   super::visit(R);
   for ( base_p p : R.getOuts() ) {
-    F() << "n" << R.getUID() << " -> " << "n" << p->getUID() << "\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << "\n";
   }
 
   return 0;
@@ -234,8 +214,7 @@ int Dot::visit(Fifo &r)
 }
 #endif
 
-int Dot::visit(ConstVal &r)
-{
+int Dot::visit(ConstVal &r) {
   VISIT_ONCE(r)
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
@@ -243,7 +222,7 @@ int Dot::visit(ConstVal &r)
   super::visit(r);
 
   for ( base_p p : r.getOuts() ) {
-    F() << "n" << r.getUID() << " -> " << "n" << p->getUID() << "\n";
+    Conn() << "n" << r.getUID() << " -> " << "n" << p->getUID() << "\n";
   }
 
   return 0;
@@ -255,8 +234,7 @@ int Dot::visit(ConstVal &r)
 /// We do not dispatch to the Index objects but handle loads and stores
 /// here.
 ///
-int Dot::visit(StreamPort &R)
-{
+int Dot::visit(StreamPort &R) {
   VISIT_ONCE(R)
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
@@ -269,7 +247,7 @@ int Dot::visit(StreamPort &R)
   // No range-based loop to call std::next()
   for (StreamPort::IndexListConstIt I=IndexList.begin(), E=IndexList.end(); I != E; I++) {
     if (I+1 != E) {
-      F() << "n" << (*I)->getUID() << " -> " << "n" << (*(std::next(I,1)))->getUID() << " [style=invis];\n";
+      Conn() << "n" << (*I)->getUID() << " -> " << "n" << (*(std::next(I,1)))->getUID() << " [style=invis];\n";
     }
   }
 
@@ -298,12 +276,12 @@ int Dot::visit(StreamPort &R)
   for ( base_p I : IndexList ) {
     // Draw connection from Index to base Stream
     // When the Stream is used with an Index, it must belong to a Parent Block.
-    F() << "n" << I->getUID() << " -> " << "n" << I->getParent()->getName() << R.getUID() << ";\n";
+    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << ";\n";
 
     // Draw connection from Index to uses
     // Stores do not have Outs().
     for ( base_p O : I->getOuts() ) {
-      F() << "n" << I->getUID() << " -> " << "n" << O->getUID() << ";\n";
+      Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << ";\n";
     }
   }
 
@@ -311,18 +289,28 @@ int Dot::visit(StreamPort &R)
   return 0;
 }
 
-int Dot::visit(ScalarPort &R)
-{
+int Dot::visit(ScalarPort &R) {
   VISIT_ONCE(R)
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-#if 0
   for ( base_p P : R.getOuts() ) {
-    F() << "n" << R.getUID() << " -> " << "n" << P->getUID() << ";\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << ";\n";
   }
-#endif
 
   super::visit(R);
   return 0;
 }
 
+int Dot::visit(Mux &R) {
+  VISIT_ONCE(R)
+
+  F() << "n" << R.getUID() << " [shape=invtrapezium,fillcolor=\"/accent8/4\",style=filled,tailport=s,label=\"" << R.getName() << "\"];" << "\n";
+
+  super::visit(R);
+
+  for ( base_p P : R.getOuts() ) {
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << ";\n";
+  }
+
+  return 0;
+}

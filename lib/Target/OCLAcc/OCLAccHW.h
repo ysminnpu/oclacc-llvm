@@ -114,7 +114,6 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
         llvm_unreachable("Do not use makeHW to create constants.");
 
       std::shared_ptr<HW> HWP = std::make_shared<HW>(args...);
-      errs() << "make " << HWP->getUniqueName() << "\n";
       HWP->setIR(IR);
 
       return HWP;

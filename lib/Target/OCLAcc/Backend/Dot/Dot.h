@@ -28,6 +28,8 @@ class Dot: public DFVisitor {
     fs_t FS;
     unsigned IndentLevel;
 
+    std::stringstream Connections;
+
     const std::string nodeOutStream(const std::string &Label) {
       return "[shape=invhouse,fillcolor=\"/purples9/5\",style=filled,tailport=n,label=\"" + Label + "\"]";
     }
@@ -50,6 +52,11 @@ class Dot: public DFVisitor {
     llvm::raw_fd_ostream &F() {
       (*FS) << Indent();
       return *FS;
+    }
+
+    std::stringstream &Conn() {
+      Connections << "    ";
+      return Connections;
     }
 
   public:
@@ -84,6 +91,7 @@ class Dot: public DFVisitor {
     virtual int visit(ConstVal &);
     virtual int visit(ScalarPort &);
     virtual int visit(StreamPort &);
+    virtual int visit(Mux &);
 };
 
 } // end ns oclacc

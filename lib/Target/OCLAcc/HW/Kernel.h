@@ -152,26 +152,26 @@ class Component : public Identifiable, public Visitable {
     void dump() {
       outs() << "----------------------\n";
       if (isBlock())
-        outs() << "Block " << Name << "\n";
+        outs() << "Block " << getUniqueName() << "\n";
       else if (isKernel())
-        outs() << "Kernel " << Name << "\n";
+        outs() << "Kernel " << getUniqueName() << "\n";
       outs() << "----------------------\n";
 
       outs() << "InScalars:\n";
       for (const scalarport_p HWP : getInScalars()) {
-        outs() << " "<< HWP->getName() << "\n";
+        outs() << " "<< HWP->getUniqueName() << "\n";
       }
       outs() << "InStreams:\n";
       for (const streamport_p HWP : getInStreams()) {
-        outs() << " "<< HWP->getName() << "\n";
+        outs() << " "<< HWP->getUniqueName() << "\n";
       }
       outs() << "OutScalars:\n";
       for (const scalarport_p HWP : getOutScalars()) {
-        outs() << " "<< HWP->getName() << "\n";
+        outs() << " "<< HWP->getUniqueName() << "\n";
       }
       outs() << "OutStreams:\n";
       for (const streamport_p HWP : getOutStreams()) {
-        outs() << " "<< HWP->getName() << "\n";
+        outs() << " "<< HWP->getUniqueName() << "\n";
       }
       outs() << "----------------------\n";
     }

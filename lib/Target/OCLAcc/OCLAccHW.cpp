@@ -372,8 +372,8 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     if (IT->isIntegerTy() || IT->isFloatingPointTy()) { 
       for (const FindAllPaths::SinglePathTy P : Paths) {
 
-        for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
-            ToBBIt != P.end(); 
+        for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt), E = P.end(); 
+            ToBBIt != E; 
             FromBBIt = ToBBIt, ++ToBBIt ) 
         {
           block_p HWFrom = getBlock(*FromBBIt);
@@ -391,7 +391,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
 
           if (!HWTo->containsInScalarForValue(I)) {
             HWIn = makeHWBB<ScalarPort>(*ToBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT));
-            HWTo->addInScalar(HWOut);
+            HWTo->addInScalar(HWIn);
           } else
             HWIn = HWTo->getInScalarForValue(I);
 
@@ -423,10 +423,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       if (HWBB->containsInScalarForValue(A))
         continue;
 
-      scalarport_p HWDef = getKernel(A->getParent())->getInScalarForValue(A);
-
-      if (HWDef == nullptr)
-        llvm_unreachable("stop");
+      scalarport_p HWDef = getHW<ScalarPort>(&BB, A);
 
       HWBB->addInScalar(HWDef);
     }
@@ -463,75 +460,6 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     }
   }
 }
-#if 0
-      Type *ElementType = IT->getPointerElementType();
-      //TODO Use Bitwidth from analysis
-      unsigned Bits = ElementType->getScalarSizeInBits();
-
-      // Check Address Space
-      unsigned LAS = ElementType->getPointerAddressSpace();
-      ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(LAS);
-
-      switch (AS) {
-        case ocl::AS_GLOBAL:
-          break;
-        case ocl::AS_LOCAL:
-          break;
-        default:
-          llvm_unreachable("Invalid AddressSpace");
-      }
-
-    // Find all possible paths from DefBB to BB
-    for (const FindAllPaths::SinglePathTy P : AP.getPathFromTo(DefBB, &BB)) {
-
-      for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
-          ToBBIt != P.end(); 
-          FromBBIt = ToBBIt, ++ToBBIt ) 
-      {
-        // Do we have a Scalar or StreamPort?
-        if (VT->isIntegerTy() || VT->isFloatingPointTy()) { 
-          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, V, V->getName(), VT->getScalarSizeInBits(), getDatatype(VT));
-          connect(HWI, HWP);
-
-          // Proceed HWI to connect potential next blocks port to
-          HWI = HWP;
-
-          // Add Port to defining and using Block
-          HWDef->addOutScalar(HWP);
-          HWBB->addInScalar(HWP);
-        } 
-        else if (VT->isPointerTy()) {
-          Type *ElementType   = VT->getPointerElementType();
-          //TODO Use Bitwidth from analysis
-          unsigned Bits = ElementType->getScalarSizeInBits();
-
-          // Check Address Space
-          unsigned LAS = ElementType->getPointerAddressSpace();
-          ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(LAS);
-
-          switch (AS) {
-            case ocl::AS_GLOBAL:
-              break;
-            case ocl::AS_LOCAL:
-              break;
-            default:
-              llvm_unreachable("Invalid AddressSpace");
-          }
-
-          const Datatype D = getDatatype(ElementType);
-          streamport_p HWS = makeHWBB<StreamPort>(&BB, V, Name, Bits, AS, D);
-
-          connect(HWI, HWS);
-
-          HWDef->addOutStream(HWS);
-          HWBB->addInStream(HWS);
-        } else 
-          llvm_unreachable("stop");
-      }
-    }
-  }
-}
-#endif
 
 /// \brief Create ScalarInput/InputStream for Kernel
 ///
@@ -556,6 +484,8 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
 /// OpenCL 2.0 pp 34: allowed address space for variables is _private,
 /// pointers may be global, local or constant
 void OCLAccHW::handleArgument(const Argument &A) {
+  ArgPromotionTracker &AT = getAnalysis<ArgPromotionTracker>();
+
   const Type *AType = A.getType();
   const std::string Name = A.getName();
 
@@ -574,9 +504,23 @@ void OCLAccHW::handleArgument(const Argument &A) {
   errs() << "Argument " << A.getName() << " uses " << Bits << " Bits\n";
 
   if (AType->isIntegerTy() || AType->isFloatingPointTy()) {
-    scalarport_p S = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType));
-    HWKernel->addInScalar(S);
-    ArgMap[&A] = S;
+    scalarport_p HWS = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType));
+    HWKernel->addInScalar(HWS);
+    ArgMap[&A] = HWS;
+
+    // We can safely add the WI ScalarPort to the EntryBlock as it will be
+    // used later. If we skip that, we have no connection between the
+    // definition in the Kernel and its uses in the blocks.
+    //
+    if (AT.isPromotedArgument(&A)) {
+      const BasicBlock *EB =  &(A.getParent()->getEntryBlock());
+      block_p HWEB = getBlock(EB);
+      scalarport_p HWSP = makeHWBB<ScalarPort>(EB, &A, Name, AType->getScalarSizeInBits(), getDatatype(AType));
+      HWEB->addInScalar(HWSP);
+
+      connect(HWS, HWSP);
+    }
+    // All other Arguments are connected when used.
   } 
   else if (const PointerType *PType = dyn_cast<PointerType>(AType)) {
     bool isRead = false;
@@ -654,8 +598,6 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
   Value *IVal = &I;
   Type *IType = I.getType();
   const BasicBlock *BB = I.getParent();
-
-  errs() << I.getName() << " in block " << I.getParent()->getName() << "\n";
 
   std::string IName = I.getName();
 
