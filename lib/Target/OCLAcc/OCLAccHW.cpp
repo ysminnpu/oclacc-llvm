@@ -264,11 +264,12 @@ void OCLAccHW::handleKernel(const Function &F) {
 /// defined in that BB
 void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
   FindAllPaths &AP = getAnalysis<FindAllPaths>(*(BB.getParent()));
+  ArgPromotionTracker &AT = getAnalysis<ArgPromotionTracker>();
 
   block_p HWBB = getBlock(&BB);
 
-  std::vector<const Argument *> AS;
-  std::vector<const Instruction *> VS;
+  std::vector<const Value *> VS;
+  std::vector<const Argument *> VA;
 
   // Collect all foreign Instructions and Arguments used by this BasicBlock
   // to add them as Ports.
@@ -289,15 +290,35 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       // We handle Arguments and Instructions separately. Instructions can be
       // safely connected as their definition has already been visited.
       //
-      if (const Instruction *I = dyn_cast<Instruction>(V)) {
+      if (const Instruction *II = dyn_cast<Instruction>(V)) {
 
         // Only handle Instructions not defined in BB
-        if (I->getParent() == &BB)
+        if (II->getParent() == &BB)
           continue;
 
-        VS.push_back(I); 
-      } else if (const Argument *A = dyn_cast<Argument>(V))
-        AS.push_back(A);
+        VS.push_back(II); 
+      } else if (const Argument *A = dyn_cast<Argument>(V)) {
+        // Only WI functions have to be passed from block to block. Other Arguments
+        // are static and can be used directly. There must exist a ScalarPort for
+        // the Argument as they are created before visiting the BasicBlocks.
+        //
+        if (AT.isPromotedArgument(A)) {
+          base_p HWI = getHW<ScalarPort>(&BB, A);
+          const Type *AType = A->getType();
+
+          if (!AType->isIntegerTy()) {
+            A->dump();
+            AType->dump();
+            llvm_unreachable("stop");
+          }
+
+          VS.push_back(A);
+        } else {
+          // Arguments which do not have to be visited recursively but only have
+          // to be added as Port to BB.
+          VA.push_back(A);
+        }
+      }
       else {
         V->dump();
         llvm_unreachable("unknown value");
@@ -307,13 +328,16 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
 
   // Multiple uses of a single Value should result in a single Port. So we
   // eliminate duplicates.
+  //
+  // std::unique returns an iterator to the new end to delete all remaining,
+  // non-unique items
   std::sort(VS.begin(), VS.end());
   VS.erase(std::unique(VS.begin(), VS.end()), VS.end());
 
-  std::sort(AS.begin(), AS.end());
-  AS.erase(std::unique(AS.begin(), AS.end()), AS.end());
+  std::sort(VA.begin(), VA.end());
+  VA.erase(std::unique(VA.begin(), VA.end()), VA.end());
 
-  for (const Instruction *I : VS) {
+  for (const Value *I : VS) {
     // The current block BB uses a value defined in a different block. We have
     // to:
     // - find the complete path from the definition's block to the current
@@ -328,13 +352,19 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     // We can be sure that all blocks from definition to use exist because only
     // values defined before in the source file can be used as operand.
 
-    const BasicBlock *DefBB = I->getParent();
+    const BasicBlock *DefBB;
+    if (const Instruction *II = dyn_cast<Instruction>(I))
+      DefBB = II->getParent();
+    else if (const Argument *A = dyn_cast<Argument>(I))
+      DefBB = &(A->getParent()->getEntryBlock());
+    else
+      llvm_unreachable("stop");
 
     block_p HWDefBB = getBlock(DefBB);
     base_p HWI = getHW<HW>(DefBB, I);
 
     // The type will be the same for all newly created ports
-    Type *IT = I->getType();
+    const Type *IT = I->getType();
     const std::string Name = I->getName();
 
     const FindAllPaths::PathTy &Paths = AP.getPathFromTo(DefBB, &BB);
@@ -382,54 +412,54 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     }
   }
 
-  ArgPromotionTracker &AT = getAnalysis<ArgPromotionTracker>();
+  // Handle the remaining Arguments which only have to be added to the block
+  // using them. The ports for the Arguments must already exist in the kernel's
+  // lists.
+  for (const Argument *A : VA) {
+    const Type *IT = A->getType();
+    const std::string Name = A->getName();
 
-  // Arguments have to be handles twofold. Propagated WI-Arguments have to be
-  // passed from BB to BB, real arguments are static for all BBs.
-  //
-  const BasicBlock *EntryBB = &(BB.getParent()->getEntryBlock());
+    if (IT->isIntegerTy() || IT->isFloatingPointTy()) { 
+      if (HWBB->containsInScalarForValue(A))
+        continue;
 
-  for (const Argument *A : AS) {
-    // Only WI functions have to be passed from block to block. Other Arguments
-    // are static and can be used directly. There must exist a ScalarPort for
-    // the Argument as they are created before visiting the BasicBlocks.
-    //
-    if (AT.isPromotedArgument(A)) {
-      base_p HWI = getHW<ScalarPort>(&BB, A);
-      const Type *AType = A->getType();
-      
-      if (!AType->isIntegerTy()) {
-        A->dump();
-        AType->dump();
+      scalarport_p HWDef = getKernel(A->getParent())->getInScalarForValue(A);
+
+      if (HWDef == nullptr)
         llvm_unreachable("stop");
-      }
 
-      const FindAllPaths::PathTy &Paths = AP.getPathFromTo(EntryBB, &BB);
+      HWBB->addInScalar(HWDef);
+    }
+    else if (IT->isPointerTy()) {
+      // nothing to do here, will be done outside of loop.
+    }
+  }
 
-      for (const FindAllPaths::SinglePathTy P : Paths) {
+  // Is the Argument used to read from or write at? The list of read and write 
+  // StreamPorts was collected by handleArguments(), when we had to find out, if
+  // we have to create a read or write port for the kernel.
+  //
+  StreamAccessMapIt AReads = ArgStreamReads.find(&BB);
+  StreamAccessMapIt AWrites = ArgStreamWrites.find(&BB);
 
-        for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
-            ToBBIt != P.end(); 
-            FromBBIt = ToBBIt, ++ToBBIt ) 
-        {
-          block_p HWFrom = getBlock(*FromBBIt);
-          block_p HWTo = getBlock(*ToBBIt);
-          // TODO: use BitWidthAnalysis
+  if (AReads != ArgStreamReads.end()) {
+    for (const Argument *RA : AReads->second) {
+      streamport_p HWArg = getHW<StreamPort>(&BB, RA);
 
-          scalarport_p HWP = makeHWBB<ScalarPort>(&BB, A, A->getName(), AType->getScalarSizeInBits(), getDatatype(AType));
-          connect(HWI, HWP);
+      if (HWBB->containsInStreamForValue(RA))
+        continue;
+      else
+        HWBB->addInStream(HWArg);
+    }
+  }
+  if (AWrites != ArgStreamReads.end()) {
+    for (const Argument *RA : AWrites->second) {
+      streamport_p HWArg = getHW<StreamPort>(&BB, RA);
 
-          // Add Port to defining and using Block
-          HWFrom->addOutScalar(HWP);
-          HWTo->addInScalar(HWP);
-
-          // Proceed HWI to connect potential next blocks port to
-          HWI = HWP;
-        }
-      }
-    } else {
-      // Nothing has to be done right now. We will connect the Argument with its
-      // user when the user is visited.
+      if (HWBB->containsOutStreamForValue(RA))
+        continue;
+      else
+        HWBB->addOutStream(HWArg);
     }
   }
 }
@@ -513,12 +543,15 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
 /// references to memory.
 ///
 /// Argument types are later handled differently:
-///  - Actual scalars: same for all WIs, no propagation between BBs
 ///  - Eliminated WI functions: propagate them from block to block.
-///  - Streams: same for all WIs
+///  - Real scalars: same for all WIs, no propagation between BBs
+///  - Streams: like real scalars
 ///
-/// The separation between WI and static scalars is respected when used. Their 
-/// generation only depends on their type.
+/// The separation between WI and static scalars is respected when they are used. Their 
+/// generation here only depends on their type.
+///
+/// To simplify the connection of the definition and the use of StreamPorts, we
+/// also add them to separate lists right now.
 ///
 /// OpenCL 2.0 pp 34: allowed address space for variables is _private,
 /// pointers may be global, local or constant
@@ -564,7 +597,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
 
     // Walk through use list and collect Load/Store/GEP Instructions using it
     std::list<const Value *> Values;
-    for ( const auto &Inst : A.uses() ) {
+    for (const auto &Inst : A.uses() ) {
       Values.push_back(Inst.getUser());
     }
 
@@ -574,9 +607,13 @@ void OCLAccHW::handleArgument(const Argument &A) {
 
       if (const StoreInst *I = dyn_cast<StoreInst>(CurrVal)) {
         isWritten = true;
-      } else if (const LoadInst *I = dyn_cast<LoadInst>(CurrVal)) {
+        ArgStreamWrites[I->getParent()].push_back(&A);
+      } 
+      else if (const LoadInst *I = dyn_cast<LoadInst>(CurrVal)) {
         isRead = true;
-      } else if (const GetElementPtrInst *I = dyn_cast<GetElementPtrInst>(CurrVal)) {
+        ArgStreamReads[I->getParent()].push_back(&A);
+      } 
+      else if (const GetElementPtrInst *I = dyn_cast<GetElementPtrInst>(CurrVal)) {
         for ( auto &Inst : CurrVal->uses() ) {
           Values.push_back(Inst.getUser());
         }

@@ -61,6 +61,10 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     typedef ArgMapTy::iterator ArgMapIt;
     typedef ArgMapTy::const_iterator ArgMapConstIt;
 
+    typedef std::unordered_map<const BasicBlock *, std::vector<const Argument *> > StreamAccessMapTy;
+    typedef StreamAccessMapTy::iterator StreamAccessMapIt;
+    typedef StreamAccessMapTy::const_iterator StreamAccessMapConstIt;
+
     static char ID;
 
     oclacc::DesignUnit &getDesign() {
@@ -89,6 +93,11 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     
     // Store Kernel Arguments. No mapping for propagated Arguments.
     ArgMapTy ArgMap;
+
+    // 
+    StreamAccessMapTy ArgStreamReads;
+    StreamAccessMapTy ArgStreamWrites;
+
 
     oclacc::DesignUnit HWDesign;
 

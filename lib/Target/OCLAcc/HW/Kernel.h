@@ -83,6 +83,12 @@ class Component : public Identifiable, public Visitable {
       InStreamsMap[P->getIR()] = P;
       InStreams.push_back(P);
     }
+
+    bool containsInStreamForValue(const Value *V) {
+      StreamMapTy::const_iterator IT = InStreamsMap.find(V);
+      return IT != InStreamsMap.end();
+    }
+
     const StreamsTy getInStreams() const { 
       return InStreams; 
     }
@@ -115,6 +121,11 @@ class Component : public Identifiable, public Visitable {
       assert(P->getIR() != nullptr);
       OutStreamsMap[P->getIR()] = P;
       OutStreams.push_back(P);
+    }
+
+    bool containsOutStreamForValue(const Value *V) {
+      StreamMapTy::const_iterator IT = OutStreamsMap.find(V);
+      return IT != OutStreamsMap.end();
     }
 
     const StreamsTy &getOutStreams() const { 
