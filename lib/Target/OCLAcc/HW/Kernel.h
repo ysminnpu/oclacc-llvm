@@ -6,7 +6,7 @@
 
 #include "Identifiable.h"
 #include "Visitor/Visitable.h"
-#include "Streams.h"
+#include "Port.h"
 
 namespace oclacc {
 

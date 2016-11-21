@@ -8,7 +8,7 @@
 #include "HW/HW.h"
 #include "HW/Arith.h"
 #include "HW/Control.h"
-#include "HW/Streams.h"
+#include "HW/Port.h"
 #include "HW/Memory.h"
 #include "HW/Constant.h"
 #include "HW/Kernel.h"

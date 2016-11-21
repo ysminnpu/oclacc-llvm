@@ -10,7 +10,7 @@
 #include "HW/typedefs.h"
 #include "HW/Design.h"
 #include "HW/Kernel.h"
-#include "HW/Streams.h"
+#include "HW/Port.h"
 
 namespace llvm {
 

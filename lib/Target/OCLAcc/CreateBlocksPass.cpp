@@ -17,7 +17,7 @@
 #include "HW/Control.h"
 #include "HW/Kernel.h"
 #include "HW/Memory.h"
-#include "HW/Streams.h"
+#include "HW/Port.h"
 
 #include "CreateBlocksPass.h"
 #include "OCLAccHWVisitor.h"

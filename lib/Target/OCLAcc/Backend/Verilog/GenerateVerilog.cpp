@@ -10,18 +10,9 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "HW/HW.h"
-#include "HW/typedefs.h"
-#include "HW/Arith.h"
-#include "HW/Constant.h"
-#include "HW/Compare.h"
-#include "HW/Control.h"
-#include "HW/Kernel.h"
-#include "HW/Memory.h"
-#include "HW/Streams.h"
 
-#include "Backend/Verilog/Verilog.h"
-
+#include "HW/Design.h"
+#include "Verilog.h"
 #include "GenerateVerilog.h"
 #include "OCLAccHWVisitor.h"
 #include "OCLAccHW.h"

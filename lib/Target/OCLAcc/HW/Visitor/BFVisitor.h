@@ -10,7 +10,7 @@
 #include "../HW.h"
 #include "../Arith.h"
 #include "../Control.h"
-#include "../Streams.h"
+#include "../Port.h"
 #include "../Memory.h"
 #include "../Constant.h"
 #include "../Kernel.h"

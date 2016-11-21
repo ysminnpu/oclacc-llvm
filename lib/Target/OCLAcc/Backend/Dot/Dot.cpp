@@ -239,7 +239,7 @@ int Dot::visit(StreamPort &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
 
-  const StreamPort::IndexListType &IndexList = R.getIndexList();
+  const StreamPort::IndexListTy &IndexList = R.getIndexList();
 
   // By using invisible edges between separate Loads and Stores to the Port,
   // they are hierarchically ordered in the graph. 

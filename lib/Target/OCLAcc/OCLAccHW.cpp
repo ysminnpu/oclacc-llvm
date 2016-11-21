@@ -58,10 +58,6 @@
 
 #include "HW/HW.h"
 #include "HW/Arith.h"
-#include "HW/typedefs.h"
-#include "HW/Design.h"
-#include "HW/Streams.h"
-#include "HW/Kernel.h"
 #include "HW/Constant.h"
 #include "HW/Compare.h"
 #include "HW/Control.h"
@@ -976,6 +972,19 @@ void OCLAccHW::visitCmpInst(CmpInst &I) {
   cmp_p C = makeHWBB<Compare>(I.getParent(), &I, "Compare");
 }
 
+//
+//bb0:
+// %12 = 
+// %13 =
+// %cond = 
+// br %cond, label %bb1, %bb2
+//
+//bb1:
+// br label %bb2
+//
+//bb2:
+// %13 = phi [%12, bb1], [%13, bb2] ...
+//
 void OCLAccHW::visitPHINode(PHINode &I) {
   mux_p HWM = makeHWBB<Mux>(I.getParent(), &I, I.getName());
 
