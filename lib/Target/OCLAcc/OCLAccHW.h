@@ -83,6 +83,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     //void visitICmpInst(ICmpInst &);
     //void visitFCmpInst(FCmpInst &);
     void visitPHINode(PHINode &);
+    void visitBranchInst(BranchInst &);
 
   private:
     KernelMapTy KernelMap;

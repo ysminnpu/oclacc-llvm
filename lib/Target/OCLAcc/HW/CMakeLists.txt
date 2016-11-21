@@ -4,4 +4,5 @@ add_llvm_library(LLVMOCLAccHW
   Constant.cpp
   Design.cpp
   Port.cpp
+  Kernel.cpp
 )

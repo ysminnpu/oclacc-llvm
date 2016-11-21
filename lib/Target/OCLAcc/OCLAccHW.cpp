@@ -972,19 +972,6 @@ void OCLAccHW::visitCmpInst(CmpInst &I) {
   cmp_p C = makeHWBB<Compare>(I.getParent(), &I, "Compare");
 }
 
-//
-//bb0:
-// %12 = 
-// %13 =
-// %cond = 
-// br %cond, label %bb1, %bb2
-//
-//bb1:
-// br label %bb2
-//
-//bb2:
-// %13 = phi [%12, bb1], [%13, bb2] ...
-//
 void OCLAccHW::visitPHINode(PHINode &I) {
   mux_p HWM = makeHWBB<Mux>(I.getParent(), &I, I.getName());
 
@@ -998,6 +985,43 @@ void OCLAccHW::visitPHINode(PHINode &I) {
     HWM->addIn(HWP, HWB);
     connect(HWP, HWM);
   }
+}
+
+//
+//bb0:
+// %12 = 
+// %13 =
+// %cond = 
+// br %cond, label %bb1, %bb2
+//
+//bb1:
+// br label %bb2
+//
+//bb2:
+// %13 = phi [%12, bb1], [%13, bb2] ...
+//
+/// 
+/// \brief Set conditions for each block
+void OCLAccHW::visitBranchInst(BranchInst &I) {
+  if (I.isUnconditional()) {
+    // we have no condition, all Ports can be used when ready.
+    return;
+  }
+  const BasicBlock *BB = I.getParent();
+  block_p HWBB = getBlock(BB);
+
+  const Value *Cond = I.getOperand(0);
+  base_p HWCond = getHW<HW>(BB, Cond);
+
+  const BasicBlock *FalseBB = cast<BasicBlock>(I.getOperand(1));
+  const BasicBlock *TrueBB = cast<BasicBlock>(I.getOperand(2));
+
+  block_p HWFalse = getBlock(FalseBB);
+  block_p HWTrue = getBlock(TrueBB);
+
+  // set the conditions for each successor
+  HWTrue->addCondition(HWCond);
+  HWFalse->addConditionNeg(HWCond);
 }
 
 #ifdef TYPENAME

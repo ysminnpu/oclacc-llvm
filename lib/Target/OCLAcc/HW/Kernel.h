@@ -51,163 +51,92 @@ class Component : public Identifiable, public Visitable {
     virtual bool isKernel() = 0;
 
   public:
-    const llvm::Value * getIR() const { return IR; }
-    void setIR(const llvm::Value *P) { IR=P; }
+    const llvm::Value * getIR() const;
+    void setIR(const llvm::Value *);
 
     // InScalars
-    void addInScalar(scalarport_p P) { 
-      assert(P->getIR() != nullptr);
-      InScalarsMap[P->getIR()] = P; 
-      InScalars.push_back(P);
-    }
+    void addInScalar(scalarport_p);
 
-    const ScalarsTy &getInScalars() const { 
-      return InScalars; 
-    }
+    const ScalarsTy &getInScalars() const;
     
-    bool containsInScalarForValue(const Value *V) {
-      ScalarMapTy::const_iterator IT = InScalarsMap.find(V);
-      return IT != InScalarsMap.end();
-    }
+    bool containsInScalarForValue(const Value *);
 
-    scalarport_p getInScalarForValue(const Value *V) {
-      ScalarMapTy::const_iterator IT = InScalarsMap.find(V);
-      if (IT != InScalarsMap.end())
-        return IT->second;
-      else return nullptr;
-    }
+    scalarport_p getInScalarForValue(const Value *);
 
     // InStreams
-    void addInStream(streamport_p P) { 
-      assert(P->getIR() != nullptr);
-      InStreamsMap[P->getIR()] = P;
-      InStreams.push_back(P);
-    }
+    void addInStream(streamport_p);
 
-    bool containsInStreamForValue(const Value *V) {
-      StreamMapTy::const_iterator IT = InStreamsMap.find(V);
-      return IT != InStreamsMap.end();
-    }
+    bool containsInStreamForValue(const Value *);
 
-    const StreamsTy getInStreams() const { 
-      return InStreams; 
-    }
+    const StreamsTy getInStreams() const;
 
     // OutScalars
-    void addOutScalar(scalarport_p P) { 
-      assert(P->getIR() != nullptr);
-      OutScalarsMap[P->getIR()] = P;
-      OutScalars.push_back(P);
-    }
+    void addOutScalar(scalarport_p);
 
-    const ScalarsTy &getOutScalars() const { 
-      return OutScalars;
-    }
+    const ScalarsTy &getOutScalars() const;
 
-    bool containsOutScalarForValue(const Value *V) {
-      ScalarMapTy::const_iterator IT = OutScalarsMap.find(V);
-      return IT != OutScalarsMap.end();
-    }
+    bool containsOutScalarForValue(const Value *V);
 
-    scalarport_p getOutScalarForValue(const Value *V) {
-      ScalarMapTy::const_iterator IT = OutScalarsMap.find(V);
-      if (IT != OutScalarsMap.end())
-        return IT->second;
-      else return nullptr;
-    }
+    scalarport_p getOutScalarForValue(const Value *V);
 
     // OutStreams
-    void addOutStream(streamport_p P) { 
-      assert(P->getIR() != nullptr);
-      OutStreamsMap[P->getIR()] = P;
-      OutStreams.push_back(P);
-    }
+    void addOutStream(streamport_p);
 
-    bool containsOutStreamForValue(const Value *V) {
-      StreamMapTy::const_iterator IT = OutStreamsMap.find(V);
-      return IT != OutStreamsMap.end();
-    }
+    bool containsOutStreamForValue(const Value *);
 
-    const StreamsTy &getOutStreams() const { 
-      return OutStreams;
-    }
+    const StreamsTy &getOutStreams() const;
 
-    PortsTy getOuts(void) const {
-      PortsTy Outs;
-      Outs.insert(Outs.end(), OutStreams.begin(), OutStreams.end());
-      Outs.insert(Outs.end(), OutScalars.begin(), OutScalars.end());
-      return Outs;
-    }
+    PortsTy getOuts(void) const;
 
-    PortsTy getIns(void) const {
-      PortsTy Ins;
-      Ins.insert(Ins.end(), InStreams.begin(), InStreams.end());
-      Ins.insert(Ins.end(), InScalars.begin(), InScalars.end());
-      return Ins;
-    }
+    PortsTy getIns(void) const;
 
-    void addConstVal(const_p p) { ConstVals.push_back(p); }
-    const ConstantsType &getConstVals() const { return ConstVals; }
+    void addConstVal(const_p p);
+    const ConstantsType &getConstVals() const;
 
-    void dump() {
-      outs() << "----------------------\n";
-      if (isBlock())
-        outs() << "Block " << getUniqueName() << "\n";
-      else if (isKernel())
-        outs() << "Kernel " << getUniqueName() << "\n";
-      outs() << "----------------------\n";
-
-      outs() << "InScalars:\n";
-      for (const scalarport_p HWP : getInScalars()) {
-        outs() << " "<< HWP->getUniqueName() << "\n";
-      }
-      outs() << "InStreams:\n";
-      for (const streamport_p HWP : getInStreams()) {
-        outs() << " "<< HWP->getUniqueName() << "\n";
-      }
-      outs() << "OutScalars:\n";
-      for (const scalarport_p HWP : getOutScalars()) {
-        outs() << " "<< HWP->getUniqueName() << "\n";
-      }
-      outs() << "OutStreams:\n";
-      for (const streamport_p HWP : getOutStreams()) {
-        outs() << " "<< HWP->getUniqueName() << "\n";
-      }
-      outs() << "----------------------\n";
-    }
-
-  DECLARE_VISIT;
+    void dump();
 
   protected: 
-    Component(const std::string &Name) : Identifiable(Name) { }
-    virtual ~Component() { }
+    Component(const std::string &);
+    virtual ~Component();
 
 };
 
 class Block : public Component {
+  public:
+    typedef std::vector<base_p> CondTy;
+    typedef CondTy::iterator CondItTy;
+    typedef CondTy::const_iterator CondConstItTy;
+
   private:
     std::vector<base_p> Ops;
     kernel_p Parent;
 
+    CondTy Conds;
+    CondTy CondNegs;
+
   protected:
-    bool isBlock() { return true; }
-    bool isKernel() { return false; }
+    bool isBlock();
+    bool isKernel();
 
   public:
-    Block (const std::string &Name) : Component(Name) { }
+    Block (const std::string &);
 
     NO_COPY_ASSIGN(Block)
 
-    void addOp(base_p P) { Ops.push_back(P); }
-    const std::vector<base_p> &getOps() const { return Ops; }
+    void addOp(base_p);
+    const std::vector<base_p> &getOps() const;
 
-    kernel_p getParent() const {
-      return Parent;
-    }
+    kernel_p getParent() const;
 
-    void setParent(kernel_p P) {
-      Parent = P;
-    }
+    void setParent(kernel_p P);
+
+    void addCondition(base_p P);
+
+    void addConditionNeg(base_p P);
+
+    const CondTy &getConditions();
+
+    const CondTy &getConditionNegs();
 
     DECLARE_VISIT;
 };
@@ -221,20 +150,20 @@ class Kernel : public Component {
     std::vector<block_p> Blocks;
 
   protected:
-    bool isBlock() { return false; }
-    bool isKernel() { return true; }
+    bool isBlock();
+    bool isKernel();
 
   public:
 
-    Kernel (const std::string &Name="unnamed", bool WorkItem=false) : Component(Name), WorkItem(false) { }
+    Kernel (const std::string &, bool);
 
     NO_COPY_ASSIGN(Kernel)
 
-    void addBlock(block_p p) { Blocks.push_back(p); }
-    const std::vector<block_p> &getBlocks() const { return Blocks; }
+    void addBlock(block_p p);
+    const std::vector<block_p> &getBlocks() const;
 
-    void setWorkItem(bool T) { WorkItem = T; }
-    bool isWorkItem() const { return WorkItem; }
+    void setWorkItem(bool T);
+    bool isWorkItem() const;
 
     DECLARE_VISIT;
 };
