@@ -14,14 +14,14 @@
 namespace oclacc {
 
 std::string moduleDeclHeader(Component &);
-std::string moduleDeclFooter();
+std::string moduleDeclFooter(Component &);
 std::string moduleBlockWires(Block &);
 std::string moduleInstBlock(Block &);
 
 
 typedef std::shared_ptr<Portmux> portmux_p;
 
-typedef std::vector<portmux_p> MuxersTy;
+typedef std::map<const port_p, portmux_p> MuxersTy;
 typedef MuxersTy::iterator MuxersItTy;
 typedef MuxersTy::const_iterator MuxersConstItTy;
 
@@ -35,13 +35,16 @@ std::string moduleDeclHeader(Component &R) {
 
   S << "module " << R.getName() << "(\n";
   for (Component::PortsConstItTy P = I.begin(), E = I.end(); P != E; ++P) {
-    S << I(1) << "input ";
+    S << I(1) << "input  ";
 
     unsigned B = (*P)->getBitWidth();
     if (B != 1)
       S << "[" << B-1 << ":0] ";
 
-    S << (*P)->getUniqueName();
+    S << (*P)->getUniqueName() << ",\n";
+
+    S << I(1) << "input  " << (*P)->getUniqueName() << "_valid,\n";
+    S << I(1) << "output  " << (*P)->getUniqueName() << "_ack";
 
     if (std::next(P) != E)
       S << ",\n";
@@ -61,18 +64,23 @@ std::string moduleDeclHeader(Component &R) {
     if (B != 1)
       S << "[" << B-1 << ":0] ";
 
-    S << (*P)->getUniqueName();
+    S << (*P)->getUniqueName() << ",\n";
+
+    S << I(1) << "input  " << (*P)->getUniqueName() << "_ack,\n";
+    S << I(1) << "output " << (*P)->getUniqueName() << "_valid";
 
     if (std::next(P) != E)
-      S << ",\n ";
+      S << ",\n";
   }
   S << "\n);\n";
 
   return S.str();
 }
 
-std::string moduleDeclFooter() {
-  return "endmodule";
+std::string moduleDeclFooter(Component &R) {
+  std::stringstream S;
+  S << "endmodule " << " // " << R.getUniqueName() << "\n";
+  return S.str();
 }
 
 std::string moduleBlockWires(Block &R) {
@@ -101,6 +109,38 @@ std::string moduleBlockWires(Block &R) {
     S << (*P)->getUniqueName();
 
     S << ";\n";
+
+    // Add valid and ack
+    S << "wire " << (*P)->getUniqueName() << "_valid;\n";
+    S << "wire " << (*P)->getUniqueName() << "_ack;\n";
+  }
+
+  return S.str();
+}
+
+std::string moduleConnectWires(Block &R) {
+  std::stringstream S;
+  S << "// Connections for " << R.getUniqueName() << "\n";
+
+
+  // It is sufficient to walk through all inputs.
+  for (port_p P : R.getIns()) {
+
+    // If there are more Inputs to this, there is already a Portmux instance
+    // with an output port already named like the input port where it is used,
+    // so we can skip it here.
+    if (P->getIns().size() > 1)
+      continue;
+
+    // ScalarInputs and alike are directly used as input. Skip them as well.
+    if (!P->isPipelined())
+      continue;
+
+    base_p I = P->getIn(0);
+
+    S << "assign " << P->getUniqueName() << " = " << I->getUniqueName() << ";\n";
+    S << "assign " << P->getUniqueName() << "_valid = " << I->getUniqueName() << "_valid;\n";
+    S << "assign " << P->getUniqueName() << "_ack = " << I->getUniqueName() << "_ack;\n";
   }
 
   return S.str();
@@ -128,7 +168,7 @@ std::string moduleInstBlock(Block &R) {
         printHead = false;
       }
       S << M->instantiate();
-      Muxers.push_back(M);
+      Muxers[P] = M;
     }
   }
 
@@ -142,7 +182,10 @@ std::string moduleInstBlock(Block &R) {
   if (I.size() > 0) {
     S << I(1) << "// In\n";
     for (Component::PortsConstItTy P = I.begin(), E = I.end(); P != E; ++P) {
-      S << I(1) << "." << (*P)->getUniqueName() << "(" << (*P)->getUniqueName() << ")";
+      S << I(1) << "." << (*P)->getUniqueName() << "(" << (*P)->getUniqueName() << "),\n";
+      S << I(1) << "." << (*P)->getUniqueName() << "_valid(" << (*P)->getUniqueName() << "_valid),\n";
+      S << I(1) << "." << (*P)->getUniqueName() << "_ack(" << (*P)->getUniqueName() << "_ack)";
+
       if (std::next(P) != E || O.size() > 0)
         S << ",\n";
     }
@@ -151,7 +194,9 @@ std::string moduleInstBlock(Block &R) {
     S << I(1) << "// Out\n";
 
     for (Component::PortsConstItTy P = O.begin(), E = O.end(); P != E; ++P) {
-      S << I(1) << "." << (*P)->getUniqueName() << "(" << (*P)->getUniqueName() << ")";
+      S << I(1) << "." << (*P)->getUniqueName() << "(" << (*P)->getUniqueName() << "),\n";
+      S << I(1) << "." << (*P)->getUniqueName() << "_valid(" << (*P)->getUniqueName() << "_valid),\n";
+      S << I(1) << "." << (*P)->getUniqueName() << "_ack(" << (*P)->getUniqueName() << "_ack)";
       if (std::next(P) != E)
         S << ",\n";
     }

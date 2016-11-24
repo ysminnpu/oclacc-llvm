@@ -38,13 +38,18 @@ int Verilog::visit(Kernel &R) {
   for (block_p B : R.getBlocks())
     (*FS) << moduleInstBlock(*B);
 
-  (*FS) << moduleDeclFooter();
+  for (block_p B : R.getBlocks())
+    (*FS) << moduleConnectWires(*B);
+
+  (*FS) << moduleDeclFooter(R);
+
+  super::visit(R);
   return 0;
 }
 
 int Verilog::visit(Block &R) {
   (*FS) << moduleDeclHeader(R);
-  (*FS) << moduleDeclFooter();
+  (*FS) << moduleDeclFooter(R);
   return 0;
 }
 
