@@ -38,13 +38,16 @@ std::string moduleDeclHeader(Component &R) {
     S << I(1) << "input  ";
 
     unsigned B = (*P)->getBitWidth();
+    std::stringstream BWS;
     if (B != 1)
-      S << "[" << B-1 << ":0] ";
+      BWS << "[" << B-1 << ":0] ";
+    
+    std::string BW = BWS.str();
 
-    S << (*P)->getUniqueName() << ",\n";
+    S << BW << (*P)->getUniqueName() << ",\n";
 
-    S << I(1) << "input  " << (*P)->getUniqueName() << "_valid,\n";
-    S << I(1) << "output  " << (*P)->getUniqueName() << "_ack";
+    S << I(1) << "input  " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_valid,\n";
+    S << I(1) << "output " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_ack";
 
     if (std::next(P) != E)
       S << ",\n";
@@ -61,13 +64,15 @@ std::string moduleDeclHeader(Component &R) {
     S << I(1) << "output ";
 
     unsigned B = (*P)->getBitWidth();
+    std::stringstream BWS;
     if (B != 1)
-      S << "[" << B-1 << ":0] ";
+      BWS << "[" << B-1 << ":0] ";
+    std::string BW = BWS.str();
 
-    S << (*P)->getUniqueName() << ",\n";
+    S << BW << (*P)->getUniqueName() << ",\n";
 
-    S << I(1) << "input  " << (*P)->getUniqueName() << "_ack,\n";
-    S << I(1) << "output " << (*P)->getUniqueName() << "_valid";
+    S << I(1) << "input  " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_ack,\n";
+    S << I(1) << "output " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_valid";
 
     if (std::next(P) != E)
       S << ",\n";
