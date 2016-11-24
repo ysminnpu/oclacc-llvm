@@ -359,14 +359,16 @@ static int compileModule(char **argv, LLVMContext &Context) {
     return -1;
   }
 
-  SmallVector<char, 1024> CurrentDir;
-  EC = sys::fs::current_path(CurrentDir);
+  SmallVector<char, 1024> CD;
+  EC = sys::fs::current_path(CD);
   if (EC) {
     errs() << "Failed to change dir: " << EC.message() << '\n';
     return -1;
   }
 
-  if (chdir(WorkDir.data())) {
+  std::string CurrentDir(CD.data(), CD.size());
+
+  if (chdir(WorkDir.c_str())) {
     errs() << "Failed to change to " << CurrentDir.data() << ": " << strerror(errno) << "\n";
     return -1;
   }
