@@ -2,14 +2,22 @@
 
 using namespace oclacc;
 
-Port::Port(const std::string &Name, size_t W, const Datatype &T) : HW(Name, W), PortType(T) {
+Port::Port(const std::string &Name, size_t W, const Datatype &T, bool Pipelined=false) : HW(Name, W), PortType(T), Pipelined(Pipelined) {
 }
+
+const Datatype &Port::getPortType() {
+  return PortType;
+}
+
+bool Port::isPipelined(void) { return Pipelined; }
 
 /// Scalar Port
 ///
-ScalarPort::ScalarPort(const std::string &Name, size_t W, const Datatype &T) : Port(Name, W, T) { }
+ScalarPort::ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined) : Port(Name, W, T, Pipelined){ }
 
 bool ScalarPort::isScalar() { return true; }
+
+
 
 /// Stream Port
 ///

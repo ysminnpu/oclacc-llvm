@@ -8,6 +8,8 @@
 #include "HW/Writeable.h"
 #include "HW/Identifiable.h"
 
+#include "Utils.h"
+
 namespace oclacc {
 
 class DesignUnit;
@@ -22,10 +24,9 @@ class StreamPort;
 
 class Dot: public DFVisitor {
   private:
-    typedef std::unique_ptr<llvm::raw_fd_ostream> fs_t;
     typedef DFVisitor super;
 
-    fs_t FS;
+    FileTy FS;
     unsigned IndentLevel;
 
     std::stringstream Connections;
@@ -62,24 +63,6 @@ class Dot: public DFVisitor {
   public:
     Dot();
     ~Dot();
-
-    fs_t  openFile(const std::string &N) {
-      if (N.empty())
-        llvm_unreachable("Filename empty");
-
-      DEBUG_WITH_TYPE("FileIO", llvm::dbgs() << "Open File "+ N << "\n" );
-
-      std::error_code EC;
-      fs_t F = std::make_unique<llvm::raw_fd_ostream>(N, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
-      if (EC)
-        llvm_unreachable("File could not be opened.");
-
-      return F;
-    }
-
-    void closeFile(fs_t F) {
-      F->close();
-    }
 
     // visit methods
     virtual int visit(DesignUnit &);

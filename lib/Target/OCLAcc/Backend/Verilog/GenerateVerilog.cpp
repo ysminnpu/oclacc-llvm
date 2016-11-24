@@ -10,7 +10,6 @@
 #include "llvm/IR/CFG.h"
 #include "llvm/Support/CommandLine.h"
 
-
 #include "HW/Design.h"
 #include "Verilog.h"
 #include "GenerateVerilog.h"
@@ -21,6 +20,8 @@
 #include "kernel_builtins.h"
 
 #include "macros.h"
+
+#define DEBUG_TYPE "verilog"
 
 using namespace llvm;
 using namespace oclacc;
@@ -39,7 +40,6 @@ namespace llvm {
 
 GenerateVerilog::GenerateVerilog() : ModulePass(GenerateVerilog::ID) {
   initializeGenerateVerilogPass(*PassRegistry::getPassRegistry());
-  DEBUG_WITH_TYPE("GenerateVerilog", dbgs() << "GenerateVerilog created\n");
 }
 
 GenerateVerilog::~GenerateVerilog() {
@@ -67,10 +67,9 @@ bool GenerateVerilog::runOnModule(Module &M) {
   DesignUnit &Design = HWP.getDesign(); 
 
   Verilog V;
-  DEBUG_WITH_TYPE("GenerateVerilog", dbgs() << "DesignUnit: " << Design.getName() << "\n");
-
-  //VeriloVisitor V;
-  //Design.accept(V);
+  Design.accept(V);
 
   return false;
 }
+
+#undef DEBUG_TYPE

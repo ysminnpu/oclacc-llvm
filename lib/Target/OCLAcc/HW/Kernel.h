@@ -19,12 +19,17 @@ const std::string ConditionFlagNames[] = {
 /// and generate outputs. Multiple blocks are connected by connecting their
 /// inputs/outputs.
 class Component : public Identifiable, public Visitable {
+  public:
+    typedef std::vector<port_p> PortsTy;
+    typedef std::vector<port_p>::iterator PortsItTy;
+    typedef std::vector<port_p>::const_iterator PortsConstItTy;
+
+    typedef std::vector<streamport_p> StreamsTy;
+    typedef std::vector<scalarport_p> ScalarsTy;
+
   protected:
     const llvm::Value *IR;
 
-    typedef std::vector<port_p> PortsTy;
-    typedef std::vector<streamport_p> StreamsTy;
-    typedef std::vector<scalarport_p> ScalarsTy;
 
     // We often have to be able to look for a specific Value, so we store them
     // in a map AND a list to avoid having to look up every single item's

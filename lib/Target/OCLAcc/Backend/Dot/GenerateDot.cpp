@@ -21,7 +21,7 @@
 
 #include "macros.h"
 
-#define DEBUG_TYPE "gen-dot"
+#define DEBUG_TYPE "dot"
 
 using namespace llvm;
 using namespace oclacc;
@@ -66,7 +66,6 @@ bool GenerateDot::runOnModule(Module &M) {
   OCLAccHW &HWP = getAnalysis<OCLAccHW>();
   DesignUnit &Design = HWP.getDesign(); 
 
-  DEBUG(dbgs() << "DesignUnit: " << Design.getName() << "\n");
   Dot D;
   Design.accept(D);
 

@@ -10,7 +10,7 @@ namespace oclacc {
 class Identifiable
 {
   public:
-    typedef uint64_t UIDType;
+    typedef unsigned UIDType;
 
   private:
     static unsigned currUID;

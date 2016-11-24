@@ -15,23 +15,26 @@ namespace oclacc {
 
 class Port : public HW {
   protected:
-    Port(const std::string &Name, size_t W, const Datatype &T);
+    Port(const std::string &, size_t, const Datatype &, bool);
 
+  public:
     virtual bool isScalar()=0;
+    const Datatype &getPortType();
+    bool isPipelined();
 
   private:
     const Datatype &PortType;
+  protected:
+    bool Pipelined = false;
   public:
-    const Datatype &getPortType() {
-      return PortType;
-    }
 };
 
 class ScalarPort : public Port {
   public:
-    ScalarPort(const std::string &Name, size_t W, const Datatype &T);
+    ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined);
 
     bool isScalar();
+
 
     DECLARE_VISIT;
 };

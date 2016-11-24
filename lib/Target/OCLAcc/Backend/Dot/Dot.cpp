@@ -4,7 +4,9 @@
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
 
-#define DEBUG_TYPE "gen-dot"
+#include "Utils.h"
+
+#define DEBUG_TYPE "dot"
 
 using namespace oclacc;
 
@@ -35,10 +37,7 @@ int Dot::visit(Kernel &R) {
 
   DEBUG(llvm::dbgs() << "Open File "+ FileName << "\n" );
 
-  std::error_code Err;
-  FS = std::make_unique<llvm::raw_fd_ostream>(FileName, Err, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
-  if (Err)
-    llvm_unreachable("File could not be opened.");
+  FS = openFile(FileName);
 
   F() << "digraph G { " << "\n";
 

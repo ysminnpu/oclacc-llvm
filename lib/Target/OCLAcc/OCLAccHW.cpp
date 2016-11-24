@@ -379,14 +379,14 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           scalarport_p HWIn;
 
           if (!HWFrom->containsOutScalarForValue(I)) {
-            HWOut = makeHWBB<ScalarPort>(*FromBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT));
+            HWOut = makeHWBB<ScalarPort>(*FromBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT), true);
             HWFrom->addOutScalar(HWOut);
             connect(HWI, HWOut);
           } else
             HWOut = HWFrom->getOutScalarForValue(I);
 
           if (!HWTo->containsInScalarForValue(I)) {
-            HWIn = makeHWBB<ScalarPort>(*ToBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT));
+            HWIn = makeHWBB<ScalarPort>(*ToBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT), true);
             HWTo->addInScalar(HWIn);
           } else
             HWIn = HWTo->getInScalarForValue(I);
@@ -500,7 +500,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
   errs() << "Argument " << A.getName() << " uses " << Bits << " Bits\n";
 
   if (AType->isIntegerTy() || AType->isFloatingPointTy()) {
-    scalarport_p HWS = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType));
+    scalarport_p HWS = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType), false);
     HWKernel->addInScalar(HWS);
     ArgMap[&A] = HWS;
 
@@ -511,7 +511,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
     if (AT.isPromotedArgument(&A)) {
       const BasicBlock *EB =  &(A.getParent()->getEntryBlock());
       block_p HWEB = getBlock(EB);
-      scalarport_p HWSP = makeHWBB<ScalarPort>(EB, &A, Name, AType->getScalarSizeInBits(), getDatatype(AType));
+      scalarport_p HWSP = makeHWBB<ScalarPort>(EB, &A, Name, AType->getScalarSizeInBits(), getDatatype(AType), true);
       HWEB->addInScalar(HWSP);
 
       connect(HWS, HWSP);
@@ -968,7 +968,15 @@ void OCLAccHW::visitCallInst(CallInst &I) {
 }
 
 void OCLAccHW::visitCmpInst(CmpInst &I) {
+  CmpInst::Predicate P = I.getPredicate();
+
+  if (I.isFPPredicate()) {
+    //TODO
+    llvm_unreachable("fp compare");
+  }
+
   // FIXME
+  // Make different classes for predicates or use enum like llvm.
   cmp_p C = makeHWBB<Compare>(I.getParent(), &I, "Compare");
 }
 

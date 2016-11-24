@@ -8,6 +8,7 @@ add_llvm_target(OCLAccCodeGen
   OCLAccTargetMachine.cpp
   OCLAccSubtarget.cpp
   OCLAccHW.cpp
+  Utils.cpp
   )
 
 add_subdirectory(TargetInfo)
