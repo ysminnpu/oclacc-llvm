@@ -359,7 +359,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
     return -1;
   }
 
-  SmallVector<char, PATH_MAX> CurrentDir;
+  SmallVector<char, 1024> CurrentDir;
   EC = sys::fs::current_path(CurrentDir);
   if (EC) {
     errs() << "Failed to change dir: " << EC.message() << '\n';
