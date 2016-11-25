@@ -4,4 +4,5 @@ add_llvm_library(LLVMOCLAccVerilogBackend
   Verilog.cpp
   Portmux.cpp
   FileHeader.cpp
+  VerilogModule.cpp
 )

@@ -2,10 +2,11 @@
 
 #include "Verilog.h"
 #include "FileHeader.h"
+#include "VerilogModule.h"
+
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
 
-#include "Code.h"
 
 #define DEBUG_TYPE "verilog"
 
@@ -31,28 +32,27 @@ int Verilog::visit(DesignUnit &R) {
   return 0;
 }
 int Verilog::visit(Kernel &R) {
-  (*FS) << moduleDeclHeader(R);
+  KernelModule TM(R);
+  (*FS) << TM.declHeader();
+  (*FS) << TM.declBlockWires();
 
   (*FS) << "// Wires and Port Muxer between blocks\n";
-  for (block_p B : R.getBlocks())
-    (*FS) << moduleBlockWires(*B);
 
   (*FS) << "// Block Instantiations\n";
-  for (block_p B : R.getBlocks())
-    (*FS) << moduleInstBlock(*B);
+  (*FS) << TM.instBlocks();
 
-  for (block_p B : R.getBlocks())
-    (*FS) << moduleConnectWires(*B);
+  (*FS) << TM.connectWires();
 
-  (*FS) << moduleDeclFooter(R);
+  (*FS) << TM.declFooter();
 
   super::visit(R);
   return 0;
 }
 
 int Verilog::visit(Block &R) {
-  (*FS) << moduleDeclHeader(R);
-  (*FS) << moduleDeclFooter(R);
+  VerilogModule M(R);
+  (*FS) << M.declHeader();
+  (*FS) << M.declFooter();
   return 0;
 }
 
