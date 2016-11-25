@@ -5,6 +5,7 @@
 
 #include "../../Utils.h"
 #include "../../HW/Port.h"
+#include "FileHeader.h"
 
 #define I(C) std::string((C*2),' ')
 
@@ -37,6 +38,8 @@ void Portmux::definition() {
 
   std::stringstream S;
 
+  S << header();
+
   S << "module " << ModName << "(\n";
 
   std::stringstream BW;
@@ -46,29 +49,33 @@ void Portmux::definition() {
   std::string BWS = BW.str();
 
   for (unsigned i = 0; i < NumPorts; ++i) {
-    S << I(1) << "input  " << BWS << " in" << i << ",\n";
-    S << I(1) << "input  " << std::string(BWS.length()+1, ' ') << " in" << i << "_valid,\n";
-    S << I(1) << "output " << std::string(BWS.length()+1, ' ') << "out" << i << "_ack,\n";
-    S << I(1) << "// \n";
+    S << I(1) << "input  wire " << BWS << " in" << i << ",\n";
+    S << I(1) << "input  wire " << std::string(BWS.length()+1, ' ') << "in" << i << "_valid,\n";
+    S << I(1) << "output wire " << std::string(BWS.length()+1, ' ') << "out" << i << "_ack,\n";
+    S << I(1) << "//\n";
   }
-  S << I(1) << "output " << BW.str() << " out," << "\n";
-  S << I(1) << "input  " << std::string(BWS.length()+1, ' ') << "ack\n";
+  S << I(1) << "output wire " << BW.str() << " out," << "\n";
+  S << I(1) << "input  wire " << std::string(BWS.length()+1, ' ') << "ack\n";
   S << ");\n";
-
-  S << "reg " << BW.str() << " out;\n";
+  S << "\n";
+  S << "reg " << BW.str() << " out_int;\n";
+  S << "\n";
 
   // Implementation
-
   S << "always @*\n";
   S << "begin\n";
+  S << I(1) << "out_int = 1'b0;\n";
   for (unsigned i = 0; i < NumPorts; ++i) {
     S << I(1);
     if (i != 0) 
       S << "else ";
     S << "if(in" << i << "_valid == 1)\n";
-    S << I(2) << "out = in" << i << ";\n";
+    S << I(2) << "out_int = in" << i << ";\n";
   }
   S << "end\n";
+  S << "\n";
+  S << "assign out = out_int;\n";
+  S << "\n";
   S << "endmodule // " << ModName << "\n";
 
   (*F) << S.str();

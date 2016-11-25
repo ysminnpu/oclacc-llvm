@@ -3,4 +3,5 @@ add_llvm_library(LLVMOCLAccVerilogBackend
   GenerateVerilog.cpp
   Verilog.cpp
   Portmux.cpp
+  FileHeader.cpp
 )

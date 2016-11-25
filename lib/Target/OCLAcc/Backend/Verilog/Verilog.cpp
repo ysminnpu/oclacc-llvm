@@ -1,6 +1,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 #include "Verilog.h"
+#include "FileHeader.h"
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
 
@@ -21,6 +22,8 @@ Verilog::~Verilog() {
 int Verilog::visit(DesignUnit &R) {
   std::string Filename = R.getName()+".v";
   FS = openFile(Filename);
+
+  (*FS) << header();
 
   super::visit(R);
 
