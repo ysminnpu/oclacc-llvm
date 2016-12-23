@@ -61,11 +61,21 @@ class StreamPort : public Port {
     typedef IndexListTy::const_iterator IndexListConstIt;
     typedef std::vector<AccessTy> AccessListTy;
 
+    typedef std::vector<staticstreamindex_p> StaticIndexListTy;
+    typedef StaticIndexListTy::iterator StaticIndexListIt;
+    typedef StaticIndexListTy::const_iterator StaticIndexListConstIt;
+
+    typedef std::vector<dynamicstreamindex_p> DynamicIndexListTy;
+    typedef DynamicIndexListTy::iterator DynamicIndexListIt;
+    typedef DynamicIndexListTy::const_iterator DynamicIndexListConstIt;
   private:
     // must be a ordered list of indices to preserve correct store order.
     // Instead of a single list we use separate lists for the Index and the
     // access type.
     IndexListTy IndexList;
+
+    // We store the type of access in a separate list. IndexList[i] has an
+    // access ty of AccessList[i].
     AccessListTy AccessList;
 
   public:
@@ -76,23 +86,31 @@ class StreamPort : public Port {
 
     bool isScalar();
 
-    void addLoad(streamindex_p I);
-
+    // Combined
     const IndexListTy get(AccessTy) const;
-
-    const IndexListTy getLoads() const;
-
-    const IndexListTy getStores() const;
-
-    bool isLoad(streamindex_p) const;
-
-    void addStore(streamindex_p);
-
-    bool isStore(streamindex_p) const;
+    const StaticIndexListTy getStaticIndizes() const;
+    const DynamicIndexListTy getDynamicIndizes() const;
 
     const IndexListTy &getIndexList() const;
-
     const AccessListTy &getAccessList() const;
+
+    // Load methods
+    //
+    bool isLoad(streamindex_p) const;
+    const IndexListTy getLoads() const;
+    const StaticIndexListTy getStaticLoads() const;
+    const DynamicIndexListTy getDynamicLoads() const;
+
+    void addLoad(streamindex_p I);
+
+    // Store methods
+    //
+    bool isStore(streamindex_p) const;
+    const IndexListTy getStores() const;
+    const StaticIndexListTy getStaticStores() const;
+    const DynamicIndexListTy getDynamicStores() const;
+
+    void addStore(streamindex_p);
 };
 
 /// \brief StreamIndex
@@ -102,7 +120,6 @@ class StreamPort : public Port {
 class StreamIndex : public HW {
   private:
     streamport_p Stream;
-    base_p Index;
 
   protected:
     StreamIndex(const std::string &Name, streamport_p Stream);

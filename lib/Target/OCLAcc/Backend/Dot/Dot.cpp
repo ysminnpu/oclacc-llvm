@@ -157,7 +157,7 @@ int Dot::visit(Compare &R) {
 
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-  F() << "n" << R.getUID() << " [shape=square,fillcolor=\"/blues9/7\",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
+  F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=\"/blues9/7\",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
   super::visit(R);
   for ( base_p p : R.getOuts() ) {
     Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << "\n";

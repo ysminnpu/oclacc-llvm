@@ -122,3 +122,74 @@ const std::string StaticStreamIndex::getUniqueName() const {
   return getName();
 }
 
+const StreamPort::StaticIndexListTy StreamPort::getStaticIndizes() const {
+  StreamPort::StaticIndexListTy R;
+
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (IndexList[i]->isStatic()) {
+      R.push_back(std::static_pointer_cast<StaticStreamIndex>(IndexList[i]));
+    }
+  }
+
+  return R;
+}
+
+const StreamPort::StaticIndexListTy StreamPort::getStaticLoads() const {
+  StreamPort::StaticIndexListTy R;
+
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (IndexList[i]->isStatic() && AccessList[i] == AccessTy::Load) {
+      R.push_back(std::static_pointer_cast<StaticStreamIndex>(IndexList[i]));
+    }
+  }
+
+  return R;
+}
+
+const StreamPort::StaticIndexListTy StreamPort::getStaticStores() const {
+  StreamPort::StaticIndexListTy R;
+
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (IndexList[i]->isStatic() && AccessList[i] == AccessTy::Store) {
+      R.push_back(std::static_pointer_cast<StaticStreamIndex>(IndexList[i]));
+    }
+  }
+
+  return R;
+}
+
+const StreamPort::DynamicIndexListTy StreamPort::getDynamicIndizes() const {
+  StreamPort::DynamicIndexListTy R;
+
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (!IndexList[i]->isStatic()) {
+      R.push_back(std::static_pointer_cast<DynamicStreamIndex>(IndexList[i]));
+    }
+  }
+
+  return R;
+}
+
+const StreamPort::DynamicIndexListTy StreamPort::getDynamicLoads() const {
+  StreamPort::DynamicIndexListTy R;
+
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (!IndexList[i]->isStatic() && AccessList[i] == AccessTy::Load) {
+      R.push_back(std::static_pointer_cast<DynamicStreamIndex>(IndexList[i]));
+    }
+  }
+
+  return R;
+}
+
+const StreamPort::DynamicIndexListTy StreamPort::getDynamicStores() const {
+  StreamPort::DynamicIndexListTy R;
+
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (!IndexList[i]->isStatic() && AccessList[i] == AccessTy::Store) {
+      R.push_back(std::static_pointer_cast<DynamicStreamIndex>(IndexList[i]));
+    }
+  }
+
+  return R;
+}

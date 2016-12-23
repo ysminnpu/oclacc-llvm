@@ -37,6 +37,9 @@ class Component : public Identifiable, public Visitable {
     typedef std::map<const llvm::Value *, streamport_p> StreamMapTy;
     typedef std::map<const llvm::Value *, scalarport_p> ScalarMapTy;
 
+    StreamsTy InOutStreams;
+    StreamMapTy InOutStreamsMap;
+
     StreamsTy InStreams;
     StreamMapTy InStreamsMap;
 
@@ -90,7 +93,15 @@ class Component : public Identifiable, public Visitable {
     bool containsOutStreamForValue(const Value *);
 
     const StreamsTy &getOutStreams() const;
+    
+    // InOutStreams
+    void addInOutStream(streamport_p);
 
+    bool containsInOutStreamForValue(const Value *);
+    
+    const StreamsTy &getInOutStreams() const;
+
+    // Unified access
     PortsTy getOuts(void) const;
 
     PortsTy getIns(void) const;

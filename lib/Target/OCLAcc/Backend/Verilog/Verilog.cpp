@@ -21,38 +21,68 @@ Verilog::~Verilog() {
 }
 
 int Verilog::visit(DesignUnit &R) {
-  std::string Filename = R.getName()+".v";
-  FS = openFile(Filename);
-
-  (*FS) << header();
 
   super::visit(R);
 
-  FS->close();
   return 0;
 }
+
+/// \brief Define Kernel in new file.
+///
+/// TODO: Allow multiple instantiations of the same kernel.
+///
 int Verilog::visit(Kernel &R) {
+  std::string Filename = R.getName()+".v";
+  // Local copy of FS since other Blocks create a new global FS for their
+  // contents. This avoids passing the FS between functions.
+  FileTy FStmp = openFile(Filename);
+  FS = FStmp;
+
+  (*FS) << header();
+
+  // Instantiate the Kernel
   KernelModule TM(R);
   (*FS) << TM.declHeader();
-  (*FS) << TM.declBlockWires();
 
-  (*FS) << "// Wires and Port Muxer between blocks\n";
+  (*FS) << "// Block Wires and Port Muxer\n";
+  (*FS) << TM.declBlockWires();
 
   (*FS) << "// Block Instantiations\n";
   (*FS) << TM.instBlocks();
+
+  (*FS) << TM.instStreams();
 
   (*FS) << TM.connectWires();
 
   (*FS) << TM.declFooter();
 
+  //errs() << TM.instStreams();
+
   super::visit(R);
+
+  FStmp->close();
   return 0;
 }
 
+/// \brief Define Block in new file
+///
 int Verilog::visit(Block &R) {
+  std::string Filename = R.getName()+".v";
+  // Local copy of FS since other Blocks create a new global FS for their
+  // contents. This avoids passing the FS between functions.
+  FileTy FStmp = openFile(Filename);
+  FS = FStmp;
+
+  (*FS) << header();
+
   VerilogModule M(R);
   (*FS) << M.declHeader();
   (*FS) << M.declFooter();
+
+  super::visit(R);
+
+  FStmp->close();
+
   return 0;
 }
 

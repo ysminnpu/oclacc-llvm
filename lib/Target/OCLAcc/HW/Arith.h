@@ -63,7 +63,7 @@ class Logic : public HW
 class Add : public Arith
 {
   public:
-    Add(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    Add(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -72,7 +72,7 @@ class Add : public Arith
 class FAdd : public FPArith
 {
   public:
-    FAdd(const std::string &Name, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) : FPArith(Name+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
+    FAdd(const std::string &Name, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) : FPArith(Name+"_"+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
     {
       //pass
     }
@@ -82,7 +82,7 @@ class FAdd : public FPArith
 class Sub : public Arith
 {
   public:
-    Sub(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this), BitWidth)
+    Sub(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this), BitWidth)
     {
       //pass
     }
@@ -91,7 +91,7 @@ class Sub : public Arith
 class FSub : public FPArith
 {
   public:
-    FSub(const std::string &Name, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) : FPArith(Name+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
+    FSub(const std::string &Name, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) : FPArith(Name+"_"+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
     {
       //pass
     }
@@ -100,7 +100,7 @@ class FSub : public FPArith
 class Mul : public Arith
 {
   public:
-    Mul(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    Mul(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -110,7 +110,7 @@ class FMul : public FPArith
 {
   public:
     FMul(const std::string &Name, unsigned BitWidth=0, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) 
-      : FPArith(Name+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
+      : FPArith(Name+"_"+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
     {
       //pass
     }
@@ -120,7 +120,7 @@ class FMul : public FPArith
 class UDiv : public Arith
 {
   public:
-    UDiv(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    UDiv(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -129,7 +129,7 @@ class UDiv : public Arith
 class SDiv : public Arith
 {
   public:
-    SDiv(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    SDiv(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -139,7 +139,7 @@ class FDiv : public FPArith
 {
   public:
     FDiv(const std::string &Name, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) 
-      : FPArith(Name+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
+      : FPArith(Name+"_"+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
     {
       //pass
     }
@@ -149,7 +149,7 @@ class FDiv : public FPArith
 class URem : public Arith
 {
   public:
-    URem(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    URem(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -159,7 +159,7 @@ class URem : public Arith
 class SRem : public Arith
 {
   public:
-    SRem(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    SRem(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -169,7 +169,7 @@ class SRem : public Arith
 class FRem : public FPArith
 {
   public:
-    FRem(const std::string &Name, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) : FPArith(Name+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
+    FRem(const std::string &Name, unsigned MantissaBitWidth=0, unsigned ExponentBitWidth=0) : FPArith(Name+"_"+TYPENAME(*this), MantissaBitWidth, ExponentBitWidth)
     {
       //pass
     }
@@ -179,7 +179,7 @@ class FRem : public FPArith
 class Shl : public Arith
 {
   public:
-    Shl(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    Shl(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -188,7 +188,7 @@ class Shl : public Arith
 class LShr : public Arith
 {
   public:
-    LShr(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    LShr(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -197,7 +197,7 @@ class LShr : public Arith
 class AShr : public Arith
 {
   public:
-    AShr(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    AShr(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -206,7 +206,7 @@ class AShr : public Arith
 class And : public Arith
 {
   public:
-    And(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    And(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -215,7 +215,7 @@ class And : public Arith
 class Or : public Arith
 {
   public:
-    Or(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    Or(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }
@@ -224,7 +224,7 @@ class Or : public Arith
 class Xor : public Arith
 {
   public:
-    Xor(const std::string &Name, unsigned BitWidth=0) : Arith(Name+TYPENAME(*this))
+    Xor(const std::string &Name, unsigned BitWidth=0) : Arith(Name+"_"+TYPENAME(*this))
     {
       //pass
     }

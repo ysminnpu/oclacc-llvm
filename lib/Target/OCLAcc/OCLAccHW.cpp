@@ -378,6 +378,10 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           scalarport_p HWOut;
           scalarport_p HWIn;
 
+          // The Ports are created with isPipelined==true to indicate, that is
+          // will be passed from BB to BB and that we have to create additional
+          // signals for synchronization (_valid, _ack).
+          //
           if (!HWFrom->containsOutScalarForValue(I)) {
             HWOut = makeHWBB<ScalarPort>(*FromBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT), true);
             HWFrom->addOutScalar(HWOut);
@@ -572,13 +576,17 @@ void OCLAccHW::handleArgument(const Argument &A) {
       streamport_p S = makeHW<StreamPort>(&A, Name, Bits, static_cast<ocl::AddressSpace>(AS), D);
       ArgMap[&A] = S;
 
-      if (isWritten) {
+      if (isRead && isWritten) {
+        HWKernel->addInOutStream(S);
+        DEBUG(dbgs() << "Argument '" << Name << "' is InOutStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
+      } else if (!isRead && isWritten) {
         HWKernel->addOutStream(S);
         DEBUG(dbgs() << "Argument '" << Name << "' is OutStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
-      }
-      if (isRead) {
+      } else if (isRead && !isWritten) {
         HWKernel->addInStream(S);
         DEBUG(dbgs() << "Argument '" << Name << "' is InStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
+      } else {
+        llvm_unreachable("Stream not used");
       }
     }
   }
@@ -913,8 +921,16 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
           break;
         }
       default:
-        IConst->dump();
-        llvm_unreachable("Invalid sign extention type");
+        // Fall back to sign extend. 
+        // FIXME:
+        // The following code did not generate valid Bits:
+        // %tmp12 = icmp sgt i32 %get_global_id_1, 0
+        {
+          int64_t S = IConst->getSExtValue();
+          CName << S;
+          HWConst = std::make_shared<ConstVal>(CName.str(), S, Bits);
+          break;
+        }
     }
   } 
   else if (const ConstantFP *FConst = dyn_cast<ConstantFP>(C)) {
@@ -968,16 +984,29 @@ void OCLAccHW::visitCallInst(CallInst &I) {
 }
 
 void OCLAccHW::visitCmpInst(CmpInst &I) {
-  CmpInst::Predicate P = I.getPredicate();
+  // We currently directly use the llvm Predicate.
+  Compare::PredTy P = static_cast<Compare::PredTy>(I.getPredicate());
 
+  cmp_p HWC;
   if (I.isFPPredicate()) {
-    //TODO
-    llvm_unreachable("fp compare");
+    HWC = makeHWBB<FPCompare>(I.getParent(), &I, I.getName() , P);
+  } else {
+    HWC = makeHWBB<IntCompare>(I.getParent(), &I, I.getName() , P);
   }
 
-  // FIXME
-  // Make different classes for predicates or use enum like llvm.
-  cmp_p C = makeHWBB<Compare>(I.getParent(), &I, "Compare");
+  for (const Use &U : I.operands()) {
+    const Value *V = U.get();
+
+    base_p HWOp;
+    if (const Constant *ConstValue = dyn_cast<Constant>(V) ) {
+      HWOp = makeConstant(ConstValue, &I);
+    } else {
+      HWOp = getHW<HW>(I.getParent(), V);
+    }
+
+    connect(HWOp, HWC);
+  }
+
 }
 
 void OCLAccHW::visitPHINode(PHINode &I) {

@@ -21,7 +21,7 @@ Portmux::Portmux(const Port &P) : InPort(P) {
   SS << "portmux_" << NumPorts << "_" << Bitwidth;
   ModName = SS.str();
 
-  Instname = "portmux_"+InPort.getUniqueName();
+  InstName = "portmux_"+InPort.getUniqueName();
 
   definition();
 }
@@ -86,7 +86,7 @@ void Portmux::definition() {
 std::string Portmux::instantiate() {
   std::stringstream S;
 
-  S << ModName << " " << Instname << " (\n";
+  S << ModName << " " << InstName << " (\n";
 
   int i = 0;
   for (base_p P : InPort.getIns()) {

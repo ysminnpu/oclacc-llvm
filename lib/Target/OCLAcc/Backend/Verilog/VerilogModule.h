@@ -41,6 +41,8 @@ class KernelModule : public VerilogModule{
 
     const std::string connectWires();
 
+    const std::string instStreams();
+
   private:
     Kernel &R;
 

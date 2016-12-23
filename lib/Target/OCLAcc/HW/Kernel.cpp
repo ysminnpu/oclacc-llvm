@@ -89,9 +89,27 @@ const Component::StreamsTy &Component::getOutStreams() const {
   return OutStreams;
 }
 
+// InOutStreams
+void Component::addInOutStream(streamport_p P) { 
+  assert(P->getIR() != nullptr);
+  InOutStreamsMap[P->getIR()] = P;
+  InOutStreams.push_back(P);
+}
+
+bool Component::containsInOutStreamForValue(const Value *V) {
+  StreamMapTy::const_iterator IT = InOutStreamsMap.find(V);
+  return IT != InOutStreamsMap.end();
+}
+
+const Component::StreamsTy &Component::getInOutStreams() const { 
+  return InOutStreams;
+}
+
+// Unified access
 Component::PortsTy Component::getOuts(void) const {
   PortsTy Outs;
   Outs.insert(Outs.end(), OutStreams.begin(), OutStreams.end());
+  Outs.insert(Outs.end(), InOutStreams.begin(), InOutStreams.end());
   Outs.insert(Outs.end(), OutScalars.begin(), OutScalars.end());
   return Outs;
 }
@@ -99,6 +117,7 @@ Component::PortsTy Component::getOuts(void) const {
 Component::PortsTy Component::getIns(void) const {
   PortsTy Ins;
   Ins.insert(Ins.end(), InStreams.begin(), InStreams.end());
+  Ins.insert(Ins.end(), InOutStreams.begin(), InOutStreams.end());
   Ins.insert(Ins.end(), InScalars.begin(), InScalars.end());
   return Ins;
 }

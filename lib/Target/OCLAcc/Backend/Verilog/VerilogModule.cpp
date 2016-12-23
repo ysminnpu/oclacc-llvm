@@ -1,6 +1,9 @@
+#include <memory>
+
 #include "../../HW/Kernel.h"
 
 #include "VerilogModule.h"
+
 
 using namespace oclacc;
 
@@ -28,8 +31,8 @@ const std::string VerilogModule::declHeader() {
 
     S << BW << (*P)->getUniqueName() << ",\n";
 
-    S << I(1) << "input  " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_valid,\n";
-    S << I(1) << "output " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_ack";
+    S << I(1) << "input wire  " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_valid,\n";
+    S << I(1) << "output reg" << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_ack";
 
     if (std::next(P) != E)
       S << ",\n";
@@ -70,9 +73,14 @@ const std::string VerilogModule::declFooter() {
   return S.str();
 }
 
+/// \brief Declare Wires for the Blocks' Ports
+///
+/// Iterate over all Blocks and creates wires for each port data. For
+/// synchronization, also create <port>_valid and <port>_ack.
+///
 const std::string KernelModule::declBlockWires() {
+  std::stringstream S;
   for (block_p B : R.getBlocks()) {
-    std::stringstream S;
     const Component::PortsTy &I = R.getIns();
     const Component::PortsTy &O = R.getOuts();
 
@@ -80,7 +88,7 @@ const std::string KernelModule::declBlockWires() {
     IO.insert(IO.end(), I.begin(), I.end());
     IO.insert(IO.end(), O.begin(), O.end());
 
-    S << "// " << R.getUniqueName() << "\n";
+    S << "// " << B->getUniqueName() << "\n";
 
     // first create wires for each port used as input and output
     for (Component::PortsConstItTy P = IO.begin(), E = IO.end(); P != E; ++P) {
@@ -102,9 +110,8 @@ const std::string KernelModule::declBlockWires() {
       S << "wire " << (*P)->getUniqueName() << "_valid;\n";
       S << "wire " << (*P)->getUniqueName() << "_ack;\n";
     }
-
-    return S.str();
   }
+  return S.str();
 }
 
 const std::string KernelModule::connectWires() {
@@ -138,8 +145,8 @@ const std::string KernelModule::connectWires() {
 }
 
 const std::string KernelModule::instBlocks() {
+  std::stringstream S;
   for (block_p B : R.getBlocks()) {
-    std::stringstream S;
 
     const Component::PortsTy &I = R.getIns();
     const Component::PortsTy &O = R.getOuts();
@@ -156,14 +163,14 @@ const std::string KernelModule::instBlocks() {
       if (P->getIns().size() > 1) {
         Portmux PM(*P);
         if (printHead) {
-          S << "// Muxer for " << R.getUniqueName() << "\n";
+          S << "// Muxer for Block " << B->getUniqueName() << "\n";
           printHead = false;
         }
         S << PM.instantiate();
       }
     }
 
-    S << R.getName() << " " << R.getUniqueName() << "(\n";
+    S << B->getName() << " " << B->getUniqueName() << "(\n";
 
     // Use can use the Port's name as it is unique. We already created wired for
     // each Port and we will connect them afterwards.
@@ -194,7 +201,35 @@ const std::string KernelModule::instBlocks() {
     }
 
     S << "\n" << ");\n";
-    return S.str();
   }
+  return S.str();
+}
+
+const std::string KernelModule::instStreams() {
+  std::stringstream S;
+
+  for (streamport_p SP : R.getInStreams()) {
+    S << SP->getUniqueName() << " BW: " << SP->getBitWidth() << "\n";
+
+    for (streamindex_p SI : SP->getIndexList()) {
+      S << "index " << SI->getUniqueName();
+
+      if (SI->isStatic()) {
+        staticstreamindex_p SSI = std::static_pointer_cast<StaticStreamIndex>(SI);
+        S << " is static " << SSI->getIndex() << "\n";
+      } else {
+        dynamicstreamindex_p DSI = std::static_pointer_cast<DynamicStreamIndex>(SI);
+        S << " is dynamic " << DSI->getIndex()->getUniqueName() << "\n";
+      }
+    }
+  }
+
+  for (streamport_p S : R.getOutStreams()) {
+  }
+
+  for (streamport_p S : R.getInOutStreams()) {
+  }
+
+  return S.str();
 }
 

@@ -13,7 +13,7 @@ class Portmux {
     unsigned NumPorts;
     unsigned Bitwidth;
     std::string ModName;
-    std::string Instname;
+    std::string InstName;
   public:
     Portmux(const Port &);
 
