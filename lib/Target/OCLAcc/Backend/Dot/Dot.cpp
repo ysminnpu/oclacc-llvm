@@ -131,9 +131,12 @@ int Dot::visit(Arith &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   F() << "n" << R.getUID() << " [shape=pentagon,fillcolor=\"/blues9/5\",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
+
   super::visit(R);
+
   for ( base_p p : R.getOuts() ) {
     Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << ";\n";
+    errs() << R.getUniqueName() << " has " << R.getOuts().size() << "\n";
   }
   return 0;
 }
@@ -144,6 +147,7 @@ int Dot::visit(FPArith &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   F() << "n" << R.getUID() << " [shape=pentagon,fillcolor=\"/greens9/5\",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
+
   super::visit(R);
 
   for ( base_p p : R.getOuts() ) {
@@ -158,7 +162,9 @@ int Dot::visit(Compare &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=\"/blues9/7\",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
+
   super::visit(R);
+  
   for ( base_p p : R.getOuts() ) {
     Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << "\n";
   }
@@ -250,6 +256,10 @@ int Dot::visit(StreamPort &R) {
     }
   }
 
+  // We do not instantiate the Index Operations here as they must be placed in
+  // their containing block.
+
+#if 0
   // Separate loads/stores and static/dynamic indices to print arrows with
   // correct direction.
   for (streamindex_p I : R.getLoads()) {
@@ -259,9 +269,7 @@ int Dot::visit(StreamPort &R) {
     } else {
       dynamicstreamindex_p DI = std::static_pointer_cast<DynamicStreamIndex>(I);
       F() << "n" << I->getUID() << nodeInStreamIndex(R.getUniqueName()+"["+DI->getUniqueName()+"]") << ";\n";
-    }
-  }
-  for (streamindex_p I : R.getStores()) {
+    B(streamindex_p I : R.getStores()) {
     if (I->isStatic()) {
       staticstreamindex_p SI = std::static_pointer_cast<StaticStreamIndex>(I);
       F() << "n" << I->getUID() << nodeOutStreamIndex(R.getUniqueName()+"["+std::to_string(SI->getIndex())+"]") << ";\n";
@@ -270,12 +278,12 @@ int Dot::visit(StreamPort &R) {
       F() << "n" << I->getUID() << nodeOutStreamIndex(R.getUniqueName()+"["+DI->getUniqueName()+"]") << ";\n";
     }
   }
-
+#endif
 
   for ( base_p I : IndexList ) {
     // Draw connection from Index to base Stream
     // When the Stream is used with an Index, it must belong to a Parent Block.
-    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << ";\n";
+//    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << ";\n";
 
     // Draw connection from Index to uses
     // Stores do not have Outs().
@@ -284,6 +292,38 @@ int Dot::visit(StreamPort &R) {
     }
   }
 
+  return 0;
+}
+
+/// \brief Create arrow for Load/Store
+///
+int Dot::visit(StaticStreamIndex &R) {
+  VISIT_ONCE(R)
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+  // Depending on being a Load or Store, the arrow direction must be correct.
+  streamport_p HWStream = R.getStream();
+  if (HWStream->isLoad(&R) )
+    F() << "n" << R.getUID() << nodeInStreamIndex(HWStream->getUniqueName()+"["+std::to_string(R.getIndex())+"]") << ";\n";
+  else
+    F() << "n" << R.getUID() << nodeOutStreamIndex(HWStream->getUniqueName()+"["+std::to_string(R.getIndex())+"]") << ";\n";
+
+  super::visit(R);
+
+  return 0;
+}
+
+int Dot::visit(DynamicStreamIndex &R) {
+  VISIT_ONCE(R)
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+  streamport_p HWStream = R.getStream();
+  if (HWStream->isLoad(&R) )
+    F() << "n" << R.getUID() << nodeInStreamIndex(HWStream->getUniqueName()+"["+R.getUniqueName()+"]") << ";\n";
+  else
+    F() << "n" << R.getUID() << nodeOutStreamIndex(HWStream->getUniqueName()+"["+R.getUniqueName()+"]") << ";\n";
+
+  super::visit(R);
 
   return 0;
 }

@@ -221,9 +221,9 @@ class DFVisitor : public BaseVisitor
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( streamindex_p P : R.getIndexList() ) {
-        P->accept(*this);
-      }
+      //for ( streamindex_p P : R.getIndexList() ) {
+      //  P->accept(*this);
+      //}
       return 0;
     }
 

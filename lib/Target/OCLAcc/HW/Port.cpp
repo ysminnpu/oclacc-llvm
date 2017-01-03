@@ -48,12 +48,16 @@ const StreamPort::IndexListTy StreamPort::getStores() const {
   return get(StreamPort::Store);
 }
 
-bool StreamPort::isLoad(streamindex_p I) const {
+bool StreamPort::isLoad(StreamIndex *I) const {
   bool ret = false;
-  IndexListConstIt It = std::find(IndexList.begin(), IndexList.end(), I);
-  if (It != IndexList.end()) {
-    unsigned index = std::distance(IndexList.begin(), It);
-    ret = AccessList.at(index) == Load;
+
+  unsigned i = 0;
+  for (streamindex_p SI : IndexList) {
+    if (SI.get() == I) {
+      if (AccessList.at(i) == Load)
+        ret = true;
+    }
+    ++i;
   }
 
   return ret;
@@ -64,12 +68,16 @@ void StreamPort::addStore(streamindex_p I) {
   AccessList.push_back(Store);
 }
 
-bool StreamPort::isStore(streamindex_p I) const {
+bool StreamPort::isStore(StreamIndex *I) const {
   bool ret = false;
-  IndexListConstIt It = std::find(IndexList.begin(), IndexList.end(), I);
-  if (It != IndexList.end()) {
-    unsigned index = std::distance(IndexList.begin(), It);
-    ret = AccessList.at(index) == Store;
+
+  unsigned i = 0;
+  for (streamindex_p SI : IndexList) {
+    if (SI.get() == I) {
+      if (AccessList.at(i) == Store)
+        ret = true;
+    }
+    ++i;
   }
 
   return ret;

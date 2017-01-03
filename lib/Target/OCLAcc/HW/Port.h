@@ -96,7 +96,8 @@ class StreamPort : public Port {
 
     // Load methods
     //
-    bool isLoad(streamindex_p) const;
+    bool isLoad(StreamIndex *) const;
+    bool isLoad(streamindex_p P) const { return isLoad(P.get()); } 
     const IndexListTy getLoads() const;
     const StaticIndexListTy getStaticLoads() const;
     const DynamicIndexListTy getDynamicLoads() const;
@@ -105,7 +106,8 @@ class StreamPort : public Port {
 
     // Store methods
     //
-    bool isStore(streamindex_p) const;
+    bool isStore(StreamIndex *) const;
+    bool isStore(streamindex_p P) const { return isStore(P.get()); }
     const IndexListTy getStores() const;
     const StaticIndexListTy getStaticStores() const;
     const DynamicIndexListTy getDynamicStores() const;

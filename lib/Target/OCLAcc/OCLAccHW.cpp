@@ -720,7 +720,7 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
   }
 }
 
-void OCLAccHW::visitLoadInst(LoadInst  &I)
+void OCLAccHW::visitLoadInst(LoadInst &I)
 {
   const std::string Name = I.getName().str();
   const Value *AddrVal = I.getPointerOperand();
@@ -750,7 +750,7 @@ void OCLAccHW::visitLoadInst(LoadInst  &I)
 
   BlockValueMap[I.getParent()][&I] = HWStreamIndex;
 
-  HWStreamIndex->setName(HWStream->getName()+"_Index");
+  HWStreamIndex->setName(P->getName());
 }
 
 ///
@@ -1010,14 +1010,16 @@ void OCLAccHW::visitCmpInst(CmpInst &I) {
 }
 
 void OCLAccHW::visitPHINode(PHINode &I) {
-  mux_p HWM = makeHWBB<Mux>(I.getParent(), &I, I.getName());
+  const BasicBlock *BB = I.getParent();
+  mux_p HWM = makeHWBB<Mux>(BB, &I, I.getName());
+
 
   for (unsigned i = 0; i < I.getNumIncomingValues(); ++i) {
-    const BasicBlock *BB = I.getIncomingBlock(i);
+    const BasicBlock *FromBB = I.getIncomingBlock(i);
     const Value *V = I.getIncomingValue(i);
 
-    port_p HWP = getHW<Port>(I.getParent(), V);
-    block_p HWB = getBlock(BB);
+    port_p HWP = getHW<Port>(BB, V);
+    block_p HWB = getBlock(FromBB);
 
     HWM->addIn(HWP, HWB);
     connect(HWP, HWM);
@@ -1044,6 +1046,7 @@ void OCLAccHW::visitBranchInst(BranchInst &I) {
     // we have no condition, all Ports can be used when ready.
     return;
   }
+
   const BasicBlock *BB = I.getParent();
   block_p HWBB = getBlock(BB);
 
