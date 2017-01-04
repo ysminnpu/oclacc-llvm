@@ -10,6 +10,7 @@
 
 #include "Utils.h"
 
+
 namespace oclacc {
 
 class DesignUnit;
@@ -30,21 +31,6 @@ class Dot: public DFVisitor {
     unsigned IndentLevel;
 
     std::stringstream Connections;
-
-    const std::string nodeOutStream(const std::string &Label) {
-      return "[shape=invhouse,fillcolor=\"/purples9/5\",style=filled,tailport=n,label=\"" + Label + "\"]";
-    }
-    const std::string nodeInStream(const std::string &Label) {
-      return "[shape=house,fillcolor=\"/purples9/5\",style=filled,tailport=n,label=\"" + Label + "\"]";
-    }
-
-    const std::string nodeInStreamIndex(const std::string &Label) { 
-      return "[shape=rarrow,fillcolor=\"/purples9/5\",style=filled,tailport=n,label=\"" + Label + "\"]";
-    }
-
-    const std::string nodeOutStreamIndex(const std::string &Label) { 
-      return "[shape=larrow,fillcolor=\"/purples9/5\",style=filled,tailport=n,label=\"" + Label + "\"]";
-    }
 
     const std::string Indent() {
       return std::string(IndentLevel*2, ' ');

@@ -115,16 +115,10 @@ const FindAllPaths::PathTy FindAllPaths::getPathForValue(
           if (PrevIt != SP.rend())
             PrevBB = *PrevIt;
 
-  //        outs() << "previous BB in Path: " << PrevBB->getName() << "\n";
-              
           if (PrevBB == IncBB) {
-   //         outs() << "Previous BB is in PHI Incoming List:" << PrevBB->getName() << "\n";
-
             const FindAllPaths::SinglePathTy NP(FIt, std::next(TIt));
             P.push_back(NP);
-          } else {
-     //       outs() << "Skip previous BB " << PrevBB->getName() << " for incoming BB " << IncBB->getName() << "\n";
-          }
+          } 
         }
       }
     }
