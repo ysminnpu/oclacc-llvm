@@ -39,9 +39,12 @@ int Dot::visit(Kernel &R) {
 
   FS = openFile(FileName);
 
-  F() << "digraph G { " << "\n";
+  F() << "digraph G {\n";
 
   IndentLevel++;
+
+  F() << "ranksep=0.8\n";
+  F() << "nodesep=0.5\n";
 
   std::stringstream RankInStream;
   std::stringstream RankOutStream;
@@ -333,7 +336,7 @@ int Dot::visit(ScalarPort &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   for ( base_p P : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << ";\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=\"/purples9/4\"] ;\n";
   }
 
   super::visit(R);

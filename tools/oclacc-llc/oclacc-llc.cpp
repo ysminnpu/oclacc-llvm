@@ -13,7 +13,6 @@
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
-#include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -100,8 +99,6 @@ static cl::opt<bool> AsmVerbose("asm-verbose",
 
 static cl::opt<std::string> OutputDir("oclacc-dir", cl::desc("Output directory. Module Name if not set.") );
 static cl::opt<std::string> ModuleName("oclacc-module", cl::desc("Module Name. Must be set if using stdin, otherwise optional.") );
-
-static cl::opt<bool> CfgDot("cfg-dot", cl::desc("Write Dot CFG"), cl::init(false));
 
 static int compileModule(char **, LLVMContext &);
 
@@ -442,9 +439,6 @@ static int compileModule(char **argv, LLVMContext &Context) {
     /* Name Instructions to allow mapping of source to generated objects */
     PM.add(createInstructionNamerPass());
     PM.add(createPrintModulePass(*NamedIRFile));
-
-    if (CfgDot)
-      PM.add(createCFGPrinterPass());
 
     // Ask the target to add backend passes as necessary.
     if (Target->addPassesToEmitFile(PM, *FLog, FileType, NoVerify,

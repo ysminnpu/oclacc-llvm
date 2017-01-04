@@ -3,6 +3,7 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/CFG.h"
+#include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/Analysis/LoopInfoImpl.h"
 #include "llvm/Analysis/Passes.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -92,6 +93,8 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
  * Must be here since results of pass are needed. No need to transfer them to
  * oclacc-llc.
  */
+
+static cl::opt<bool> CfgDot("cfg-dot", cl::desc("Write Dot CFG"), cl::init(false));
 
 INITIALIZE_PASS_BEGIN(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
 INITIALIZE_PASS_DEPENDENCY(HDLPromoteID);
@@ -205,6 +208,13 @@ bool OCLAccHW::runOnModule(Module &M) {
 
     FindAllPaths &AP = getAnalysis<FindAllPaths>(*KF);
     AP.dump();
+
+    // Print cfg
+    if (CfgDot) {
+      FunctionPass *CFG = createCFGPrinterPass();
+      CFG->runOnFunction(*KF);
+    }
+
   }
 
   return false;
@@ -257,13 +267,16 @@ void OCLAccHW::handleKernel(const Function &F) {
 /// \brief Walk through BBs, set inputs and outputs
 ///
 /// Walk through all instructions, visit their uses and check if they were
-/// defined in that BB
+/// defined in that BB. If not, check if it is used by a PHINode to avoid
+/// unnecessary ports.
+///
 void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
   FindAllPaths &AP = getAnalysis<FindAllPaths>(*(BB.getParent()));
   ArgPromotionTracker &AT = getAnalysis<ArgPromotionTracker>();
 
   block_p HWBB = getBlock(&BB);
 
+  // List of values defined in other BBs and Arguments.
   std::vector<const Value *> VS;
   std::vector<const Argument *> VA;
 
@@ -292,6 +305,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
         if (II->getParent() == &BB)
           continue;
 
+        
         VS.push_back(II); 
       } else if (const Argument *A = dyn_cast<Argument>(V)) {
         // Only WI functions have to be passed from block to block. Other Arguments
@@ -363,7 +377,14 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     const Type *IT = I->getType();
     const std::string Name = I->getName();
 
-    const FindAllPaths::PathTy &Paths = AP.getPathFromTo(DefBB, &BB);
+    //const FindAllPaths::PathTy &Paths = AP.getPathFromTo(DefBB, &BB);
+
+    // If the current Instruction is a PHINode, we only have to find all paths
+    // between the Value's definition and the incoming block of the PHINode.
+    const FindAllPaths::PathTy &Paths = AP.getPathForValue(DefBB, &BB, I);
+
+    DEBUG(outs() << "For Value " << I->getName() << " in Block " << BB.getName() << "\n");
+    DEBUG(FindPaths::dump(Paths));
 
     if (IT->isIntegerTy() || IT->isFloatingPointTy()) { 
       for (const FindAllPaths::SinglePathTy P : Paths) {
