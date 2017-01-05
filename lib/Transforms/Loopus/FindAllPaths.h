@@ -48,12 +48,15 @@ class FindAllPaths : public llvm::FunctionPass {
     virtual void getAnalysisUsage(llvm::AnalysisUsage &) const override;
     virtual bool runOnFunction(llvm::Function &) override;
     virtual bool doInitialization(llvm::Module &) override;
+    virtual void print(llvm::raw_ostream &O, const llvm::Module *M) const override;
 };
 
 namespace FindPaths {
 
-void dump(FindAllPaths::SinglePathTy);
+void dump(FindAllPaths::PathTy, llvm::raw_ostream &, const std::string);
 void dump(FindAllPaths::PathTy);
+void dump(FindAllPaths::SinglePathTy, llvm::raw_ostream &, const std::string);
+void dump(FindAllPaths::SinglePathTy);
 
 } // end ns FindPaths
 

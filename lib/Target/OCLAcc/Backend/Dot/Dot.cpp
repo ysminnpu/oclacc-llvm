@@ -147,8 +147,7 @@ int Dot::visit(Arith &R) {
   super::visit(R);
 
   for ( base_p p : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << "[];\n";
-    errs() << R.getUniqueName() << " has " << R.getOuts().size() << "\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_ARITH << "];\n";
   }
   return 0;
 }
@@ -163,7 +162,7 @@ int Dot::visit(FPArith &R) {
   super::visit(R);
 
   for ( base_p p : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << ";\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_FPARITH << "];\n";
   }
   return 0;
 }
@@ -178,7 +177,7 @@ int Dot::visit(Compare &R) {
   super::visit(R);
   
   for ( base_p p : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << "\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_COMPARE << "];\n";
   }
 
   return 0;
@@ -239,7 +238,7 @@ int Dot::visit(ConstVal &r) {
   super::visit(r);
 
   for ( base_p p : r.getOuts() ) {
-    Conn() << "n" << r.getUID() << " -> " << "n" << p->getUID() << "\n";
+    Conn() << "n" << r.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_CONSTVAL << "];\n";
   }
 
   return 0;
@@ -292,16 +291,25 @@ int Dot::visit(StreamPort &R) {
   }
 #endif
 
-  for ( base_p I : IndexList ) {
-    // Draw connection from Index to base Stream
-    // When the Stream is used with an Index, it must belong to a Parent Block.
-//    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << ";\n";
+  // Draw connection from Index to base Stream only for Stores. Loads make the
+  // graph look polluted.
+  for ( base_p I : R.getStores() ) {
+    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << "];\n";
+  }
 
-    // Draw connection from Index to uses
-    // Stores do not have Outs().
+#if 0
+  for ( base_p I : R.getLoads() ) {
+    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << "];\n";
+  }
+#endif
+
+  // Draw connection from Index to uses
+  // Stores do not have Outs().
+  for ( base_p I : R.getLoads() ) {
     for ( base_p O : I->getOuts() ) {
-      Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << ";\n";
+      Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << "];\n";
     }
+
   }
 
   return 0;
@@ -345,7 +353,7 @@ int Dot::visit(ScalarPort &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   for ( base_p P : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_SCALARPORT << "]; \n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_SCALARPORT << "];\n";
   }
 
   super::visit(R);
@@ -360,7 +368,7 @@ int Dot::visit(Mux &R) {
   super::visit(R);
 
   for ( base_p P : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << ";\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_MUX << "];\n";
   }
 
   return 0;

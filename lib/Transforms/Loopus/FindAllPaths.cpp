@@ -172,23 +172,29 @@ void FindAllPaths::walkPaths(const BasicBlock *BB) {
   }
 }
 
-void FindPaths::dump(FindAllPaths::SinglePathTy P) {
+void FindPaths::dump(FindAllPaths::SinglePathTy P, llvm::raw_ostream &O, const std::string Indent="") {
   for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt); 
       ToBBIt != P.end(); 
       FromBBIt = ToBBIt, ++ToBBIt ) {
-    outs() << "  " << (*FromBBIt)->getName() << " -> " << (*ToBBIt)->getName() << "\n";
+    O << Indent << (*FromBBIt)->getName() << " -> " << (*ToBBIt)->getName() << "\n";
   }
 }
 
-void FindPaths::dump(FindAllPaths::PathTy PP) {
-  outs() << "-----------------\n";
+void FindPaths::dump(FindAllPaths::PathTy PP, llvm::raw_ostream &O, const std::string Indent = "") {
   int i = 0;
   for (const FindAllPaths::SinglePathTy &P : PP) {
-    outs() << "Path " << i << ":\n";
-    FindPaths::dump(P);
+    O << Indent << "Path " << i << ":\n";
+    FindPaths::dump(P, O, Indent+"  ");
     ++i;
   }
-  outs() << "-----------------\n";
+}
+
+void FindPaths::dump(FindAllPaths::SinglePathTy P) {
+  dump(P, outs());
+}
+
+void FindPaths::dump(FindAllPaths::PathTy PP) {
+  dump(PP, outs());
 }
 
 //===- Implementation of LLVM pass ----------------------------------------===//
@@ -229,13 +235,18 @@ bool FindAllPaths::runOnFunction(Function &F) {
     Paths.pop_back();
 
   DEBUG(dbgs() << "Generated Paths:\n");
-  DEBUG(FindPaths::dump(Paths));
+  DEBUG(FindPaths::dump(Paths, dbgs()));
 
   return false;
 }
 
 bool FindAllPaths::doInitialization(Module &F) {
   return false;
+}
+
+void FindAllPaths::print(llvm::raw_ostream &O, const llvm::Module *M) const {
+  O << "Found the follwing paths:\n";
+  FindPaths::dump(Paths, O, "  ");
 }
 
 #undef DEBUG_TYPE

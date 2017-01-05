@@ -29,6 +29,10 @@ class Port : public HW {
   public:
 };
 
+/// \brief Input or Output Port
+///
+/// It depends on the Block, whether a Port is input or output.
+/// ScalarPorts, when used as input, may contain a list of Conditions
 class ScalarPort : public Port {
   public:
     ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined);
