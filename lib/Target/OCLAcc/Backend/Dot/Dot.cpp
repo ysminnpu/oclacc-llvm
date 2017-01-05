@@ -147,7 +147,7 @@ int Dot::visit(Arith &R) {
   super::visit(R);
 
   for ( base_p p : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_ARITH << "];\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_ARITH << ",fontcolor=" << C_ARITH << ",label=" << R.getBitWidth() << "];\n";
   }
   return 0;
 }
@@ -162,7 +162,7 @@ int Dot::visit(FPArith &R) {
   super::visit(R);
 
   for ( base_p p : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_FPARITH << "];\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_FPARITH << ",fontcolor=" << C_FPARITH << ",label=" << R.getBitWidth() << "];\n";
   }
   return 0;
 }
@@ -177,7 +177,7 @@ int Dot::visit(Compare &R) {
   super::visit(R);
   
   for ( base_p p : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_COMPARE << "];\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_COMPARE << ",fontcolor=" << C_COMPARE << ",label=" << R.getBitWidth() << "];\n";
   }
 
   return 0;
@@ -230,15 +230,15 @@ int Dot::visit(Fifo &r)
 }
 #endif
 
-int Dot::visit(ConstVal &r) {
-  VISIT_ONCE(r)
+int Dot::visit(ConstVal &R) {
+  VISIT_ONCE(R)
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-  F() << "n" << r.getUID() << " [shape=oval,fillcolor=" << C_CONSTVAL << ",style=filled,tailport=s,label=\"" << r.getName() << "\"];\n";
-  super::visit(r);
+  F() << "n" << R.getUID() << " [shape=oval,fillcolor=" << C_CONSTVAL << ",style=filled,tailport=s,label=\"" << R.getName() << "\"];\n";
+  super::visit(R);
 
-  for ( base_p p : r.getOuts() ) {
-    Conn() << "n" << r.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_CONSTVAL << "];\n";
+  for ( base_p P : R.getOuts() ) {
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_CONSTVAL << ",fontcolor=" << C_CONSTVAL << ",fontcolor=" << C_CONSTVAL << ",label=" << R.getBitWidth() << "];\n";
   }
 
   return 0;
@@ -294,12 +294,12 @@ int Dot::visit(StreamPort &R) {
   // Draw connection from Index to base Stream only for Stores. Loads make the
   // graph look polluted.
   for ( base_p I : R.getStores() ) {
-    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << "];\n";
+    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
   }
 
 #if 0
   for ( base_p I : R.getLoads() ) {
-    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << "];\n";
+    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << "];\n";
   }
 #endif
 
@@ -307,7 +307,7 @@ int Dot::visit(StreamPort &R) {
   // Stores do not have Outs().
   for ( base_p I : R.getLoads() ) {
     for ( base_p O : I->getOuts() ) {
-      Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << "];\n";
+      Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
     }
 
   }
@@ -353,7 +353,7 @@ int Dot::visit(ScalarPort &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   for ( base_p P : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_SCALARPORT << "];\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_SCALARPORT << ",fontcolor=" << C_SCALARPORT << ",label=" << R.getBitWidth() << "];\n";
   }
 
   super::visit(R);
@@ -368,7 +368,7 @@ int Dot::visit(Mux &R) {
   super::visit(R);
 
   for ( base_p P : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_MUX << "];\n";
+    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_MUX << ",fontcolor=" << C_MUX << ",label=" << R.getBitWidth() << "];\n";
   }
 
   return 0;
