@@ -20,6 +20,8 @@ bool VhdlTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   if (FileType != TargetMachine::CGFT_AssemblyFile)
     return true;
 
+  OCLAccTargetMachine::addPassesToEmitFile(PM,O,FileType,DisableVerify,StartAfter,StopAfter);
+
   PM.add(createGenerateVhdlPass());
 
   return false;

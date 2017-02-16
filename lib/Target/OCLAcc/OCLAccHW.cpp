@@ -181,7 +181,7 @@ bool OCLAccHW::runOnModule(Module &M) {
 
   // Print current state of optimization
   std::error_code EC;
-  std::string FileName = ModuleName+".oclacchw.ll";
+  std::string FileName = ModuleName+".final.ll";
   raw_fd_ostream File(FileName, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
   if (EC) {
     errs() << "Failed to create " << FileName << "(" << __LINE__ << "): " << EC.message() << "\n";
@@ -206,8 +206,10 @@ bool OCLAccHW::runOnModule(Module &M) {
 
     handleKernel(*KF);
 
+#if 0
     FindAllPaths &AP = getAnalysis<FindAllPaths>(*KF);
     AP.dump();
+#endif
 
     // Print cfg
     if (CfgDot) {
@@ -383,8 +385,10 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     // between the Value's definition and the incoming block of the PHINode.
     const FindAllPaths::PathTy &Paths = AP.getPathForValue(DefBB, &BB, I);
 
-    DEBUG(outs() << "For Value " << I->getName() << " in Block " << BB.getName() << "\n");
-    DEBUG(FindPaths::dump(Paths));
+#if 0
+    DEBUG(dbgs() << "For Value " << I->getName() << " in Block " << BB.getName() << "\n");
+    DEBUG(FindPaths::dump(Paths, dbgs()));
+#endif
 
     if (IT->isIntegerTy() || IT->isFloatingPointTy()) { 
       for (const FindAllPaths::SinglePathTy P : Paths) {
@@ -1030,11 +1034,17 @@ void OCLAccHW::visitCmpInst(CmpInst &I) {
 
 }
 
+/// \brief Create Multiplexer for all PHI Inputs
+///
 void OCLAccHW::visitPHINode(PHINode &I) {
   const BasicBlock *BB = I.getParent();
+  const block_p HWBB = getBlock(BB);
+
   mux_p HWM = makeHWBB<Mux>(BB, &I, I.getName());
 
-
+  DEBUG(dbgs() << "Block " << BB->getName() << "\n";
+  dbgs() << "\tPHI " << I.getName() << "\n";
+  );
   for (unsigned i = 0; i < I.getNumIncomingValues(); ++i) {
     const BasicBlock *FromBB = I.getIncomingBlock(i);
     const Value *V = I.getIncomingValue(i);
@@ -1042,8 +1052,39 @@ void OCLAccHW::visitPHINode(PHINode &I) {
     port_p HWP = getHW<Port>(BB, V);
     block_p HWB = getBlock(FromBB);
 
-    HWM->addIn(HWP, HWB);
-    connect(HWP, HWM);
+    // All incoming blocks should already have been visited, so we can use 
+    // Conds and NegConds of BB to look for the IncomingBlock and the condition.
+
+    const base_p Cond = HWBB->getCondForBlock(HWB);
+    const base_p NegCond = HWBB->getNegCondForBlock(HWB);
+
+    if (!Cond && !NegCond) {
+      // Unconditional branch from FromBB to BB
+      const_p HWConst = std::make_shared<ConstVal>("1", 1, 1);
+      HWBB->addConstVal(HWConst);
+      HWM->addIn(HWP, HWConst);
+      connect(HWConst, HWM);
+    } else {
+      assert(Cond && !NegCond || !Cond && NegCond);
+      DEBUG(
+      dbgs() << "\t\tFrom Block " << FromBB->getName() << "\n";
+      if (Cond)
+        dbgs() << "\t\t\t" << Cond->getUniqueName() << "\n";
+      if (NegCond)
+        dbgs() << "\t\t\t!" << NegCond->getUniqueName() << "\n";
+
+      );
+
+      if (Cond) {
+        HWM->addIn(HWP, Cond);
+      }
+
+      if (NegCond) {
+        HWM->addIn(HWP, NegCond);
+      }
+
+      connect(HWP, HWM);
+    }
   }
 }
 
@@ -1064,25 +1105,65 @@ void OCLAccHW::visitPHINode(PHINode &I) {
 /// \brief Set conditions for each block
 void OCLAccHW::visitBranchInst(BranchInst &I) {
   if (I.isUnconditional()) {
-    // we have no condition, all Ports can be used when ready.
+    // No condition, so all Ports can be used when ready.
     return;
   }
 
   const BasicBlock *BB = I.getParent();
   block_p HWBB = getBlock(BB);
 
-  const Value *Cond = I.getOperand(0);
+  const Value *Cond = I.getCondition();
   base_p HWCond = getHW<HW>(BB, Cond);
 
-  const BasicBlock *FalseBB = cast<BasicBlock>(I.getOperand(1));
-  const BasicBlock *TrueBB = cast<BasicBlock>(I.getOperand(2));
+  const BasicBlock *TrueBB = I.getSuccessor(0);
+  const BasicBlock *FalseBB = I.getSuccessor(1);
 
-  block_p HWFalse = getBlock(FalseBB);
   block_p HWTrue = getBlock(TrueBB);
+  block_p HWFalse = getBlock(FalseBB);
 
-  // set the conditions for each successor
-  HWTrue->addCondition(HWCond);
-  HWFalse->addConditionNeg(HWCond);
+  const Type *CIT = Cond->getType();
+  
+  bool isCondInTrue = isValueInBB(TrueBB, Cond);
+  bool isCondInFalse = isValueInBB(FalseBB, Cond);
+
+  scalarport_p HWPort, HWCondTrue, HWCondFalse; 
+ 
+  // If the condition is already used by other ports, omit the creation of a new
+  // OutScalar. Otherwise, create a new Output.
+  if (!HWBB->containsOutScalarForValue(Cond)) {
+    HWPort = makeHWBB<ScalarPort>(BB, Cond, Cond->getName(), CIT->getScalarSizeInBits(), getDatatype(CIT), true);
+    HWBB->addOutScalar(HWPort);
+    connect(HWCond, HWPort);
+  } else {
+    HWBB->getOutScalarForValue(Cond);
+  }
+
+  // Create inputs like normal Inputs but add them as Condition to the Block if
+  // Cond is not already valid in the successor Blocks
+  if (isValueInBB(TrueBB, Cond)) {
+    HWCondTrue = getHW<ScalarPort>(TrueBB, Cond);
+  } else {
+    HWCondTrue = makeHWBB<ScalarPort>(TrueBB, Cond, Cond->getName(), CIT->getScalarSizeInBits(), getDatatype(CIT), true);
+    HWTrue->addInScalar(HWCondTrue);
+    connect(HWPort, HWCondTrue);
+  }
+
+  if (isValueInBB(FalseBB, Cond)) {
+    HWCondFalse = getHW<ScalarPort>(FalseBB, Cond);
+  } else {
+    HWCondFalse = makeHWBB<ScalarPort>(FalseBB, Cond, Cond->getName(), CIT->getScalarSizeInBits(), getDatatype(CIT), true);
+    HWFalse->addInScalar(HWCondFalse);
+    connect(HWPort, HWCondFalse);
+  }
+
+
+  // The condition must be added as OutScalar to BB and InScalar to HWTrue and
+  // HWFalse if the Value is not already valid in these Blocks.
+
+  // Set the conditions for each successor
+  HWTrue->addCond(HWCondTrue, HWBB);
+  HWFalse->addNegCond(HWCondFalse, HWBB);
+  
 }
 
 #ifdef TYPENAME

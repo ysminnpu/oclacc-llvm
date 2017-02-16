@@ -10,10 +10,13 @@ using namespace oclacc;
 VerilogModule::VerilogModule(Component &C) : R(C) {
 }
 
+BlockModule::BlockModule(Block &B) : VerilogModule(B), R(B) {
+}
+
 KernelModule::KernelModule(Kernel &K) : VerilogModule(K), R(K) {
 }
 
-const std::string VerilogModule::declHeader() {
+const std::string VerilogModule::declHeader() const {
   std::stringstream S;
   const Component::PortsTy &I = R.getIns();
   const Component::PortsTy &O = R.getOuts();
@@ -62,12 +65,41 @@ const std::string VerilogModule::declHeader() {
     if (std::next(P) != E)
       S << ",\n";
   }
-  S << "\n);\n";
+  S << "\n); // end ports\n";
 
   return S.str();
 }
 
-const std::string VerilogModule::declFooter() {
+const std::string BlockModule::declEnable() const {
+  std::stringstream S;
+  
+  S << "// block enable\n";
+  S << "wire enable_" << R.getName() << ";\n";
+  S << "assign enable_" << R.getName() << " = ";
+
+  const Block::CondListTy &C = R.getConds();
+  const Block::CondListTy &NC = R.getNegConds();
+
+  for (Block::CondConstItTy I=C.begin(), E=C.end(); I != E; ++I) {
+    S << I->first->getUniqueName();
+    if (std::next(I) != E) {
+      S << " & ";
+    }
+  }
+  for (Block::CondConstItTy I=NC.begin(), E=NC.end(); I != E; ++I) {
+    S << "~" << I->first->getUniqueName();
+    if (std::next(I) != E) {
+      S << " & ";
+    }
+  }
+  S << ";\n";
+  S << "// end block enable\n";
+
+  return S.str();
+}
+
+
+const std::string VerilogModule::declFooter() const {
   std::stringstream S;
   S << "endmodule " << " // " << R.getUniqueName() << "\n";
   return S.str();
@@ -78,7 +110,7 @@ const std::string VerilogModule::declFooter() {
 /// Iterate over all Blocks and creates wires for each port data. For
 /// synchronization, also create <port>_valid and <port>_ack.
 ///
-const std::string KernelModule::declBlockWires() {
+const std::string KernelModule::declBlockWires() const {
   std::stringstream S;
   for (block_p B : R.getBlocks()) {
     const Component::PortsTy &I = R.getIns();
@@ -114,7 +146,7 @@ const std::string KernelModule::declBlockWires() {
   return S.str();
 }
 
-const std::string KernelModule::connectWires() {
+const std::string KernelModule::connectWires() const {
   for (block_p B : R.getBlocks()) {
     std::stringstream S;
     S << "// Connections for " << R.getUniqueName() << "\n";
@@ -144,12 +176,12 @@ const std::string KernelModule::connectWires() {
   }
 }
 
-const std::string KernelModule::instBlocks() {
+const std::string KernelModule::instBlocks() const {
   std::stringstream S;
   for (block_p B : R.getBlocks()) {
 
-    const Component::PortsTy &I = R.getIns();
-    const Component::PortsTy &O = R.getOuts();
+    const Component::PortsTy &I = B->getIns();
+    const Component::PortsTy &O = B->getOuts();
 
     Component::PortsTy IO;
     IO.insert(IO.end(), I.begin(), I.end());
@@ -205,7 +237,7 @@ const std::string KernelModule::instBlocks() {
   return S.str();
 }
 
-const std::string KernelModule::instStreams() {
+const std::string KernelModule::instStreams() const {
   std::stringstream S;
 
   for (streamport_p SP : R.getInStreams()) {
@@ -232,4 +264,3 @@ const std::string KernelModule::instStreams() {
 
   return S.str();
 }
-

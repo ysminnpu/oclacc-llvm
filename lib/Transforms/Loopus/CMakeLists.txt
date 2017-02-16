@@ -1,12 +1,12 @@
 add_llvm_library(LLVMLoopus
-	Loopus.cpp
-	HDLLoopUnroll.cpp
+  Loopus.cpp
+  HDLLoopUnroll.cpp
   SimplifyIDCalls.cpp
-	HDLPromoteID.cpp
-	OpenCLMDKernels.cpp
-	HDLInliner.cpp
-	HDLFlattenCFG.cpp
-	MangledFunctionNames.cpp
+  HDLPromoteID.cpp
+  OpenCLMDKernels.cpp
+  HDLInliner.cpp
+  HDLFlattenCFG.cpp
+  MangledFunctionNames.cpp
   HardwareModel.cpp
   SplitBarrierBlocks.cpp
   DelayStores.cpp
@@ -20,6 +20,7 @@ add_llvm_library(LLVMLoopus
   CanonicalizePredecessors.cpp
   CFGOptimizer.cpp
   FindAllPaths.cpp
+  RenameInvalid.cpp
 )
 
 add_dependencies(LLVMLoopus intrinsics_gen)

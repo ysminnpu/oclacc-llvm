@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 
+#include "typedefs.h"
 #include "Identifiable.h"
 #include "Visitor/Visitable.h"
 #include "Port.h"
@@ -119,16 +120,17 @@ class Component : public Identifiable, public Visitable {
 
 class Block : public Component {
   public:
-    typedef std::vector<base_p> CondTy;
-    typedef CondTy::iterator CondItTy;
-    typedef CondTy::const_iterator CondConstItTy;
+    typedef std::pair<base_p, block_p> CondTy;
+    typedef std::vector<CondTy> CondListTy;
+    typedef CondListTy::iterator CondItTy;
+    typedef CondListTy::const_iterator CondConstItTy;
 
   private:
     std::vector<base_p> Ops;
     kernel_p Parent;
 
-    CondTy Conds;
-    CondTy CondNegs;
+    CondListTy Conds;
+    CondListTy NegConds;
 
   protected:
     bool isBlock();
@@ -146,13 +148,19 @@ class Block : public Component {
 
     void setParent(kernel_p P);
 
-    void addCondition(base_p P);
+    void addCond(base_p, block_p);
 
-    void addConditionNeg(base_p P);
+    void addNegCond(base_p, block_p);
 
-    const CondTy &getConditions();
+    bool isConditional() const;
 
-    const CondTy &getConditionNegs();
+    const CondListTy &getConds() const;
+    
+    const base_p getCondForBlock(block_p) const;
+
+    const CondListTy &getNegConds() const;
+
+    const base_p getNegCondForBlock(block_p) const;
 
     DECLARE_VISIT;
 };

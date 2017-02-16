@@ -122,8 +122,13 @@ Component::PortsTy Component::getIns(void) const {
   return Ins;
 }
 
-void Component::addConstVal(const_p p) { ConstVals.push_back(p); }
-const Component::ConstantsType &Component::getConstVals() const { return ConstVals; }
+void Component::addConstVal(const_p p) {
+  ConstVals.push_back(p);
+}
+
+const Component::ConstantsType &Component::getConstVals() const {
+  return ConstVals;
+}
 
 void Component::dump() {
   outs() << "----------------------\n";
@@ -132,14 +137,14 @@ void Component::dump() {
     Block * B = static_cast<Block *>(this);
 
     outs() << "if:";
-    for (base_p C : B->getConditions()) {
-      outs() << " " << C->getUniqueName();
+    for (const Block::CondTy &C : B->getConds()) {
+      outs() << " " << C.first->getUniqueName();
     }
     outs() << "\n";
 
     outs() << "if not:";
-    for (base_p C : B->getConditionNegs()) {
-      outs() << " " << C->getUniqueName();
+    for (const Block::CondTy &C : B->getNegConds()) {
+      outs() << " " << C.first->getUniqueName();
     }
     outs() << "\n";
   }
@@ -185,20 +190,48 @@ void Block::setParent(kernel_p P) {
   Parent = P;
 }
 
-void Block::addCondition(base_p P) {
-  Conds.push_back(P);
+void Block::addCond(base_p P, block_p B) {
+  Conds.push_back(std::make_pair(P, B));
 }
 
-void Block::addConditionNeg(base_p P) {
-  CondNegs.push_back(P);
+void Block::addNegCond(base_p P, block_p B) {
+  NegConds.push_back(std::make_pair(P, B));
 }
 
-const Block::CondTy& Block::getConditions() {
+const Block::CondListTy& Block::getConds() const {
   return Conds;
 }
 
-const Block::CondTy& Block::getConditionNegs() {
-  return CondNegs;
+// There must be a single condition to reach the Block from B
+const base_p Block::getCondForBlock(block_p B) const {
+  base_p R = nullptr;
+  for (const Block::CondTy &C : getConds()) {
+    if (C.second == B) {
+      assert(!R);
+      R = C.first;
+    }
+  }
+  return R;
+}
+
+const Block::CondListTy& Block::getNegConds() const {
+  return NegConds;
+}
+
+const base_p Block::getNegCondForBlock(block_p B) const {
+  base_p R = nullptr;
+  for (const Block::CondTy &C : getNegConds()) {
+    if (C.second == B) {
+      assert(!R);
+      R = C.first;
+    }
+  }
+  return R;
+}
+
+bool Block::isConditional() const {
+  return !(getConds().empty() 
+    && getNegConds().empty());
 }
 
 

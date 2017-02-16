@@ -17,12 +17,24 @@ class VerilogModule {
   public:
     VerilogModule(Component &);
 
-    const std::string declHeader();
+    const std::string declHeader() const;
 
-    const std::string declFooter();
+    const std::string declFooter() const;
 
   private:
     Component &R;
+
+};
+
+/// \brief Implementation of Block
+class BlockModule : public VerilogModule {
+  public:
+    BlockModule(Block &);
+
+    const std::string declEnable() const;
+
+  private:
+    Block &R;
 
 };
 
@@ -35,13 +47,13 @@ class KernelModule : public VerilogModule{
   public:
     KernelModule(Kernel &);
 
-    const std::string declBlockWires();
+    const std::string declBlockWires() const;
 
-    const std::string instBlocks();
+    const std::string instBlocks() const;
 
-    const std::string connectWires();
+    const std::string connectWires() const;
 
-    const std::string instStreams();
+    const std::string instStreams() const;
 
   private:
     Kernel &R;

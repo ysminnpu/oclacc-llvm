@@ -11,9 +11,9 @@
 // Color definitions
 #define C_SCALARPORT "\"/purples9/4\""
 #define C_STREAMPORT "\"/purples9/5\""
-#define C_MUX        "\"/accent8/4\""
+#define C_MUX        "\"/accent8/3\""
 #define C_ARITH      "\"/blues9/5\""
-#define C_CONSTVAL   "\"/set312/12\""
+#define C_CONSTVAL   "\"/reds9/4\""
 #define C_FPARITH    "\"/greens9/5\""
 #define C_COMPARE    "\"/blues9/7\""
 using namespace oclacc;
@@ -104,7 +104,23 @@ int Dot::visit(Block &R) {
   F() << "subgraph cluster_" << "n" << R.getUID() << " {" << "\n";
   IndentLevel++;
 
-  F() << "label = \"block_" << R.getName()  << "\";" << "\n";
+  std::stringstream Conds;
+  std::stringstream NegConds;
+
+  bool HasConds=false;
+  for (const Block::CondTy &C : R.getConds()) {
+    HasConds=true;
+    Conds << " " << C.first->getUniqueName();
+  }
+  for (const Block::CondTy &C : R.getNegConds()) {
+    HasConds=true;
+    NegConds << " !" << C.first->getUniqueName();
+  }
+
+  if (HasConds)
+    F() << "label = \"block_" << R.getName() << " when" << Conds.str() << NegConds.str() << "\";" << "\n";
+  else
+    F() << "label = \"block_" << R.getName() << "\";" << "\n";
 
   super::visit(R);
 
@@ -238,7 +254,10 @@ int Dot::visit(ConstVal &R) {
   super::visit(R);
 
   for ( base_p P : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_CONSTVAL << ",fontcolor=" << C_CONSTVAL << ",fontcolor=" << C_CONSTVAL << ",label=" << R.getBitWidth() << "];\n";
+    // Do not print Node when used by a Mux
+    if (!std::dynamic_pointer_cast<Mux>(P)) {
+      Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_CONSTVAL << ",fontcolor=" << C_CONSTVAL << ",fontcolor=" << C_CONSTVAL << ",label=" << R.getBitWidth() << "];\n";
+    }
   }
 
   return 0;
@@ -353,7 +372,13 @@ int Dot::visit(ScalarPort &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   for ( base_p P : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_SCALARPORT << ",fontcolor=" << C_SCALARPORT << ",label=" << R.getBitWidth() << "];\n";
+    // Special handling of Muxers because they use sub-labels to connect their
+    // inputs. As Muxers are created from PHINodes, only ScalarInputs may be
+    // used as Muxer imput.
+    // 
+    if(!std::dynamic_pointer_cast<Mux>(P)) {
+      Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_SCALARPORT << ",fontcolor=" << C_SCALARPORT << ",label=" << R.getBitWidth() << "];\n";
+    }
   }
 
   super::visit(R);
@@ -361,9 +386,26 @@ int Dot::visit(ScalarPort &R) {
 }
 
 int Dot::visit(Mux &R) {
-  VISIT_ONCE(R)
+  VISIT_ONCE(R);
 
-  F() << "n" << R.getUID() << " [shape=invtrapezium,fillcolor=" << C_MUX << ",style=filled,tailport=s,label=\"" << R.getName() << "\"];" << "\n";
+  std::stringstream SS;
+  SS << "<TABLE BORDER=\"0\" CELLBORDER=\"1\" CELLSPACING=\"0\">";
+  SS << "<TR>";
+  unsigned count=0;
+  for (const Mux::MuxInputTy P : R.getIns()) {
+    port_p Port = P.first;
+    base_p Cond = P.second;
+
+    SS << "<TD PORT=\"in" << count << "\">"<< Cond->getUniqueName() << "</TD>";
+    Conn() << "n" << Port->getUID() << " -> " << "n" << R.getUID() << ":in" << count << " [color=" << C_SCALARPORT << ",fontcolor=" << C_SCALARPORT << ",label=" << Cond->getBitWidth() << "];\n";
+    count++;
+  }
+  SS << "</TR>";
+  SS << "<TR><TD COLSPAN=\"" << count << "\">" << R.getUniqueName() << "</TD></TR>";
+  SS << "</TABLE>";
+
+  //F() << "n" << R.getUID() << " [shape=invtrapezium,fillcolor=" << C_MUX << ",style=filled,tailport=s,label=\"" << R.getName() << "\"];" << "\n";
+  F() << "n" << R.getUID() << " [shape=plaintext,fillcolor=" << C_MUX << ",style=filled,tailport=s,label=<" << SS.str() << ">];" << "\n";
 
   super::visit(R);
 

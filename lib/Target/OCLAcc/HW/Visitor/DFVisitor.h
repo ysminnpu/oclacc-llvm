@@ -201,6 +201,10 @@ class DFVisitor : public BaseVisitor
         P->accept(*this);
       }
 
+      for ( const_p P : R.getConstVals()) {
+        P->accept(*this);
+      }
+
       return 0;
     }
 

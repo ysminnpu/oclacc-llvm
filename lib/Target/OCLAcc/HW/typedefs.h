@@ -1,12 +1,15 @@
 #ifndef TYPEDEFS_H
 #define TYPEDEFS_H
 
+#include <vector>
+
 #include <memory>
 
 namespace oclacc {
 
 class HW;
 typedef std::shared_ptr<HW> base_p;
+typedef std::vector<base_p> HWList;
 
 class Port;
 typedef std::shared_ptr<Port> port_p;

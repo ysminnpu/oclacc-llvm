@@ -41,22 +41,22 @@ int Verilog::visit(Kernel &R) {
   (*FS) << header();
 
   // Instantiate the Kernel
-  KernelModule TM(R);
-  (*FS) << TM.declHeader();
+  KernelModule KM(R);
+  (*FS) << KM.declHeader();
 
   (*FS) << "// Block Wires and Port Muxer\n";
-  (*FS) << TM.declBlockWires();
+  (*FS) << KM.declBlockWires();
 
   (*FS) << "// Block Instantiations\n";
-  (*FS) << TM.instBlocks();
+  (*FS) << KM.instBlocks();
 
-  (*FS) << TM.instStreams();
+  (*FS) << KM.instStreams();
 
-  (*FS) << TM.connectWires();
+  (*FS) << KM.connectWires();
 
-  (*FS) << TM.declFooter();
+  (*FS) << KM.declFooter();
 
-  //errs() << TM.instStreams();
+  //errs() << KM.instStreams();
 
   super::visit(R);
 
@@ -75,9 +75,13 @@ int Verilog::visit(Block &R) {
 
   (*FS) << header();
 
-  VerilogModule M(R);
-  (*FS) << M.declHeader();
-  (*FS) << M.declFooter();
+  BlockModule BM(R);
+  (*FS) << BM.declHeader();
+
+  if (R.isConditional())
+    (*FS) << BM.declEnable();
+
+  (*FS) << BM.declFooter();
 
   super::visit(R);
 
@@ -90,7 +94,6 @@ int Verilog::visit(ScalarPort &R) {
   return 0;
 }
 
-
 /// \brief Generate Stream as BRAM with Addressgenerator
 ///
 int Verilog::visit(StreamPort &R) {
@@ -102,6 +105,10 @@ int Verilog::visit(Arith &R) {
 }
 
 int Verilog::visit(FPArith &R) {
+  return 0;
+}
+
+int Verilog::visit(Mux &R) {
   return 0;
 }
 

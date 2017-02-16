@@ -213,6 +213,26 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
         return std::static_pointer_cast<HW>(VI->second);
     }
 
+    /// \brief Return true if Value is already Valid in \param BB
+    ///
+    bool isValueInBB(const BasicBlock *BB, const Value *IR) const {
+      BlockValueMapConstIt BI = BlockValueMap.find(BB);
+      ValueMapConstIt VI;
+
+      if (BI != BlockValueMap.end())
+        VI = BI->second.find(IR);
+      
+
+      // The block may not exist yet in BlockValueMap though the block itself
+      // exists in BlockMap.
+      //
+      if (BI != BlockValueMap.end() && VI != BI->second.end())
+        return true;
+
+      return false;
+    }
+
+
 #if 0
     /// \brief Return HW object for initial definition of IR.
     /// Generally use getHW(const BasicBlock *BB, ...) 

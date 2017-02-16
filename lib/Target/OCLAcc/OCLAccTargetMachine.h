@@ -28,6 +28,13 @@ class OCLAccTargetMachine : public TargetMachine {
 
     ~OCLAccTargetMachine();
 
+    virtual bool addPassesToEmitFile(PassManagerBase &PM,
+                                           formatted_raw_ostream &O,
+                                           CodeGenFileType FileType,
+                                           bool DisableVerify,
+                                           AnalysisID StartAfter,
+                                           AnalysisID StopAfter);
+
     virtual const OCLAccSubtarget *getSubtargetImpl() const { return &Subtarget; }
 
     virtual const DataLayout *getDataLayout() const { return &DL; }

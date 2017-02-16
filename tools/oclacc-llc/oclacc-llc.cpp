@@ -13,6 +13,7 @@
 #include "llvm/MC/SubtargetFeature.h"
 #include "llvm/Pass.h"
 #include "llvm/PassManager.h"
+#include "llvm/Analysis/CFGPrinter.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FileSystem.h"
@@ -29,9 +30,6 @@
 #include "llvm/Target/TargetLibraryInfo.h"
 #include "llvm/Target/TargetMachine.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
-
-//InstructionNamerPass
-#include "llvm/Transforms/Scalar.h"
 
 #include <memory>
 #include <dirent.h>
@@ -427,18 +425,6 @@ static int compileModule(char **argv, LLVMContext &Context) {
       StopAfterID = PI->getTypeInfo();
     }
 
-    //OCLAcc Passes
-
-    std::string NamedFile = Module+".named.ll";
-    auto NamedIRFile = std::make_unique<raw_fd_ostream>(NamedFile, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
-    if (EC) {
-      errs() << "Failed to create " << NamedFile << "(" << __LINE__ << "): " << EC.message() << "\n";
-      return -1;
-    }
-
-    /* Name Instructions to allow mapping of source to generated objects */
-    PM.add(createInstructionNamerPass());
-    PM.add(createPrintModulePass(*NamedIRFile));
 
     // Ask the target to add backend passes as necessary.
     if (Target->addPassesToEmitFile(PM, *FLog, FileType, NoVerify,

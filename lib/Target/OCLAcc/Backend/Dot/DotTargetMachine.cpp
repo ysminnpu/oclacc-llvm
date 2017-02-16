@@ -20,6 +20,8 @@ bool DotTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   if (FileType != TargetMachine::CGFT_AssemblyFile)
     return true;
 
+  OCLAccTargetMachine::addPassesToEmitFile(PM,O,FileType,DisableVerify,StartAfter,StopAfter);
+
   PM.add(createGenerateDotPass());
 
   return false;

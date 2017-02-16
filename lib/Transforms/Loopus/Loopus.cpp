@@ -30,5 +30,6 @@ void llvm::initializeLoopus(PassRegistry &Registry) {
   initializeArgPromotionTrackerPass(Registry);
   initializeCanonicalizePredecessorsPass(Registry);
   initializeCFGOptimizerPass(Registry);
+  initializeRenameInvalidPass(Registry);
 }
 

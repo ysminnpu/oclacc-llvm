@@ -29,7 +29,7 @@ class Tmp : public HW
 class Mux : public HW
 {
   public:
-    typedef std::pair<port_p, block_p> MuxInputTy;
+    typedef std::pair<port_p, base_p> MuxInputTy;
     typedef std::list<MuxInputTy> MuxInputsTy;
 
   private:
@@ -44,11 +44,11 @@ class Mux : public HW
     Mux (const Mux &) = delete;
     Mux &operator =(const Mux &) = delete;
 
-    void addIn(port_p P, block_p B) {
+    void addIn(port_p P, base_p B) {
       Ins.push_back(std::make_pair(P, B));
     }
 
-    MuxInputsTy &getns() {
+    MuxInputsTy &getIns() {
       return Ins;
     }
 

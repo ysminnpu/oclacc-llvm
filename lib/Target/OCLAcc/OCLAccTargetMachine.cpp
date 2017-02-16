@@ -4,12 +4,18 @@
 #include "Backend/Verilog/VerilogTargetMachine.h"
 #include "Backend/Dot/DotTargetMachine.h"
 
+#include "llvm/Transforms/Loopus.h"
+
 #include "llvm/PassManager.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/FormattedStream.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
+
+//InstructionNamerPass
+#include "llvm/Transforms/Scalar.h"
+
 
 using namespace llvm;
 
@@ -44,3 +50,19 @@ OCLAccTargetMachine::OCLAccTargetMachine(const Target &T, StringRef TT,
 }
 
 OCLAccTargetMachine::~OCLAccTargetMachine() {}
+
+bool OCLAccTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
+                                           formatted_raw_ostream &O,
+                                           CodeGenFileType FileType,
+                                           bool DisableVerify,
+                                           AnalysisID StartAfter,
+                                           AnalysisID StopAfter) {
+  if (FileType != TargetMachine::CGFT_AssemblyFile)
+    return true;
+
+  /* Name Instructions to allow mapping of source to generated objects */
+  PM.add(createInstructionNamerPass());
+  PM.add(createRenameInvalidPass());
+
+  return false;
+}

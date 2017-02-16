@@ -108,6 +108,8 @@ Pass* createCanonicalizePredecessorsPass();
 //
 Pass* createCFGOptimizerPass();
 
+Pass* createRenameInvalidPass();
+
 } // End llvm namespace
 
 #endif

@@ -17,6 +17,7 @@ class ScalarPort;
 class StreamPort;
 class Arith;
 class FPArith;
+class Mux;
 
 class Verilog : public DFVisitor {
   private:
@@ -27,13 +28,14 @@ class Verilog : public DFVisitor {
     Verilog();
     ~Verilog();
 
-    int visit(DesignUnit &R);
-    int visit(Kernel &R);
-    int visit(Block &R);
-    int visit(ScalarPort &R);
-    int visit(StreamPort &R);
-    int visit(Arith &R);
-    int visit(FPArith &R);
+    int visit(DesignUnit &);
+    int visit(Kernel &);
+    int visit(Block &);
+    int visit(ScalarPort &);
+    int visit(StreamPort &);
+    int visit(Arith &);
+    int visit(FPArith &);
+    int visit(Mux &);
 };
 
 } // end ns oclacc
