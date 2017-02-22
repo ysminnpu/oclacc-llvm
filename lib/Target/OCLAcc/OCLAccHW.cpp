@@ -147,8 +147,10 @@ void OCLAccHW::createMakefile() {
   F << "\tdot -Tpng $< > $@\n";
   F << "%.svg: %.dot\n";
   F << "\tdot -Tsvg $< > $@\n";
-  F << "%.pdf: %.svg\n";
-  F << "\tinkscape -D $< -A $@\n";
+  F << "%.pdf: %.ps\n";
+  F << "\tps2pdf $<\n";
+  F << "%.ps: %.dot\n";
+  F << "\tdot -Tps2 $< > $@\n";
   F.close();
 }
 

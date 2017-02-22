@@ -16,7 +16,7 @@ class Compare : public HW {
     PredTy Pred;
 
   public:
-    Compare(const std::string &Name, Compare::PredTy P) : HW(Name+"_"+getPredAsString(P), 1), Pred(P) {
+    Compare(const std::string &Name, Compare::PredTy P) : HW(Name, 1), Pred(P) {
     }
 
     const std::string getPredAsString(PredTy P) {
@@ -50,6 +50,10 @@ class Compare : public HW {
         case 41: return "ICMP_SLE";
         default: return "INV_CMP";
       }
+    }
+
+    const std::string getOp() {
+      return getPredAsString(Pred);
     }
 
     DECLARE_VISIT;
