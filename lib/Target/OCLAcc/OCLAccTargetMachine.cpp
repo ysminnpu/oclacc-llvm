@@ -62,6 +62,7 @@ bool OCLAccTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
 
   /* Name Instructions to allow mapping of source to generated objects */
   PM.add(createInstructionNamerPass());
+  // Rename values like 'ir.cond3' which result in problems when used in HDL
   PM.add(createRenameInvalidPass());
 
   return false;

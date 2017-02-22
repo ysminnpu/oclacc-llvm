@@ -420,7 +420,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           } else
             HWIn = HWTo->getInScalarForValue(I);
 
-          assert(HWOut != nullptr && HWIn != nullptr);
+          assert(HWOut && HWIn);
 
           // TODO: use BitWidthAnalysis
 
@@ -532,6 +532,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
     scalarport_p HWS = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType), false);
     HWKernel->addInScalar(HWS);
     ArgMap[&A] = HWS;
+    HWS->setParent(HWKernel);
 
     // We can safely add the WI ScalarPort to the EntryBlock as it will be
     // used later. If we skip that, we have no connection between the
@@ -600,6 +601,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
       const Datatype D = getDatatype(ElementType);
       streamport_p S = makeHW<StreamPort>(&A, Name, Bits, static_cast<ocl::AddressSpace>(AS), D);
       ArgMap[&A] = S;
+      S->setParent(HWKernel);
 
       if (isRead && isWritten) {
         HWKernel->addInOutStream(S);

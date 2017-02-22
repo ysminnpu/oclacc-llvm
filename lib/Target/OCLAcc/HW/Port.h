@@ -31,11 +31,15 @@ class Port : public HW {
 
 /// \brief Input or Output Port
 ///
-/// It depends on the Block, whether a Port is input or output.
-/// ScalarPorts, when used as input, may contain a list of Conditions
-class ScalarPort : public Port {
-  public:
-    ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined);
+/// It depends on the Block, whether a Port is input or output. ScalarPorts,
+/// when used as input, may contain a list of Conditions.
+///
+/// ScalarPorts are \param Pipelined when they are promoted Kernel Arguments or
+/// Values defined in BBs. Normal Arguments may not change between WorkItems, so
+/// there is no need to propagate them between BBs.
+///
+class ScalarPort : public Port { public: ScalarPort(const std::string &Name,
+    size_t W, const Datatype &T, bool Pipelined);
 
     bool isScalar();
 

@@ -103,9 +103,9 @@ class Component : public Identifiable, public Visitable {
     const StreamsTy &getInOutStreams() const;
 
     // Unified access
-    PortsTy getOuts(void) const;
+    const PortsTy getOuts(void) const;
 
-    PortsTy getIns(void) const;
+    const PortsTy getIns(void) const;
 
     void addConstVal(const_p p);
     const ConstantsType &getConstVals() const;

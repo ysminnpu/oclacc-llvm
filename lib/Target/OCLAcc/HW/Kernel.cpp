@@ -106,7 +106,7 @@ const Component::StreamsTy &Component::getInOutStreams() const {
 }
 
 // Unified access
-Component::PortsTy Component::getOuts(void) const {
+const Component::PortsTy Component::getOuts(void) const {
   PortsTy Outs;
   Outs.insert(Outs.end(), OutStreams.begin(), OutStreams.end());
   Outs.insert(Outs.end(), InOutStreams.begin(), InOutStreams.end());
@@ -114,7 +114,7 @@ Component::PortsTy Component::getOuts(void) const {
   return Outs;
 }
 
-Component::PortsTy Component::getIns(void) const {
+const Component::PortsTy Component::getIns(void) const {
   PortsTy Ins;
   Ins.insert(Ins.end(), InStreams.begin(), InStreams.end());
   Ins.insert(Ins.end(), InOutStreams.begin(), InOutStreams.end());

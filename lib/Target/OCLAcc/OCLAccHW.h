@@ -104,8 +104,9 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
     oclacc::const_p makeConstant(const Constant *, const Instruction *);
 
-    /// Create shared_ptr to HW object and return requested pointer type.
+    /// \brief Create shared_ptr to HW object and return requested pointer type.
     ///
+    /// Does not set Parent pointer for the created object.
     template<class HW, class ...Args>
     std::shared_ptr<HW> makeHW(const Value *IR, Args&& ...args) {
 
@@ -120,6 +121,9 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
       return HWP;
     }
 
+    /// \brief Create shared_ptr to HW object and add to ValueMap for \param BB
+    ///
+    /// Set Parent pointer for the created object.
     template<class HW, class ...Args>
     std::shared_ptr<HW> makeHWBB(const BasicBlock *BB, const Value *IR, Args&& ...args) {
 

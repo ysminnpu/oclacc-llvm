@@ -12,6 +12,7 @@
 
 namespace oclacc {
 
+
 /// \brief Base class to implement Components
 class VerilogModule {
   public:
@@ -23,7 +24,6 @@ class VerilogModule {
 
   private:
     Component &R;
-
 };
 
 /// \brief Implementation of Block
@@ -49,11 +49,13 @@ class KernelModule : public VerilogModule{
 
     const std::string declBlockWires() const;
 
-    const std::string instBlocks() const;
+    const std::string instBlocks();
 
     const std::string connectWires() const;
 
     const std::string instStreams() const;
+
+
 
   private:
     Kernel &R;

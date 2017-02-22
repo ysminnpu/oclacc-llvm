@@ -21,6 +21,8 @@ Portmux::Portmux(const Port &P) : InPort(P) {
   SS << "portmux_" << NumPorts << "_" << Bitwidth;
   ModName = SS.str();
 
+  FileName = ModName+".v";
+
   InstName = "portmux_"+InPort.getUniqueName();
 
   definition();
@@ -34,7 +36,8 @@ void Portmux::definition() {
   // Module was not created yet, so do it now.
   ModInstances.insert(ModName);
 
-  FileTy F = openFile(ModName+".v");
+
+  FileTy F = openFile(FileName);
 
   std::stringstream S;
 
@@ -92,6 +95,7 @@ std::string Portmux::instantiate() {
   for (base_p P : InPort.getIns()) {
     S << I(1) << ".in" << i << "(" << P->getUniqueName() << "),\n";
     S << I(1) << ".in" << i << "_valid(" << P->getUniqueName() << "_valid),\n";
+    S << I(1) << ".out" << i << "_ack(" << P->getUniqueName() << "_ack),\n";
     ++i;
   }
   S << I(1) << ".out(" << InPort.getUniqueName() << ")\n";

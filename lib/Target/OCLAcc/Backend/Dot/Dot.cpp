@@ -118,9 +118,9 @@ int Dot::visit(Block &R) {
   }
 
   if (HasConds)
-    F() << "label = \"block_" << R.getName() << " when" << Conds.str() << NegConds.str() << "\";" << "\n";
+    F() << "label = \"" << R.getUniqueName() << " when" << Conds.str() << NegConds.str() << "\";" << "\n";
   else
-    F() << "label = \"block_" << R.getName() << "\";" << "\n";
+    F() << "label = \"" << R.getUniqueName() << "\";" << "\n";
 
   super::visit(R);
 
@@ -158,7 +158,7 @@ int Dot::visit(Arith &R) {
 
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-  F() << "n" << R.getUID() << " [shape=pentagon,fillcolor=" << C_ARITH << ",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
+  F() << "n" << R.getUID() << " [shape=invtrapezium,fillcolor=" << C_ARITH << ",style=filled,label=\"" << R.getUniqueName() << "\n" << R.getOp() << "\"];" << "\n";
 
   super::visit(R);
 

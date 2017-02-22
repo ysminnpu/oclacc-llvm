@@ -2,6 +2,7 @@
 #define VERILOG_H
 
 #include <sstream>
+#include <list>
 
 #include "HW/Visitor/DFVisitor.h"
 #include "HW/Writeable.h"
@@ -19,11 +20,24 @@ class Arith;
 class FPArith;
 class Mux;
 
+struct DesignFiles {
+  public:
+    typedef std::list<std::string> FileListTy;
+    typedef std::list<std::string>::const_iterator FileListConstItTy;
+
+  private:
+    FileListTy Files;
+  public:
+    void addFile(const std::string);
+
+    void write(const std::string Filename);
+};
+
+
 class Verilog : public DFVisitor {
   private:
     typedef DFVisitor super;
 
-    FileTy FS;
   public:
     Verilog();
     ~Verilog();
@@ -39,6 +53,5 @@ class Verilog : public DFVisitor {
 };
 
 } // end ns oclacc
-
 
 #endif /* VERILOG_H */
