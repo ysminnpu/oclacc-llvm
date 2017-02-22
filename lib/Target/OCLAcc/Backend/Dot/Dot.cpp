@@ -278,7 +278,7 @@ int Dot::visit(StreamPort &R) {
 
   // By using invisible edges between separate Loads and Stores to the Port,
   // they are hierarchically ordered in the graph. 
-  //
+
   // No range-based loop to call std::next()
   for (StreamPort::IndexListConstIt I=IndexList.begin(), E=IndexList.end(); I != E; I++) {
     if (I+1 != E) {
@@ -289,38 +289,11 @@ int Dot::visit(StreamPort &R) {
   // We do not instantiate the Index Operations here as they must be placed in
   // their containing block.
 
-#if 0
-  // Separate loads/stores and static/dynamic indices to print arrows with
-  // correct direction.
-  for (streamindex_p I : R.getLoads()) {
-    if (I->isStatic()) {
-      staticstreamindex_p SI = std::static_pointer_cast<StaticStreamIndex>(I);
-      F() << "n" << I->getUID() << nodeInStreamIndex(R.getUniqueName()+"["+std::to_string(SI->getIndex())+"]") << ";\n";
-    } else {
-      dynamicstreamindex_p DI = std::static_pointer_cast<DynamicStreamIndex>(I);
-      F() << "n" << I->getUID() << nodeInStreamIndex(R.getUniqueName()+"["+DI->getUniqueName()+"]") << ";\n";
-    B(streamindex_p I : R.getStores()) {
-    if (I->isStatic()) {
-      staticstreamindex_p SI = std::static_pointer_cast<StaticStreamIndex>(I);
-      F() << "n" << I->getUID() << nodeOutStreamIndex(R.getUniqueName()+"["+std::to_string(SI->getIndex())+"]") << ";\n";
-    } else {
-      dynamicstreamindex_p DI = std::static_pointer_cast<DynamicStreamIndex>(I);
-      F() << "n" << I->getUID() << nodeOutStreamIndex(R.getUniqueName()+"["+DI->getUniqueName()+"]") << ";\n";
-    }
-  }
-#endif
-
   // Draw connection from Index to base Stream only for Stores. Loads make the
   // graph look polluted.
   for ( base_p I : R.getStores() ) {
     Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
   }
-
-#if 0
-  for ( base_p I : R.getLoads() ) {
-    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << "];\n";
-  }
-#endif
 
   // Draw connection from Index to uses
   // Stores do not have Outs().
@@ -343,9 +316,9 @@ int Dot::visit(StaticStreamIndex &R) {
   // Depending on being a Load or Store, the arrow direction must be correct.
   streamport_p HWStream = R.getStream();
   if (HWStream->isLoad(&R) )
-    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << HWStream->getUniqueName() << "[" << R.getIndex() << "]\"];\n";
+    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
   else
-    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "[" << R.getIndex() << "]\"];\n";
+    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
 
   super::visit(R);
 
@@ -358,9 +331,9 @@ int Dot::visit(DynamicStreamIndex &R) {
 
   streamport_p HWStream = R.getStream();
   if (HWStream->isLoad(&R) )
-    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "[" << R.getIndex()->getUniqueName() << "]\"];\n";
+    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
   else
-    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "[" << R.getIndex()->getUniqueName() << "]\"];\n";
+    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
 
   super::visit(R);
 
