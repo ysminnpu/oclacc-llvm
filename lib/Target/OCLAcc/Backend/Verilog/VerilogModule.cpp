@@ -1,4 +1,6 @@
 #include <memory>
+#include <iomanip>
+#include <sstream>
 
 #include "../../HW/Kernel.h"
 
@@ -10,6 +12,14 @@ using namespace oclacc;
 
 extern DesignFiles TheFiles;
 
+Signal::Signal(std::string Name, unsigned BitWidth, SignalDirection Direction, SignalType Type) : Name(Name), BitWidth(BitWidth), Direction(Direction), Type(Type) {
+}
+const std::string Signal::getDirectionStr(void) const {
+  return SignalDirection_S[Direction];
+}
+const std::string Signal::getTypeStr(void) const {
+  return SignalType_S[Type];
+}
 
 VerilogModule::VerilogModule(Component &C) : R(C) {
 }
@@ -17,58 +27,225 @@ VerilogModule::VerilogModule(Component &C) : R(C) {
 BlockModule::BlockModule(Block &B) : VerilogModule(B), R(B) {
 }
 
+/// \brief Return all signals for a specific port depending on its dynamic type
+const PortListTy oclacc::getComponentSignals(const component_p P) {
+  return getComponentSignals(*P);
+}
+
+const PortListTy oclacc::getComponentSignals(const Component &R) {
+  PortListTy L;
+
+  // Inputs
+  for (const scalarport_p P : R.getInScalars()) {
+    const PortListTy SISC = getInPortSignals(P);
+    L.insert(std::end(L),std::begin(SISC), std::end(SISC)); 
+  }
+  for (const streamport_p P : R.getInStreams()) {
+    const PortListTy SIST = getInPortSignals(P);
+    L.insert(std::end(L),std::begin(SIST), std::end(SIST)); 
+  }
+
+  // Outouts
+  for (const scalarport_p P : R.getOutScalars()) {
+    const PortListTy SOSC = getOutPortSignals(P);
+    L.insert(std::end(L),std::begin(SOSC), std::end(SOSC)); 
+  }
+
+  for (const streamport_p P : R.getOutStreams()) {
+    const PortListTy SOST = getOutPortSignals(P);
+    L.insert(std::end(L),std::begin(SOST), std::end(SOST)); 
+  }
+
+  // InOutStreams
+  for (const streamport_p P : R.getInOutStreams()) {
+    const PortListTy SIIOST = getInPortSignals(P);
+    L.insert(std::end(L),std::begin(SIIOST), std::end(SIIOST)); 
+    const PortListTy SIOOST = getOutPortSignals(P);
+    L.insert(std::end(L),std::begin(SIOOST), std::end(SIOOST)); 
+  }
+
+  return L;
+}
+
+const PortListTy oclacc::getInPortSignals(const port_p P) {
+  if (P->isScalar()) {
+    const scalarport_p S = std::static_pointer_cast<ScalarPort>(P);    
+    return getInScalarPortSignals(*S);
+  } else {
+    const streamport_p S = std::static_pointer_cast<StreamPort>(P);    
+    return getInStreamPortSignals(*S);
+  }
+}
+
+const PortListTy oclacc::getOutPortSignals(const port_p P) {
+  if (P->isScalar()) {
+    const scalarport_p S = std::static_pointer_cast<ScalarPort>(P);    
+    return getOutScalarPortSignals(*S);
+  } else {
+    const streamport_p S = std::static_pointer_cast<StreamPort>(P);    
+    return getOutStreamPortSignals(*S);
+  }
+}
+
+
+// Signal names:
+// <Name>_<ID From>_<ID To> to minimize efforts to connect ports
+
+/// \brief Return a list of all ScalarPorts
+const PortListTy oclacc::getInScalarPortSignals(const ScalarPort &P) {
+  PortListTy L;
+
+  unsigned BitWidth = P.getBitWidth();
+  
+  for (base_p In : P.getIns()) {
+    std::stringstream PNameS;
+    PNameS << P.getName() << "_" << In->getUID() << "_" << P.getUID();
+    const std::string PName = PNameS.str();
+
+    L.push_back(Signal(PName,BitWidth,SignalDirection::In, SignalType::Wire));
+
+    // Only pipelined ports have synchronization signals
+    if (P.isPipelined()) {
+      L.push_back(Signal(PName+"_valid", 1, SignalDirection::In, SignalType::Wire));
+      L.push_back(Signal(PName+"_ack", 1, SignalDirection::Out, SignalType::Reg));
+    }
+  }
+
+  return L;
+}
+
+const PortListTy oclacc::getInStreamPortSignals(const StreamPort &P) {
+  PortListTy L;
+
+  const std::string PName = P.getUniqueName();
+
+  // Walk through all loads and create address signals. StaticIndexes also
+  // require an address signal, which is set to the value in the wire
+  // declaration.
+  for(staticstreamindex_p PI : P.getStaticLoads()) {
+    // Static loads have fixed addresses stored in the memory controller
+    const std::string PIName = std::to_string(PI->getUID());
+    unsigned AddressWidth = PI->getBitWidth();
+    unsigned DataWidth = P.getBitWidth();
+
+    L.push_back(Signal(PName+"_"+PIName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+PIName+"_data", DataWidth, SignalDirection::In, SignalType::Wire));
+    L.push_back(Signal(PName+"_"+PIName+"_valid", 1, SignalDirection::In, SignalType::Wire));
+    L.push_back(Signal(PName+"_"+PIName+"_ack", 1, SignalDirection::Out, SignalType::Reg));
+  }
+  for(dynamicstreamindex_p PI : P.getDynamicLoads()) {
+    const base_p Index = PI->getIndex();
+    const std::string PIName = std::to_string(PI->getUID());
+
+    unsigned AddressWidth = Index->getBitWidth();
+    unsigned DataWidth = P.getBitWidth();
+
+    L.push_back(Signal(PName+"_"+PIName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+PIName+"_data", DataWidth, SignalDirection::In, SignalType::Wire));
+    L.push_back(Signal(PName+"_"+PIName+"_valid", 1, SignalDirection::In, SignalType::Wire));
+    L.push_back(Signal(PName+"_"+PIName+"_ack", 1, SignalDirection::Out, SignalType::Reg));
+  }
+
+  return L;
+}
+
+const PortListTy oclacc::getOutScalarPortSignals(const ScalarPort &P) {
+  PortListTy L;
+
+  if (!P.isPipelined())
+    llvm_unreachable("No non-pipelined OurScalars");
+
+  unsigned BitWidth = P.getBitWidth();
+
+  for (base_p Out : P.getOuts()) {
+    std::stringstream PNameS;
+    PNameS << P.getName() << "_" << P.getUID() << "_" << Out->getUID();
+
+    const std::string PName = PNameS.str();
+    L.push_back(Signal(PName, BitWidth, SignalDirection::Out, SignalType::Reg));
+
+    L.push_back(Signal(PName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
+
+    // Multiple outputs need multiple ack signals
+    for (base_p O : P.getOuts()) {
+      L.push_back(Signal(PName+"_"+O->getUniqueName()+"_ack", 1, SignalDirection::In, SignalType::Wire));
+    }
+  }
+
+  return L;
+}
+
+
+const PortListTy oclacc::getOutStreamPortSignals(const StreamPort &P) {
+  PortListTy L;
+
+  const std::string PName = P.getUniqueName();
+
+  // Create pairs of address and data port for each store
+  for(staticstreamindex_p PI : P.getStaticStores()) {
+    // Make sure that negativ array indices do not result in incollect signal
+    // names
+    StaticStreamIndex::IndexTy Index = PI->getIndex();
+    if (Index < 0) Index = -Index;
+    const std::string IName = "const"+std::to_string(Index);
+
+    unsigned AddressWidth = PI->getBitWidth();
+    unsigned DataWidth = P.getBitWidth();
+
+    L.push_back(Signal(PName+"_"+IName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+IName+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+IName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+IName+"_ack", 1, SignalDirection::In, SignalType::Wire));
+  }
+  for(dynamicstreamindex_p PI : P.getDynamicStores()) {
+    const base_p Index = PI->getIndex();
+    const std::string IName = std::to_string(Index->getUID());
+
+    unsigned AddressWidth = Index->getBitWidth();
+    unsigned DataWidth = P.getBitWidth();
+
+    L.push_back(Signal(PName+"_"+IName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+IName+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+IName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
+    L.push_back(Signal(PName+"_"+IName+"_ack", 1, SignalDirection::In, SignalType::Wire));
+  }
+
+  return L;
+}
+
 KernelModule::KernelModule(Kernel &K) : VerilogModule(K), R(K) {
 }
 
 const std::string VerilogModule::declHeader() const {
   std::stringstream S;
-  const Component::PortsTy &I = R.getIns();
-  const Component::PortsTy &O = R.getOuts();
+
+  PortListTy Ports = getComponentSignals(R);
 
   S << "module " << R.getName() << "(\n";
-  for (Component::PortsConstItTy P = I.begin(), E = I.end(); P != E; ++P) {
-    S << I(1) << "input  wire ";
 
-    unsigned B = (*P)->getBitWidth();
-    std::stringstream BWS;
-    if (B != 1)
-      BWS << "[" << B-1 << ":0] ";
-    
-    std::string BW = BWS.str();
+  std::string Prefix = "";
+  unsigned Lastwidth = 15;
 
-    S << BW << (*P)->getUniqueName() << ",\n";
+  for (const Signal &P : Ports) {
+    S << Prefix << I(1) << std::setw(6) << std::left << P.getDirectionStr() << " " << std::setw(4) << P.getTypeStr() << " ";
 
-    S << I(1) << "input  wire " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_valid,\n";
-    S << I(1) << "output reg  " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_ack";
+    unsigned B = P.BitWidth;
 
-    if (std::next(P) != E)
-      S << ",\n";
+    // Print width columnwise
+    if (B!=1) {
+      std::stringstream BWS;
+      BWS << "[" << B-1 << ":0]";
+
+      S << std::setw(6) << BWS.str();
+    } else
+      S << std::string(6, ' ');
+
+
+    S << " " << P.Name;
+
+    Prefix = ",\n";
   }
 
-  if (I.size() != 0) {
-    if (O.size() != 0)
-      S << ",\n";
-    else
-      S << "\n";
-  }
-
-  for (Component::PortsConstItTy P = O.begin(), E = O.end(); P != E; ++P) {
-    S << I(1) << "output reg  ";
-
-    unsigned B = (*P)->getBitWidth();
-    std::stringstream BWS;
-    if (B != 1)
-      BWS << "[" << B-1 << ":0] ";
-    std::string BW = BWS.str();
-
-    S << BW << (*P)->getUniqueName() << ",\n";
-
-    S << I(1) << "input  wire " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_ack,\n";
-    S << I(1) << "output reg  " << std::string(BW.length(), ' ' ) << (*P)->getUniqueName() << "_valid";
-
-    if (std::next(P) != E)
-      S << ",\n";
-  }
   S << "\n); // end ports\n";
 
   return S.str();
@@ -111,29 +288,21 @@ const std::string VerilogModule::declFooter() const {
 
 /// \brief Declare Wires for the Blocks' Ports
 ///
-/// Iterate over all Blocks and create wires for each port data. For
-/// synchronization, also create <port>_valid and <port>_ack.
+/// Iterate over all Blocks' ports and create wires for each port.
+/// Finally connect the kernel outsputs.
 ///
 const std::string KernelModule::declBlockWires() const {
   std::stringstream S;
+#if 0
   for (block_p B : R.getBlocks()) {
-    const Component::PortsTy I = B->getIns();
-    const Component::PortsTy O = B->getOuts();
-
-    dbgs() << "Block " << B->getName() << " has " << I.size() << " Ins and " << O.size() << " Outs\n";
-
-    Component::PortsTy IO;
-    IO.insert(IO.end(), I.begin(), I.end());
-    IO.insert(IO.end(), O.begin(), O.end());
-
     S << "// " << B->getUniqueName() << "\n";
 
-    // first create wires for each port used as input and output
-    for (port_p P : IO) {
+    const Component::PortsTy IO = B.getPorts();
+    // Blocks must not have no input
+    assert(IO.size());
 
-      // Skip Streams as they are directly connected
-      if (!P->isPipelined())
-        continue;
+    // First create wires for each port used as input and output
+    for (port_p P : IO) {
 
       S << "wire ";
 
@@ -150,40 +319,38 @@ const std::string KernelModule::declBlockWires() const {
       S << "wire " << P->getUniqueName() << "_ack;\n";
     }
   }
+#endif
   return S.str();
 }
 
-/// \brief Walk through all Blocks and connect inputs with outputs. 
+/// \brief Walk through all Blocks and connect inputs.
 ///
 /// For Scalars, connect valid and ack. Streams also have an address. Skip
-/// Kernel ports as they already exist in the Top module.
+/// Kernel ports (must be StreamPorts) as they already exist in the Top module.
 const std::string KernelModule::connectWires() const {
   std::stringstream S;
 
-  S << "// Assign block ports\n";
 
-  Component::PortsTy I;
+#if 0
+  S << "// Port connections\n";
 
   // It is sufficient to walk through all inputs.
   for (block_p B : R.getBlocks()) {
-    const Component::PortsTy PI = B->getIns();
-    I.insert(I.end(), PI.begin(), PI.end());
+    S << "// " << curr_block->getUniqueName() << "\n";
+
+    // Ports
+    if (P->getIns().size() > 1)
+
+    // We only have a single input
+    base_p PI = P->getIn(0);
+    for (const Component::PortsTy &P : B->getIns()) {
+    }
+
+    PortListTy OutPorts = getOutPortSignals(B);
+    PortListTy InPorts = getInPortSignals(B);
   }
 
-  component_p curr_block;
-
   for (port_p P : I) {
-    // Skip Streams as they are directly connected
-    if (!P->isPipelined()) 
-      continue;
-
-    // Print header between blocks
-    component_p parent = P->getParent();
-    assert(parent);
-
-    if (curr_block != parent) {
-      curr_block = parent;
-      S << "// " << curr_block->getUniqueName() << "\n";
     }
 
     // If there are more Inputs to this, there is already a Portmux instance
@@ -201,6 +368,7 @@ const std::string KernelModule::connectWires() const {
     S << "assign " << P->getUniqueName() << "_valid = " << PI->getUniqueName() << "_valid;\n";
     S << "assign " << P->getUniqueName() << "_ack = " << PI->getUniqueName() << "_ack;\n";
   }
+#endif
 
   return S.str();
 }
@@ -216,165 +384,30 @@ const std::string KernelModule::connectWires() const {
 /// - Streams have separate address ports for each store and load
 
 const std::string KernelModule::instBlocks() {
-  std::stringstream SMux;
   std::stringstream SBlock;
   for (block_p B : R.getBlocks()) {
     const std::string BName = B->getUniqueName();
 
-    const Component::PortsTy &I = B->getIns();
-    const Component::PortsTy &O = B->getOuts();
-
-    Component::PortsTy IO;
-    IO.insert(IO.end(), I.begin(), I.end());
-    IO.insert(IO.end(), O.begin(), O.end());
-
     // Walk through all Ports of the Block.
-
-
-
-    const Component::ScalarsTy &ISC = B->getInScalars();
-    const Component::ScalarsTy &OSC = B->getOutScalars();
-    const Component::StreamsTy &IST = B->getInStreams();
-    const Component::StreamsTy &OST = B->getOutStreams();
+    PortListTy Ports = getComponentSignals(B);
 
     // Blocks must have any input and output
-    assert(!ISC.empty() || !IST.empty());
-    if (OSC.empty() || OST.empty()) {
-      dbgs() << BName << "\n";
-    }
-    assert(!OSC.empty() || !OST.empty());
-    
+    assert(Ports.size());
 
     // Block instance name
     SBlock << B->getName() << " " << B->getUniqueName() << "(\n";
 
-    bool print_head = true;
     std::string Linebreak = "";
-    for (const scalarport_p P : ISC) {
-      const std::string PName = P->getUniqueName();
-      if (print_head) {
-        SBlock << I(1) << "// In Scalars\n";
-        print_head = false;
-      }
+    for (const Signal &P : Ports) {
+      const std::string PName = P.Name;
 
       SBlock << Linebreak << I(1) << "." << PName << "(" << PName << ")";
-
-      if (!P->isPipelined()) {
-        // No synchronization ports are needed
-      } else {
-        if (P->getIns().size() == 1) {
-          // Normal synchronization signals
-          SBlock << ",\n" << I(1) << "." << PName << "_valid(" << PName << "_valid),\n";
-          SBlock << I(1) << "." << PName << "_ack(" << PName << "_ack)";
-        } else {
-          // If the Input has multiple Inputs (same Value from different BBs), we
-          // need a Multiplexer to select the correct value to be used at runtime.
-          Portmux PM(*P);
-          SMux << "// Muxer for Block " << BName << " Input " << PName << "\n";
-          SMux << PM.instantiate();
-
-          TheFiles.addFile(PM.getFileName());
-        }
-      }
       Linebreak = ",\n";
     }
-
-    for (const streamport_p P : IST) {
-      const std::string PName = P->getUniqueName();
-      if (print_head) {
-        SBlock << I(1) << "// In Streams\n";
-        print_head = false;
-      }
-      // Walk through all loads and create address signals
-      for(staticstreamindex_p PI : P->getStaticLoads()) {
-        int64_t Index = PI->getIndex();
-        SBlock << Linebreak << I(1) << "." << PName << "_data(" << PName << "_data)";
-      }
-      for(dynamicstreamindex_p PI : P->getDynamicLoads()) {
-        const base_p Index = PI->getIndex();
-        const std::string IName = Index->getUniqueName();
-
-        SBlock << Linebreak << I(1) << "." << PName << "_" << IName << "_address(" << PName << "_" << IName << "_address),\n";
-        SBlock << I(1) << "." << PName << "_" << IName << "_data(" << PName << "_" << IName << "_data)";
-      }
-      Linebreak = ",\n";
-    }
-
-    print_head = true;
-    for (const scalarport_p P: OSC) {
-      if (print_head) {
-        SBlock << I(1) << "// Out Scalars\n";
-        print_head = false;
-      }
-      Linebreak = ",\n";
-    }
-
-    print_head = true;
-    for (const streamport_p P : OST) {
-      if (print_head) {
-        SBlock << I(1) << "// Out Streams\n";
-        print_head = false;
-      }
-      // Create pairs of address and data port for each store
-      Linebreak = ",\n";
-    }
-
-#if 0
-
-    if (I.size() > 0) {
-      S << I(1) << "// In\n";
-      for (Component::PortsConstItTy P = I.begin(), E = I.end(); P != E; ++P) {
-
-        S << I(1) << "." << (*P)->getUniqueName() << "(" << (*P)->getUniqueName() << "),\n";
-
-        if ((*P)->isScalar()) {
-          scalarport_p SP = std::static_pointer_cast<ScalarPort>(*P);
-
-          if (SP->isPipelined()) {
-            S << I(1) << "." << (*P)->getUniqueName() << "_valid(" << (*P)->getUniqueName() << "_valid),\n";
-            S << I(1) << "." << (*P)->getUniqueName() << "_ack(" << (*P)->getUniqueName() << "_ack)";
-          }
-        } else {
-          // Streams are added as Input or Output of a Block but they have
-          // neither.
-        }
-
-        if (std::next(P) != E || O.size() > 0)
-          S << ",\n";
-      }
-    }
-    if (O.size() > 0) {
-      S << I(1) << "// Out\n";
-
-      for (Component::PortsConstItTy P = O.begin(), E = O.end(); P != E; ++P) {
-
-        S << I(1) << "." << (*P)->getUniqueName() << "(" << (*P)->getUniqueName() << "),\n";
-
-        if ((*P)->isScalar()) {
-          scalarport_p SP = std::static_pointer_cast<ScalarPort>(*P);
-
-          if (SP->isPipelined()) {
-            S << I(1) << "." << (*P)->getUniqueName() << "_valid(" << (*P)->getUniqueName() << "_valid),\n";
-            S << I(1) << "." << (*P)->getUniqueName() << "_ack(" << (*P)->getUniqueName() << "_ack)";
-          }
-        } else {
-        }
-          dbgs() << "Out " << (*P)->dump() << "\n";
-
-        S << I(1) << "." << (*P)->getUniqueName() << "(" << (*P)->getUniqueName() << "),\n";
-        S << I(1) << "." << (*P)->getUniqueName() << "_valid(" << (*P)->getUniqueName() << "_valid),\n";
-        S << I(1) << "." << (*P)->getUniqueName() << "_ack(" << (*P)->getUniqueName() << "_ack)";
-        if (std::next(P) != E)
-          S << ",\n";
-      }
-    }
-#endif
 
     SBlock << "\n" << ");\n";
-
   }
-  SMux << SBlock.str();
-  return SMux.str();
+  return SBlock.str();
 }
 
 const std::string KernelModule::instStreams() const {

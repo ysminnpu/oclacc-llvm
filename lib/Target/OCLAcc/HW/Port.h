@@ -18,9 +18,9 @@ class Port : public HW {
     Port(const std::string &, size_t, const Datatype &, bool);
 
   public:
-    virtual bool isScalar()=0;
+    virtual bool isScalar() const=0;
     const Datatype &getPortType();
-    bool isPipelined();
+    bool isPipelined() const;
 
   private:
     const Datatype &PortType;
@@ -41,7 +41,7 @@ class Port : public HW {
 class ScalarPort : public Port { public: ScalarPort(const std::string &Name,
     size_t W, const Datatype &T, bool Pipelined);
 
-    bool isScalar();
+    bool isScalar() const;
 
 
     DECLARE_VISIT;
@@ -92,7 +92,7 @@ class StreamPort : public Port {
 
     DECLARE_VISIT;
 
-    bool isScalar();
+    bool isScalar() const;
 
     // Combined
     const IndexListTy get(AccessTy) const;
@@ -172,16 +172,18 @@ class DynamicStreamIndex : public StreamIndex {
 /// The index is not represented as ConstantVal object to simplify offset
 /// analysis for stream optimization.
 class StaticStreamIndex : public StreamIndex {
+  public:
+    typedef int64_t IndexTy;
   private:
-    int64_t Index;
+    IndexTy Index;
   public:
     StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t W);
 
     StaticStreamIndex(const StaticStreamIndex&) = delete;
     StaticStreamIndex& operator=(const StaticStreamIndex&) = delete;
 
-    virtual void setIndex(int64_t I);
-    int64_t getIndex() const;
+    virtual void setIndex(IndexTy I);
+    IndexTy getIndex() const;
 
     bool isStatic() const;
 

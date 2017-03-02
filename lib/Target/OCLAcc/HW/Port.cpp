@@ -9,13 +9,13 @@ const Datatype &Port::getPortType() {
   return PortType;
 }
 
-bool Port::isPipelined(void) { return Pipelined; }
+bool Port::isPipelined(void) const { return Pipelined; }
 
 /// Scalar Port
 ///
 ScalarPort::ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined) : Port(Name, W, T, Pipelined){ }
 
-bool ScalarPort::isScalar() { return true; }
+bool ScalarPort::isScalar() const { return true; }
 
 
 
@@ -23,7 +23,7 @@ bool ScalarPort::isScalar() { return true; }
 ///
 StreamPort::StreamPort(const std::string &Name, size_t W, ocl::AddressSpace, const Datatype &T) : Port(Name, W, T) { }
 
-bool StreamPort::isScalar() { return false; }
+bool StreamPort::isScalar() const { return false; }
 
 void StreamPort::addLoad(streamindex_p I) {
   IndexList.push_back(I);
@@ -119,10 +119,10 @@ StaticStreamIndex::StaticStreamIndex(const std::string &Name, streamport_p Strea
   setBitWidth(W);
 }
 
-void StaticStreamIndex::setIndex(int64_t I) {
+void StaticStreamIndex::setIndex(StaticStreamIndex::IndexTy I) {
   Index = I;
 }
-int64_t StaticStreamIndex::getIndex() const { return Index; }
+StaticStreamIndex::IndexTy StaticStreamIndex::getIndex() const { return Index; }
 
 bool StaticStreamIndex::isStatic() const {return true;}
 

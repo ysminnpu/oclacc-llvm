@@ -63,6 +63,7 @@ class Component : public Identifiable, public Visitable {
     const llvm::Value * getIR() const;
     void setIR(const llvm::Value *);
 
+
     // InScalars
     void addInScalar(scalarport_p);
 
@@ -106,6 +107,8 @@ class Component : public Identifiable, public Visitable {
     const PortsTy getOuts(void) const;
 
     const PortsTy getIns(void) const;
+
+    const PortsTy getPorts(void) const;
 
     void addConstVal(const_p p);
     const ConstantsType &getConstVals() const;

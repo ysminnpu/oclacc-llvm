@@ -122,6 +122,16 @@ const Component::PortsTy Component::getIns(void) const {
   return Ins;
 }
 
+const Component::PortsTy Component::getPorts(void) const {
+  PortsTy P;
+  P.insert(P.end(), InScalars.begin(), InScalars.end());
+  P.insert(P.end(), InStreams.begin(), InStreams.end());
+  P.insert(P.end(), OutStreams.begin(), OutStreams.end());
+  P.insert(P.end(), InOutStreams.begin(), InOutStreams.end());
+  P.insert(P.end(), OutScalars.begin(), OutScalars.end());
+  return P;
+}
+
 void Component::addConstVal(const_p p) {
   ConstVals.push_back(p);
 }
