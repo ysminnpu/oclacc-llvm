@@ -456,6 +456,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     }
     else if (IT->isPointerTy()) {
       // nothing to do here, will be done outside of loop.
+      continue;
     }
   }
 
@@ -468,22 +469,18 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
 
   if (AReads != ArgStreamReads.end()) {
     for (const Argument *RA : AReads->second) {
-      streamport_p HWArg = getHW<StreamPort>(&BB, RA);
-
-      if (HWBB->containsInStreamForValue(RA))
-        continue;
-      else
-        HWBB->addInStream(HWArg);
+      if (!HWBB->containsInStreamIndexForValue(RA)) {
+        streamindex_p HWArg = getHW<StreamIndex>(&BB, RA);
+        HWBB->addInStreamIndex(HWArg);
+      }
     }
   }
   if (AWrites != ArgStreamReads.end()) {
     for (const Argument *RA : AWrites->second) {
-      streamport_p HWArg = getHW<StreamPort>(&BB, RA);
-
-      if (HWBB->containsOutStreamForValue(RA))
-        continue;
-      else
-        HWBB->addOutStream(HWArg);
+      if (!HWBB->containsOutStreamIndexForValue(RA)) {
+        streamindex_p HWArg = getHW<StreamIndex>(&BB, RA);
+        HWBB->addOutStreamIndex(HWArg);
+      }
     }
   }
 }
@@ -530,6 +527,8 @@ void OCLAccHW::handleArgument(const Argument &A) {
 
   errs() << "Argument " << A.getName() << " uses " << Bits << " Bits\n";
 
+  // Normal Scalars are not pipelined as they have the same value for all
+  // WorkItems
   if (AType->isIntegerTy() || AType->isFloatingPointTy()) {
     scalarport_p HWS = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType), false);
     HWKernel->addInScalar(HWS);
@@ -550,6 +549,8 @@ void OCLAccHW::handleArgument(const Argument &A) {
     }
     // All other Arguments are connected when used.
   } 
+  // Create Ports for all Pointers. The direction of the Port will be defined
+  // depending on its usage in the BBs.
   else if (const PointerType *PType = dyn_cast<PointerType>(AType)) {
     bool isRead = false;
     bool isWritten = false;
@@ -568,6 +569,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
     }
 
     // Walk through use list and collect Load/Store/GEP Instructions using it
+#if 0
     std::list<const Value *> Values;
     for (const auto &Inst : A.uses() ) {
       Values.push_back(Inst.getUser());
@@ -595,16 +597,20 @@ void OCLAccHW::handleArgument(const Argument &A) {
       }
     }
 
-    const Type *ElementType   = AType->getPointerElementType();
 
     if (!isWritten && !isRead)
       DEBUG(dbgs() << "omitting unused Argument " << A.getName() << "\n");
     else {
+#endif
+      const Type *ElementType   = AType->getPointerElementType();
+
       const Datatype D = getDatatype(ElementType);
       streamport_p S = makeHW<StreamPort>(&A, Name, Bits, static_cast<ocl::AddressSpace>(AS), D);
       ArgMap[&A] = S;
       S->setParent(HWKernel);
 
+      HWKernel->addStream(S);
+#if 0
       if (isRead && isWritten) {
         HWKernel->addInOutStream(S);
         DEBUG(dbgs() << "Argument '" << Name << "' is InOutStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
@@ -617,10 +623,13 @@ void OCLAccHW::handleArgument(const Argument &A) {
       } else {
         llvm_unreachable("Stream not used");
       }
+#endif
     }
+#if 0
   }
   else
     llvm_unreachable("Unknown Argument Type");
+#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -753,6 +762,9 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
 {
   const std::string Name = I.getName().str();
   const Value *AddrVal = I.getPointerOperand();
+  const BasicBlock *Parent = I.getParent();
+
+  const block_p HWParent = getBlock(Parent);
 
   unsigned AddrSpace = I.getPointerAddressSpace();
 
@@ -777,9 +789,9 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
 
   HWStream->addLoad(HWStreamIndex);
 
-  BlockValueMap[I.getParent()][&I] = HWStreamIndex;
+  HWParent->addInStreamIndex(HWStreamIndex);
 
-  HWStreamIndex->setName(P->getName());
+  BlockValueMap[I.getParent()][&I] = HWStreamIndex;
 }
 
 ///
@@ -797,6 +809,9 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
 
   const Value *DataVal = I.getValueOperand();
   const Value *AddrVal = I.getPointerOperand();
+  const BasicBlock *Parent = I.getParent();
+
+  const block_p HWParent = getBlock(Parent);
 
   // Check Address Space
   unsigned AS = I.getPointerAddressSpace();
@@ -819,11 +834,11 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
     const_p HWConst = makeConstant(ConstValue, &I);
     HWData = HWConst;
   } else {
-    HWData = getHW<HW>(I.getParent(), DataVal);
+    HWData = getHW<HW>(Parent, DataVal);
   }
 
   //Get Address to store at
-  HWOut = getHW<HW>(I.getParent(), AddrVal);
+  HWOut = getHW<HW>(Parent, AddrVal);
 
   streamport_p HWStream;
   streamindex_p HWStreamIndex;
@@ -840,6 +855,8 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   }
 
   HWStream->addStore(HWStreamIndex);
+
+  HWParent->addOutStreamIndex(HWStreamIndex);
 
   connect(HWData, HWStreamIndex);
 }
@@ -890,12 +907,12 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
       llvm_unreachable("Unknown Constant Type");
 
     int64_t C = IntConst->getSExtValue();
-    HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), &I, Name, HWBase, C, IntConst->getValue().getActiveBits());
+    HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), InstValue, Name, HWBase, C, IntConst->getValue().getActiveBits());
   } else {
     HWIndex = getHW<HW>(I.getParent(), IndexValue);
 
     // No need to add StreamIndex to BlockValueMap so create object directly
-    HWStreamIndex = makeHWBB<DynamicStreamIndex>(I.getParent(), &I, Name, HWBase, HWIndex);
+    HWStreamIndex = makeHWBB<DynamicStreamIndex>(I.getParent(), InstValue, Name, HWBase, HWIndex);
 
     HWIndex->addOut(HWStreamIndex);
   }

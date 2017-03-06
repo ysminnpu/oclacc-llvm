@@ -25,7 +25,6 @@ class Component : public Identifiable, public Visitable {
     typedef std::vector<port_p>::iterator PortsItTy;
     typedef std::vector<port_p>::const_iterator PortsConstItTy;
 
-    typedef std::vector<streamport_p> StreamsTy;
     typedef std::vector<scalarport_p> ScalarsTy;
 
   protected:
@@ -35,17 +34,7 @@ class Component : public Identifiable, public Visitable {
     // We often have to be able to look for a specific Value, so we store them
     // in a map AND a list to avoid having to look up every single item's
     // IR pointer when a new one is to be inserted.
-    typedef std::map<const llvm::Value *, streamport_p> StreamMapTy;
     typedef std::map<const llvm::Value *, scalarport_p> ScalarMapTy;
-
-    StreamsTy InOutStreams;
-    StreamMapTy InOutStreamsMap;
-
-    StreamsTy InStreams;
-    StreamMapTy InStreamsMap;
-
-    StreamsTy OutStreams;
-    StreamMapTy OutStreamsMap;
 
     ScalarsTy InScalars;
     ScalarMapTy InScalarsMap;
@@ -73,13 +62,6 @@ class Component : public Identifiable, public Visitable {
 
     scalarport_p getInScalarForValue(const Value *);
 
-    // InStreams
-    void addInStream(streamport_p);
-
-    bool containsInStreamForValue(const Value *);
-
-    const StreamsTy getInStreams() const;
-
     // OutScalars
     void addOutScalar(scalarport_p);
 
@@ -89,31 +71,10 @@ class Component : public Identifiable, public Visitable {
 
     scalarport_p getOutScalarForValue(const Value *V);
 
-    // OutStreams
-    void addOutStream(streamport_p);
-
-    bool containsOutStreamForValue(const Value *);
-
-    const StreamsTy &getOutStreams() const;
-    
-    // InOutStreams
-    void addInOutStream(streamport_p);
-
-    bool containsInOutStreamForValue(const Value *);
-    
-    const StreamsTy &getInOutStreams() const;
-
-    // Unified access
-    const PortsTy getOuts(void) const;
-
-    const PortsTy getIns(void) const;
-
-    const PortsTy getPorts(void) const;
-
     void addConstVal(const_p p);
     const ConstantsType &getConstVals() const;
 
-    void dump();
+    virtual void dump() = 0;
 
   protected: 
     Component(const std::string &);
@@ -128,12 +89,21 @@ class Block : public Component {
     typedef CondListTy::iterator CondItTy;
     typedef CondListTy::const_iterator CondConstItTy;
 
+    typedef std::vector<streamindex_p> StreamIndicesTy;
+    typedef std::map<const llvm::Value *, streamindex_p> StreamIndexMapTy;
+
   private:
     std::vector<base_p> Ops;
     kernel_p Parent;
 
     CondListTy Conds;
     CondListTy NegConds;
+
+    StreamIndicesTy InStreamIndices;
+    StreamIndexMapTy InStreamIndicesMap;
+
+    StreamIndicesTy OutStreamIndices;
+    StreamIndexMapTy OutStreamIndicesMap;
 
   protected:
     bool isBlock();
@@ -165,16 +135,53 @@ class Block : public Component {
 
     const base_p getNegCondForBlock(block_p) const;
 
+    // InStreams
+    void addInStreamIndex(streamindex_p);
+
+    bool containsInStreamIndexForValue(const Value *);
+
+    const StreamIndicesTy &getInStreamIndices() const;
+
+    // OutStreams
+    void addOutStreamIndex(streamindex_p);
+
+    bool containsOutStreamIndexForValue(const Value *);
+
+    const StreamIndicesTy &getOutStreamIndices() const;
+    
+    virtual void dump();
+
     DECLARE_VISIT;
 };
 
 /// \brief Schedulable Kernels
 /// Kernels are blocks which represent the beginning dataflow of a WorkItem.
 class Kernel : public Component {
+  public:
+    typedef std::vector<streamport_p> StreamsTy;
+    typedef std::map<const llvm::Value *, streamport_p> StreamMapTy;
+    typedef std::vector<block_p> BlocksTy;
+
+  private:
+
   private:
     bool WorkItem;
 
-    std::vector<block_p> Blocks;
+    BlocksTy Blocks;
+
+    StreamsTy Streams;
+    StreamMapTy StreamsMap;
+#if 0
+    StreamsTy InStreams;
+    StreamMapTy InStreamsMap;
+
+    StreamsTy OutStreams;
+    StreamMapTy OutStreamsMap;
+
+    StreamsTy InOutStreams;
+    StreamMapTy InOutStreamsMap;
+#endif
+
 
   protected:
     bool isBlock();
@@ -187,10 +194,46 @@ class Kernel : public Component {
     NO_COPY_ASSIGN(Kernel)
 
     void addBlock(block_p p);
-    const std::vector<block_p> &getBlocks() const;
+    const BlocksTy &getBlocks() const;
 
     void setWorkItem(bool T);
     bool isWorkItem() const;
+
+    void addStream(streamport_p);
+    const StreamsTy getStreams() const;
+
+#if 0
+
+    // InStreams
+    void addInStream(streamport_p);
+
+    bool containsInStreamForValue(const Value *);
+
+    const StreamsTy getInStreams() const;
+
+    // OutStreams
+    void addOutStream(streamport_p);
+
+    bool containsOutStreamForValue(const Value *);
+
+    const StreamsTy &getOutStreams() const;
+    
+    // InOutStreams
+    void addInOutStream(streamport_p);
+
+    bool containsInOutStreamForValue(const Value *);
+    
+    const StreamsTy &getInOutStreams() const;
+#endif
+
+    // Unified access
+    virtual const PortsTy getOuts(void) const;
+
+    virtual const PortsTy getIns(void) const;
+
+    const PortsTy getPorts(void) const;
+
+    virtual void dump();
 
     DECLARE_VISIT;
 };

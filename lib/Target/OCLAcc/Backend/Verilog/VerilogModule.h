@@ -36,17 +36,36 @@ struct Signal {
 };
 
 typedef std::vector<Signal> PortListTy;
-const PortListTy getInScalarPortSignals(const ScalarPort &);
-const PortListTy getInStreamPortSignals(const StreamPort &);
-const PortListTy getOutScalarPortSignals(const ScalarPort &);
-const PortListTy getOutStreamPortSignals(const StreamPort &);
 
-const PortListTy getInPortSignals(const port_p);
-const PortListTy getOutPortSignals(const port_p);
+// Components
+const PortListTy getSignals(const block_p);
+const PortListTy getSignals(const Block &);
 
-const PortListTy getComponentSignals(const component_p);
-const PortListTy getComponentSignals(const Component &);
+const PortListTy getSignals(const kernel_p);
+const PortListTy getSignals(const Kernel &);
 
+const std::string createPortList(const PortListTy &);
+
+// Scalars
+const PortListTy getInSignals(const ScalarPort &);
+const PortListTy getOutSignals(const ScalarPort &);
+
+// Streams
+const PortListTy getInSignals(const StreamPort &);
+const PortListTy getOutSignals(const StreamPort &);
+
+const PortListTy getInSignals(const StaticStreamIndex &);
+const PortListTy getInSignals(const DynamicStreamIndex &);
+
+const PortListTy getOutSignals(const StaticStreamIndex &);
+const PortListTy getOutSignals(const DynamicStreamIndex &);
+
+// Used for delegation
+const PortListTy getInSignals(const port_p);
+const PortListTy getInSignals(const streamindex_p);
+
+const PortListTy getOutSignals(const port_p);
+const PortListTy getOutSignals(const streamindex_p);
 
 /// \brief Base class to implement Components
 class VerilogModule {
@@ -55,12 +74,12 @@ class VerilogModule {
   public:
     VerilogModule(Component &);
 
-    const std::string declHeader() const;
+    virtual const std::string declHeader() const = 0;
 
     const std::string declFooter() const;
 
   private:
-    Component &R;
+    Component &Comp;
 };
 
 /// \brief Implementation of Block
@@ -68,10 +87,12 @@ class BlockModule : public VerilogModule {
   public:
     BlockModule(Block &);
 
+    virtual const std::string declHeader() const;
+
     const std::string declEnable() const;
-      
+
   private:
-    Block &R;
+    Block &Comp;
 
 };
 
@@ -84,6 +105,8 @@ class KernelModule : public VerilogModule{
   public:
     KernelModule(Kernel &);
 
+    virtual const std::string declHeader() const;
+
     const std::string declBlockWires() const;
 
     const std::string instBlocks();
@@ -95,7 +118,7 @@ class KernelModule : public VerilogModule{
 
 
   private:
-    Kernel &R;
+    Kernel &Comp;
 
 };
 

@@ -102,6 +102,9 @@ class StreamPort : public Port {
     const IndexListTy &getIndexList() const;
     const AccessListTy &getAccessList() const;
 
+    bool hasLoads() const;
+    bool hasStores() const;
+
     // Load methods
     //
     bool isLoad(StreamIndex *) const;
@@ -138,7 +141,7 @@ class StreamIndex : public HW {
     StreamIndex(const StreamIndex&) = delete;
     StreamIndex& operator=(const StreamIndex&) = delete;
 
-    streamport_p getStream() const;
+    const streamport_p getStream() const;
 
     virtual bool isStatic() const = 0;
 
@@ -152,7 +155,7 @@ class DynamicStreamIndex : public StreamIndex {
     base_p Index;
 
   public:
-    DynamicStreamIndex(const std::string &Name, streamport_p Stream, base_p Index);
+    DynamicStreamIndex(const std::string &Name, streamport_p, base_p);
 
     DynamicStreamIndex(const DynamicStreamIndex&) = delete;
     DynamicStreamIndex& operator=(const DynamicStreamIndex&) = delete;

@@ -191,10 +191,10 @@ class DFVisitor : public BaseVisitor
     {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      for ( port_p P : R.getIns() ) {
+      for ( port_p P : R.getInScalars() ) {
         P->accept(*this);
       }
-      for ( port_p P : R.getOuts() ) {
+      for ( port_p P : R.getOutScalars() ) {
         P->accept(*this);
       }
       for ( base_p P : R.getOps() ) {

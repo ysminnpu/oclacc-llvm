@@ -2,12 +2,11 @@
 
 using namespace oclacc;
 
-Port::Port(const std::string &Name, size_t W, const Datatype &T, bool Pipelined=false) : HW(Name, W), PortType(T), Pipelined(Pipelined) {
-}
+Port::Port(const std::string &Name, 
+    size_t W, const Datatype &T, 
+    bool Pipelined=false) : HW(Name, W), PortType(T), Pipelined(Pipelined) { }
 
-const Datatype &Port::getPortType() {
-  return PortType;
-}
+const Datatype &Port::getPortType() { return PortType; }
 
 bool Port::isPipelined(void) const { return Pipelined; }
 
@@ -46,6 +45,15 @@ const StreamPort::IndexListTy StreamPort::getLoads() const {
 
 const StreamPort::IndexListTy StreamPort::getStores() const {
   return get(StreamPort::Store);
+}
+
+
+bool StreamPort::hasLoads() const {
+  return getLoads().empty();
+}
+
+bool StreamPort::hasStores() const {
+  return getStores().empty();
 }
 
 bool StreamPort::isLoad(StreamIndex *I) const {
@@ -94,9 +102,10 @@ const StreamPort::AccessListTy &StreamPort::getAccessList() const {
 ///
 /// In and Out used for data while the index depends on the actual subcalss
 /// type.
-StreamIndex::StreamIndex(const std::string &Name, streamport_p Stream) : HW(Name,0), Stream(Stream) { }
+StreamIndex::StreamIndex(const std::string &Name, streamport_p Stream) : HW(Name,0), Stream(Stream) {
+}
 
-streamport_p StreamIndex::getStream() const {
+const streamport_p StreamIndex::getStream() const {
   return Stream;
 }
 
