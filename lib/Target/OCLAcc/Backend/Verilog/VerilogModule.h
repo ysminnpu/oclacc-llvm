@@ -47,12 +47,15 @@ const PortListTy getSignals(const Kernel &);
 const std::string createPortList(const PortListTy &);
 
 // Scalars
+const PortListTy getInSignals(const scalarport_p);
+const PortListTy getOutSignals(const scalarport_p);
+
 const PortListTy getInSignals(const ScalarPort &);
 const PortListTy getOutSignals(const ScalarPort &);
 
 // Streams
-const PortListTy getInSignals(const StreamPort &);
-const PortListTy getOutSignals(const StreamPort &);
+const PortListTy getSignals(const streamport_p);
+const PortListTy getSignals(const StreamPort &);
 
 const PortListTy getInSignals(const StaticStreamIndex &);
 const PortListTy getInSignals(const DynamicStreamIndex &);
@@ -61,10 +64,8 @@ const PortListTy getOutSignals(const StaticStreamIndex &);
 const PortListTy getOutSignals(const DynamicStreamIndex &);
 
 // Used for delegation
-const PortListTy getInSignals(const port_p);
 const PortListTy getInSignals(const streamindex_p);
 
-const PortListTy getOutSignals(const port_p);
 const PortListTy getOutSignals(const streamindex_p);
 
 /// \brief Base class to implement Components
@@ -114,8 +115,6 @@ class KernelModule : public VerilogModule{
     const std::string connectWires() const;
 
     const std::string instStreams() const;
-
-
 
   private:
     Kernel &Comp;

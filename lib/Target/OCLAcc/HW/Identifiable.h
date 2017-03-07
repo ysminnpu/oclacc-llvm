@@ -10,13 +10,13 @@ namespace oclacc {
 class Identifiable
 {
   public:
-    typedef unsigned UIDType;
+    typedef unsigned UIDTy;
 
   private:
     static unsigned currUID;
 
   protected:
-    const UIDType UID;
+    const UIDTy UID;
     std::string Name;
 
   public:
@@ -28,7 +28,7 @@ class Identifiable
     Identifiable (const Identifiable &) = delete;
     Identifiable &operator =(const Identifiable &) = delete;
 
-    UIDType getUID() const;
+    UIDTy getUID() const;
     virtual const std::string getName() const;
     virtual const std::string getUniqueName() const;
 

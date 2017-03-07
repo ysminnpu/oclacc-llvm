@@ -530,7 +530,10 @@ void OCLAccHW::handleArgument(const Argument &A) {
   // Normal Scalars are not pipelined as they have the same value for all
   // WorkItems
   if (AType->isIntegerTy() || AType->isFloatingPointTy()) {
-    scalarport_p HWS = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType), false);
+    // Promoted Arguments must be marked for the Kernel and all BBs
+    bool isPromoted = AT.isPromotedArgument(&A);
+    scalarport_p HWS = makeHW<ScalarPort>(&A, Name, AType->getScalarSizeInBits(), getDatatype(AType), isPromoted);
+
     HWKernel->addInScalar(HWS);
     ArgMap[&A] = HWS;
     HWS->setParent(HWKernel);
@@ -539,7 +542,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
     // used later. If we skip that, we have no connection between the
     // definition in the Kernel and its uses in the blocks.
     //
-    if (AT.isPromotedArgument(&A)) {
+    if (isPromoted) {
       const BasicBlock *EB =  &(A.getParent()->getEntryBlock());
       block_p HWEB = getBlock(EB);
       scalarport_p HWSP = makeHWBB<ScalarPort>(EB, &A, Name, AType->getScalarSizeInBits(), getDatatype(AType), true);
