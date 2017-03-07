@@ -40,35 +40,39 @@ const StreamPort::IndexListTy StreamPort::get(StreamPort::AccessTy A) const {
 }
 
 const StreamPort::IndexListTy StreamPort::getLoads() const {
-  return get(StreamPort::Load);
+  return get(Load);
 }
 
 const StreamPort::IndexListTy StreamPort::getStores() const {
-  return get(StreamPort::Store);
+  return get(Store);
 }
 
 
 bool StreamPort::hasLoads() const {
-  return getLoads().empty();
+  for (AccessListTy::size_type i = 0; i < AccessList.size(); ++i) {
+    if (AccessList[i] == Load) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool StreamPort::hasStores() const {
-  return getStores().empty();
+  for (AccessListTy::size_type i = 0; i < AccessList.size(); ++i) {
+    if (AccessList[i] == Store) {
+      return true;
+    }
+  }
+  return false;
 }
 
 bool StreamPort::isLoad(StreamIndex *I) const {
-  bool ret = false;
-
-  unsigned i = 0;
-  for (streamindex_p SI : IndexList) {
-    if (SI.get() == I) {
-      if (AccessList.at(i) == Load)
-        ret = true;
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (IndexList[i].get() == I && AccessList[i] == Load) {
+      return true;
     }
-    ++i;
   }
-
-  return ret;
+  return false;
 }
 
 void StreamPort::addStore(streamindex_p I) {
@@ -77,23 +81,18 @@ void StreamPort::addStore(streamindex_p I) {
 }
 
 bool StreamPort::isStore(StreamIndex *I) const {
-  bool ret = false;
-
-  unsigned i = 0;
-  for (streamindex_p SI : IndexList) {
-    if (SI.get() == I) {
-      if (AccessList.at(i) == Store)
-        ret = true;
+  for (IndexListTy::size_type i = 0; i < IndexList.size(); ++i) {
+    if (IndexList[i].get() == I && AccessList[i] == Store) {
+      return true;
     }
-    ++i;
   }
-
-  return ret;
+  return false;
 }
 
 const StreamPort::IndexListTy &StreamPort::getIndexList() const {
   return IndexList;
 }
+
 const StreamPort::AccessListTy &StreamPort::getAccessList() const {
   return AccessList;
 }

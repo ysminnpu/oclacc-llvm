@@ -62,21 +62,23 @@ int Dot::visit(Kernel &R) {
 
   F() << "label = \"kernel_" << R.getName()  << "\";" << "\n";
 
-  for (port_p P : R.getInScalars()) {
+  for (scalarport_p P : R.getInScalars()) {
     F() << "n" << P->getUID() << " [shape=box,fillcolor=" << C_SCALARPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
     RankInStream << "n" << P->getUID() << " ";
   }
   for (streamport_p P : R.getStreams()) {
     if (P->hasLoads()) {
-      F() << "n" << P->getUID() << "[shape=house,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
+      outs() << P->getUniqueName() << " has Loads\n";
+      F() << "n" << P->getUID() << " [shape=house,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
       RankInStream << "n" << P->getUID() << " ";
     }
-    else {
-      F() << "n" << P->getUID() << "[shape=invhouse,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
+    if (P->hasStores()) {
+      outs() << P->getUniqueName() << " has Stores\n";
+      F() << "n" << P->getUID() << " [shape=invhouse,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
       RankOutStream << "n" << P->getUID() << " ";
     }
   }
-  for (port_p P : R.getOutScalars()) {
+  for (scalarport_p P : R.getOutScalars()) {
     F() << "n" << P->getUID() << " [shape=box,fillcolor=" << C_SCALARPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
     RankOutStream << "n" << P->getUID() << " ";
   }
@@ -133,18 +135,9 @@ int Dot::visit(Block &R) {
     F() << "n" << P->getUID() << " [shape=box,fillcolor=" << C_SCALARPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
     RankInStream << "n" << P->getUID() << " ";
   }
-  for (streamindex_p P : R.getInStreamIndices()) {
-    streamport_p S = P->getStream();
-    F() << "n" << P->getUID() << "[shape=house,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << S->getUniqueName() << "\n" << P->getUniqueName() << "\"];\n";
-    RankInStream << "n" << P->getUID() << " ";
-  }
+
   for (port_p P : R.getOutScalars()) {
     F() << "n" << P->getUID() << " [shape=box,fillcolor=" << C_SCALARPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];" << "\n";
-    RankOutStream << "n" << P->getUID() << " ";
-  }
-  for (streamindex_p P : R.getOutStreamIndices()) {
-    streamport_p S = P->getStream();
-    F() << "n" << S->getUID() << "[shape=invhouse,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\n" << P->getUniqueName() << "\"];\n";
     RankOutStream << "n" << P->getUID() << " ";
   }
 
@@ -340,6 +333,8 @@ int Dot::visit(DynamicStreamIndex &R) {
     F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
 
   super::visit(R);
+
+  Conn() << "n" << R.getUID() << " -> " << "n" << R.getStream()->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getIndex()->getBitWidth() << "];\n";
 
   return 0;
 }
