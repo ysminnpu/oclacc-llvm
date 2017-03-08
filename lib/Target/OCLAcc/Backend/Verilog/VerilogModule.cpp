@@ -447,57 +447,6 @@ const std::string KernelModule::declBlockWires() const {
   return S.str();
 }
 
-/// \brief Walk through all Blocks and connect inputs.
-///
-/// For Scalars, connect valid and ack. Streams also have an address. Skip
-/// Kernel ports (must be StreamPorts) as they already exist in the Top module.
-const std::string KernelModule::connectWires() const {
-  std::stringstream S;
-
-
-#if 0
-  S << "// Port connections\n";
-
-  // It is sufficient to walk through all inputs.
-  for (block_p B : Comp.getBlocks()) {
-    S << "// " << curr_block->getUniqueName() << "\n";
-
-    // Ports
-    if (P->getIns().size() > 1)
-
-    // We only have a single input
-    base_p PI = P->getIn(0);
-    for (const Component::PortsTy &P : B->getIns()) {
-    }
-
-    PortListTy OutPorts = getOutPortSignals(B);
-    PortListTy InPorts = getInPortSignals(B);
-  }
-
-  for (port_p P : I) {
-    }
-
-    // If there are more Inputs to this, there is already a Portmux instance
-    // with an output port already named like the input port where it is used,
-    // so we can skip it here.
-    if (P->getIns().size() > 1)
-      continue;
-
-    // We only have a single input
-    base_p PI = P->getIn(0);
-    if (!PI) dbgs() << P->getUniqueName() << " does not have an input\n";
-    assert(PI);
-
-    S << "assign " << P->getUniqueName() << " = " << PI->getUniqueName() << ";\n";
-    S << "assign " << P->getUniqueName() << "_valid = " << PI->getUniqueName() << "_valid;\n";
-    S << "assign " << P->getUniqueName() << "_ack = " << PI->getUniqueName() << "_ack;\n";
-  }
-#endif
-
-  return S.str();
-}
-
-
 /// \brief Instantiate blocks with ports
 ///
 /// Use the Port's name as it is unique. We already created wires for
@@ -532,26 +481,4 @@ const std::string KernelModule::instBlocks() {
     SBlock << "\n" << ");\n";
   }
   return SBlock.str();
-}
-
-const std::string KernelModule::instStreams() const {
-  std::stringstream S;
-
-  for (streamport_p SP : Comp.getStreams()) {
-    //S << SP->getUniqueName() << " BW: " << SP->getBitWidth() << "\n";
-
-    for (streamindex_p SI : SP->getIndexList()) {
-      //S << "index " << SI->getUniqueName();
-
-      if (SI->isStatic()) {
-        staticstreamindex_p SSI = std::static_pointer_cast<StaticStreamIndex>(SI);
-        //S << " is static " << SSI->getIndex() << "\n";
-      } else {
-        dynamicstreamindex_p DSI = std::static_pointer_cast<DynamicStreamIndex>(SI);
-        //S << " is dynamic " << DSI->getIndex()->getUniqueName() << "\n";
-      }
-    }
-  }
-
-  return S.str();
 }

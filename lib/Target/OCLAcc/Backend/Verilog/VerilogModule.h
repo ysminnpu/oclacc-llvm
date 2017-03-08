@@ -112,10 +112,6 @@ class KernelModule : public VerilogModule{
 
     const std::string instBlocks();
 
-    const std::string connectWires() const;
-
-    const std::string instStreams() const;
-
   private:
     Kernel &Comp;
 

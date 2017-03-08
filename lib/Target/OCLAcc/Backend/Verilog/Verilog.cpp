@@ -99,10 +99,6 @@ int Verilog::visit(Kernel &R) {
   (*FS) << "// Block instantiations\n";
   (*FS) << KM.instBlocks();
 
-  (*FS) << KM.instStreams();
-
-  (*FS) << KM.connectWires();
-
   (*FS) << KM.declFooter();
 
   //errs() << KM.instStreams();
