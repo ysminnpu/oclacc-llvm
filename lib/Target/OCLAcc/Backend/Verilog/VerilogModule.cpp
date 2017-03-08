@@ -181,60 +181,24 @@ const PortListTy oclacc::getSignals(const StreamPort &P) {
 
   const std::string PName = P.getUniqueName();
 
-  // Walk through all loads and stores and create address signals. StaticIndexes also
-  // require an address signal, which is set to the value in the wire
-  // declaration.
+  // Loads
   for(staticstreamindex_p PI : P.getStaticLoads()) {
-    // Static loads have fixed addresses stored in the memory controller
-    const std::string PIName = std::to_string(PI->getUID());
-    unsigned AddressWidth = PI->getBitWidth();
-    unsigned DataWidth = P.getBitWidth();
-
-    L.push_back(Signal(PName+"_"+PIName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+PIName+"_data", DataWidth, SignalDirection::In, SignalType::Wire));
-    L.push_back(Signal(PName+"_"+PIName+"_valid", 1, SignalDirection::In, SignalType::Wire));
-    L.push_back(Signal(PName+"_"+PIName+"_ack", 1, SignalDirection::Out, SignalType::Reg));
+    const PortListTy Ports = getInSignals(PI);
+    L.insert(std::end(L), std::begin(Ports), std::end(Ports));
   }
   for(dynamicstreamindex_p PI : P.getDynamicLoads()) {
-    const base_p Index = PI->getIndex();
-    const std::string PIName = std::to_string(PI->getUID());
-
-    unsigned AddressWidth = Index->getBitWidth();
-    unsigned DataWidth = P.getBitWidth();
-
-    L.push_back(Signal(PName+"_"+PIName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+PIName+"_data", DataWidth, SignalDirection::In, SignalType::Wire));
-    L.push_back(Signal(PName+"_"+PIName+"_valid", 1, SignalDirection::In, SignalType::Wire));
-    L.push_back(Signal(PName+"_"+PIName+"_ack", 1, SignalDirection::Out, SignalType::Reg));
+    const PortListTy Ports = getInSignals(PI);
+    L.insert(std::end(L), std::begin(Ports), std::end(Ports));
   }
 
-  // Create pairs of address and data port for each store
+  // Stores
   for(staticstreamindex_p PI : P.getStaticStores()) {
-    // Make sure that negativ array indices do not result in incollect signal
-    // names
-    StaticStreamIndex::IndexTy Index = PI->getIndex();
-    if (Index < 0) Index = -Index;
-    const std::string IName = "const"+std::to_string(Index);
-
-    unsigned AddressWidth = PI->getBitWidth();
-    unsigned DataWidth = P.getBitWidth();
-
-    L.push_back(Signal(PName+"_"+IName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+IName+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+IName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+IName+"_ack", 1, SignalDirection::In, SignalType::Wire));
+    const PortListTy Ports = getOutSignals(PI);
+    L.insert(std::end(L), std::begin(Ports), std::end(Ports));
   }
   for(dynamicstreamindex_p PI : P.getDynamicStores()) {
-    const base_p Index = PI->getIndex();
-    const std::string IName = std::to_string(Index->getUID());
-
-    unsigned AddressWidth = Index->getBitWidth();
-    unsigned DataWidth = P.getBitWidth();
-
-    L.push_back(Signal(PName+"_"+IName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+IName+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+IName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
-    L.push_back(Signal(PName+"_"+IName+"_ack", 1, SignalDirection::In, SignalType::Wire));
+    const PortListTy Ports = getOutSignals(PI);
+    L.insert(std::end(L), std::begin(Ports), std::end(Ports));
   }
 
   return L;
@@ -252,18 +216,13 @@ const PortListTy oclacc::getOutSignals(const ScalarPort &P) {
   // as Kernels do not have scalar outputs.
 
   for (base_p Out : P.getOuts()) {
-    std::stringstream PNameS;
-    PNameS << P.getName() << "_" << P.getUID() << "_" << Out->getUID();
+    const std::string PName = P.getName() + "_" + std::to_string(P.getUID()) + "_" + std::to_string(Out->getUID());
 
-    const std::string PName = PNameS.str();
     L.push_back(Signal(PName, BitWidth, SignalDirection::Out, SignalType::Reg));
 
     L.push_back(Signal(PName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
 
-    // Multiple outputs need multiple ack signals
-    for (base_p O : P.getOuts()) {
-      L.push_back(Signal(PName+"_"+O->getUniqueName()+"_ack", 1, SignalDirection::In, SignalType::Wire));
-    }
+    L.push_back(Signal(PName+"_ack", 1, SignalDirection::In, SignalType::Wire));
   }
 
   return L;
@@ -273,6 +232,7 @@ const PortListTy oclacc::getInSignals(const StaticStreamIndex &P) {
   PortListTy L;
 
   const std::string PName = P.getUniqueName();
+  const std::string StreamName = P.getStream()->getName();
 
   StaticStreamIndex::IndexTy Index = P.getIndex();
   if (Index < 0) Index = -Index;
@@ -282,10 +242,10 @@ const PortListTy oclacc::getInSignals(const StaticStreamIndex &P) {
   unsigned AddressWidth = 64;
   unsigned DataWidth = P.getBitWidth();
 
-  L.push_back(Signal(PName+"_"+IName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
-  L.push_back(Signal(PName+"_"+IName+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
-  L.push_back(Signal(PName+"_"+IName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
-  L.push_back(Signal(PName+"_"+IName+"_ack", 1, SignalDirection::In, SignalType::Wire));
+  L.push_back(Signal(StreamName+"_"+PName+"_"+IName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
+  L.push_back(Signal(StreamName+"_"+PName+"_"+IName+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
+  L.push_back(Signal(StreamName+"_"+PName+"_"+IName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
+  L.push_back(Signal(StreamName+"_"+PName+"_"+IName+"_ack", 1, SignalDirection::In, SignalType::Wire));
 
   return L;
 }
@@ -293,18 +253,19 @@ const PortListTy oclacc::getInSignals(const StaticStreamIndex &P) {
 const PortListTy oclacc::getInSignals(const DynamicStreamIndex &P) {
   PortListTy L;
 
-  const std::string PName = P.getUniqueName();
+  const std::string IndexName = P.getUniqueName();
+  const std::string StreamName = P.getStream()->getName();
 
   const base_p Index = P.getIndex();
-  const std::string IName = std::to_string(Index->getUID());
+  const std::string ID = std::to_string(Index->getUID());
 
   unsigned AddressWidth = Index->getBitWidth();
   unsigned DataWidth = P.getBitWidth();
 
-  L.push_back(Signal(PName+"_"+IName+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
-  L.push_back(Signal(PName+"_"+IName+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
-  L.push_back(Signal(PName+"_"+IName+"_valid", 1, SignalDirection::Out, SignalType::Reg));
-  L.push_back(Signal(PName+"_"+IName+"_ack", 1, SignalDirection::In, SignalType::Wire));
+  L.push_back(Signal(StreamName+"_"+IndexName+"_"+ID+"_address", AddressWidth, SignalDirection::Out, SignalType::Reg));
+  L.push_back(Signal(StreamName+"_"+IndexName+"_"+ID+"_data", DataWidth, SignalDirection::Out, SignalType::Reg));
+  L.push_back(Signal(StreamName+"_"+IndexName+"_"+ID+"_valid", 1, SignalDirection::Out, SignalType::Reg));
+  L.push_back(Signal(StreamName+"_"+IndexName+"_"+ID+"_ack", 1, SignalDirection::In, SignalType::Wire));
 
   return L;
 }
@@ -461,35 +422,28 @@ const std::string VerilogModule::declFooter() const {
 /// Iterate over all Blocks' ports and create wires for each port.
 /// Finally connect the kernel outsputs.
 ///
+/// All non-pipelined ScalarPorts and StreamPorts already exist as kernel ports.
+///
 const std::string KernelModule::declBlockWires() const {
   std::stringstream S;
-#if 0
   for (block_p B : Comp.getBlocks()) {
     S << "// " << B->getUniqueName() << "\n";
 
-    const Component::PortsTy IO = B.getPorts();
-    // Blocks must not have no input
-    assert(IO.size());
+    // The EntryBlock must be skipped because Arguments also added to the first
+    // Block.
+    if (B->isEntryBlock())
+      continue;
 
     // First create wires for each port used as input and output
-    for (port_p P : IO) {
+    for (scalarport_p P : B->getInScalars()) {
+      if (!P->isPipelined())
+        continue;
 
-      S << "wire ";
-
-      unsigned B = P->getBitWidth();
-      if (B != 1)
-        S << "[" << B-1 << ":0] ";
-
-      S << P->getUniqueName();
-
-      S << ";\n";
-
-      // Add valid and ack
-      S << "wire " << P->getUniqueName() << "_valid;\n";
-      S << "wire " << P->getUniqueName() << "_ack;\n";
+      for (const Signal &Sig : getInSignals(P)) {
+        S << Sig.getTypeStr() << " " << Sig.Name << ";\n";
+      }
     }
   }
-#endif
   return S.str();
 }
 

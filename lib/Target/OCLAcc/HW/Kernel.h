@@ -52,7 +52,6 @@ class Component : public Identifiable, public Visitable {
     const llvm::Value * getIR() const;
     void setIR(const llvm::Value *);
 
-
     // InScalars
     void addInScalar(scalarport_p);
 
@@ -105,12 +104,14 @@ class Block : public Component {
     StreamIndicesTy OutStreamIndices;
     StreamIndexMapTy OutStreamIndicesMap;
 
+    bool EntryBlock;
+
   protected:
     bool isBlock();
     bool isKernel();
 
   public:
-    Block (const std::string &);
+    Block (const std::string &, bool);
 
     NO_COPY_ASSIGN(Block)
 
@@ -134,6 +135,8 @@ class Block : public Component {
     const CondListTy &getNegConds() const;
 
     const base_p getNegCondForBlock(block_p) const;
+
+    bool isEntryBlock() const;
 
     // InStreams
     void addInStreamIndex(streamindex_p);

@@ -167,7 +167,7 @@ void Block::dump() {
 //
 // Block
 //
-Block::Block (const std::string &Name) : Component(Name) { }
+Block::Block (const std::string &Name, bool EntryBlock) : Component(Name), EntryBlock(EntryBlock) { }
 
 bool Block::isBlock() { return true; }
 bool Block::isKernel() { return false; }
@@ -209,6 +209,10 @@ const base_p Block::getCondForBlock(block_p B) const {
 
 const Block::CondListTy& Block::getNegConds() const {
   return NegConds;
+}
+
+bool Block::isEntryBlock() const {
+  return EntryBlock;
 }
 
 const base_p Block::getNegCondForBlock(block_p B) const {

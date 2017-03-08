@@ -93,10 +93,10 @@ int Verilog::visit(Kernel &R) {
   KernelModule KM(R);
   (*FS) << KM.declHeader();
 
-  (*FS) << "// Block Wires and Port Muxer\n";
+  (*FS) << "// Block wires";
   (*FS) << KM.declBlockWires();
 
-  (*FS) << "// Block Instantiations\n";
+  (*FS) << "// Block instantiations\n";
   (*FS) << KM.instBlocks();
 
   (*FS) << KM.instStreams();

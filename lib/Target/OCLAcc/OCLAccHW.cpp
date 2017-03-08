@@ -243,8 +243,9 @@ void OCLAccHW::handleKernel(const Function &F) {
 
   // We first create blocks for each BasicBlock, so we can handle the Kernel
   // Arguments.
+  const BasicBlock *EntryBB = &(F.getEntryBlock());
   for (const BasicBlock &BB : F.getBasicBlockList()) {
-    block_p HWBB = makeBlock(&BB,BB.getName());
+    block_p HWBB = makeBlock(&BB,BB.getName(), &BB == EntryBB);
   }
 
   // Create Arguments, assign them to the Kernel and the first BasicBlock.
