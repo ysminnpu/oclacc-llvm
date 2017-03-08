@@ -68,7 +68,6 @@ int Dot::visit(Kernel &R) {
   }
   for (streamport_p P : R.getStreams()) {
     if (P->hasLoads()) {
-      outs() << P->getUniqueName() << " has Loads\n";
       F() << "n" << P->getUID() << " [shape=house,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
       RankInStream << "n" << P->getUID() << " ";
     }
