@@ -108,10 +108,10 @@ void Kernel::dump() {
   for (const streamport_p HWP : getStreams()) {
     outs() << " "<< HWP->getUniqueName() << "\n";
     for (const streamindex_p HWI : HWP->getLoads()) {
-      outs() << " ld @"<< HWI->getUniqueName() << "\n";
+      outs() << "  ld @"<< HWI->getUniqueName() << "\n";
     }
     for (const streamindex_p HWI : HWP->getStores()) {
-      outs() << " st @"<< HWI->getUniqueName() << "\n";
+      outs() << "  st @"<< HWI->getUniqueName() << "\n";
     }
   }
   outs() << "OutScalars:\n";
