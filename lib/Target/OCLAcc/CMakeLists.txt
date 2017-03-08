@@ -3,7 +3,6 @@ tablegen(LLVM OCLAccGenSubtargetInfo.inc -gen-subtarget)
 add_public_tablegen_target(OCLAccCommonTableGen)
 
 add_llvm_target(OCLAccCodeGen
-  CreateBlocksPass.cpp
   OCLAccSPIRCheckVisitor.cpp
   OCLAccTargetMachine.cpp
   OCLAccSubtarget.cpp
