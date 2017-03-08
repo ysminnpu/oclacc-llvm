@@ -72,7 +72,6 @@ int Dot::visit(Kernel &R) {
       RankInStream << "n" << P->getUID() << " ";
     }
     if (P->hasStores()) {
-      outs() << P->getUniqueName() << " has Stores\n";
       F() << "n" << P->getUID() << " [shape=invhouse,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
       RankOutStream << "n" << P->getUID() << " ";
     }
@@ -269,16 +268,14 @@ int Dot::visit(StreamPort &R) {
   VISIT_ONCE(R)
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-
-  const StreamPort::IndexListTy &IndexList = R.getIndexList();
-
   // By using invisible edges between separate Loads and Stores to the Port,
   // they are hierarchically ordered in the graph. 
 
   // No range-based loop to call std::next()
+  const StreamPort::IndexListTy &IndexList = R.getIndexList();
   for (StreamPort::IndexListConstIt I=IndexList.begin(), E=IndexList.end(); I != E; I++) {
-    if (I+1 != E) {
-      Conn() << "n" << (*I)->getUID() << " -> " << "n" << (*(std::next(I,1)))->getUID() << " [style=invis];\n";
+    if (std::next(I) != E) {
+      Conn() << "n" << (*I)->getUID() << " -> " << "n" << (*(std::next(I)))->getUID() << " [style=invis];\n";
     }
   }
 
@@ -287,13 +284,13 @@ int Dot::visit(StreamPort &R) {
 
   // Draw connection from Index to base Stream only for Stores. Loads make the
   // graph look polluted.
-  for ( base_p I : R.getStores() ) {
+  for ( streamindex_p I : R.getStores() ) {
     Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
   }
 
   // Draw connection from Index to uses
   // Stores do not have Outs().
-  for ( base_p I : R.getLoads() ) {
+  for ( streamindex_p I : R.getLoads() ) {
     for ( base_p O : I->getOuts() ) {
       Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
     }
@@ -332,8 +329,6 @@ int Dot::visit(DynamicStreamIndex &R) {
     F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
 
   super::visit(R);
-
-  Conn() << "n" << R.getUID() << " -> " << "n" << R.getStream()->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getIndex()->getBitWidth() << "];\n";
 
   return 0;
 }
