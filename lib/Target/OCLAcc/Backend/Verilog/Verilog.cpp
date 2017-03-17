@@ -14,6 +14,10 @@
 
 using namespace oclacc;
 
+const std::string conf::to_string(bool B) {
+  return B? "true" : "false";
+}
+
 DesignFiles TheFiles;
 
 void DesignFiles::write(const std::string Filename) {
@@ -101,13 +105,20 @@ int Verilog::visit(Kernel &R) {
 
   (*FS) << KM.declFooter();
 
-  //errs() << KM.instStreams();
-
   super::visit(R);
 
   FS->close();
 
   TheFiles.write(R.getName()+".do");
+
+
+
+  // Write flopoco instances
+  FileTy FInstF = openFile(R.getName()+".flo");
+
+  (*FInstF) << FInst.str();
+
+  FInstF->close();
 
   return 0;
 }
@@ -132,6 +143,7 @@ int Verilog::visit(Block &R) {
 
   (*FS) << BM.declFooter();
 
+  // Create instances for all operations
   super::visit(R);
 
   FS->close();
@@ -139,26 +151,110 @@ int Verilog::visit(Block &R) {
   return 0;
 }
 
-int Verilog::visit(ScalarPort &R) {
-  return 0;
-}
+// The following methods create arithmetic cores. The block then instantiates
+// them and takes care of the critical path.
 
 /// \brief Generate Stream as BRAM with Addressgenerator
 ///
-int Verilog::visit(StreamPort &R) {
+
+int Verilog::visit(Add &R) {
+  const std::string BW = std::to_string(R.getBitWidth());
+  
+  const std::string Arch = std::to_string(conf::IntAdder_Arch);
+  const std::string Opt = std::to_string(conf::IntAdder_OptObjective);
+  const std::string SRL = std::to_string(conf::IntAdder_SRL);
+
+  FInst << "# " << R.getUniqueName() << "\n";
+  FInst << "IntAdder" << " wIn=" << BW;
+  FInst << " arch=" << Arch;
+  FInst << " optObjective=" << Opt;
+  FInst << " SRL=" << SRL;
+  FInst << " name=IntAdder_" << BW;
+  FInst << "\n";
   return 0;
 }
 
-int Verilog::visit(Arith &R) {
+int Verilog::visit(Sub &R) {
   return 0;
 }
 
-int Verilog::visit(FPArith &R) {
+int Verilog::visit(FAdd &R) {
+  assert(R.getIns().size() == 2);
+
+  const std::string isSub = "false";
+
+  const std::string dualPath = conf::to_string(conf::FPAdd_DualPath);
+
+  const std::string WE = std::to_string(R.getExponentBitWidth());
+  const std::string WM = std::to_string(R.getMantissaBitWidth());
+
+  FInst << "# " << R.getUniqueName() << "\n";
+  FInst << "FPAdd" << " wE=" << WE << " wF=" << WM;
+  FInst << " sub=" << isSub;
+  FInst << " dualPath=" << dualPath;
+  FInst << " name=" << " FPAdd_" << WE << "_" << WM;
+  FInst << "\n";
   return 0;
 }
 
-int Verilog::visit(Mux &R) {
+int Verilog::visit(FSub &R) {
   return 0;
 }
+int Verilog::visit(Mul &R) {
+  assert(R.getIns().size() == 2);
+
+  const std::string WX = std::to_string(R.getIn(0)->getBitWidth());
+  const std::string WY = std::to_string(R.getIn(1)->getBitWidth());
+  const std::string WOut = std::to_string(R.getBitWidth());
+
+  bool isSigned = true;
+
+  FInst << "# " << R.getUniqueName() << "\n";
+  FInst << "IntMultiplier" << " wX=" << WX << " wY=" << WY << " WOut=" << WOut;
+  FInst << " signedIO=" << conf::to_string(isSigned);
+  FInst << " name=IntMultiplier_" << WX << "_" << WY << "_" << WOut;
+  FInst << "\n";
+  return 0;
+}
+int Verilog::visit(FMul &R) {
+  return 0;
+}
+int Verilog::visit(UDiv &R) {
+  return 0;
+}
+int Verilog::visit(SDiv &R) {
+  return 0;
+}
+int Verilog::visit(FDiv &R) {
+  return 0;
+}
+int Verilog::visit(URem &R) {
+  return 0;
+}
+int Verilog::visit(SRem &R) {
+  return 0;
+}
+int Verilog::visit(FRem &R) {
+  return 0;
+}
+int Verilog::visit(Shl &R) {
+  return 0;
+}
+int Verilog::visit(LShr &R) {
+  return 0;
+}
+int Verilog::visit(AShr &R) {
+  return 0;
+}
+int Verilog::visit(And &R) {
+  return 0;
+}
+int Verilog::visit(Or &R) {
+  return 0;
+}
+int Verilog::visit(Xor &R) {
+  return 0;
+}
+
 
 #undef DEBUG_TYPE

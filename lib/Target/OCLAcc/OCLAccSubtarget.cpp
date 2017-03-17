@@ -21,9 +21,16 @@ using namespace llvm;
 
 void OCLAccSubtarget::anchor() { }
 
-OCLAccSubtarget::OCLAccSubtarget(const std::string &TT, const std::string &CPU,
-                                 const std::string &FS) : 
-  OCLAccGenSubtargetInfo(TT, CPU, FS),
-  HasF1(false), HasF2(false), HasF3(false), HasF4(false), HasF5(false) {
-    ParseSubtargetFeatures(CPU, FS);
+OCLAccSubtarget::OCLAccSubtarget(
+    const std::string &TT,
+    const std::string &CPU,
+    const std::string &FS) : OCLAccGenSubtargetInfo(TT, CPU, FS) {
+
+  std::string TheCPU = CPU;
+
+  if (TheCPU.empty()) {
+    outs() << "No CPU model supplied. Defaulting to s5phq_d5!\n";
+    TheCPU="s5phq_d5";
+  }
+  ParseSubtargetFeatures(CPU, FS);
 }

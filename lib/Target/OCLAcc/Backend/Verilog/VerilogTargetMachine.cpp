@@ -25,6 +25,10 @@ bool VerilogTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
 
   PM.add(createGenerateVerilogPass());
 
+  if (getSubtargetImpl()->isStratix5()) {
+    outs() << "Stratix V\n";
+  }
+
   return false;
 }
 
