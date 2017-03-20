@@ -27,19 +27,53 @@ VerilogModule::VerilogModule(Component &C) : Comp(C) {
 BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B) {
 }
 
-const PortListTy oclacc::getInSignals(const scalarport_p P) {
+// Local Port functions
+namespace {
+
+// Components
+const PortListTy getSignals(const block_p);
+const PortListTy getSignals(const Block &);
+
+const PortListTy getSignals(const kernel_p);
+const PortListTy getSignals(const Kernel &);
+
+const std::string createPortList(const PortListTy &);
+
+// Scalars
+const PortListTy getInSignals(const scalarport_p);
+const PortListTy getOutSignals(const scalarport_p);
+
+const PortListTy getInSignals(const ScalarPort &);
+const PortListTy getOutSignals(const ScalarPort &);
+
+// Streams
+const PortListTy getSignals(const streamport_p);
+const PortListTy getSignals(const StreamPort &);
+
+const PortListTy getInSignals(const StaticStreamIndex &);
+const PortListTy getInSignals(const DynamicStreamIndex &);
+
+const PortListTy getOutSignals(const StaticStreamIndex &);
+const PortListTy getOutSignals(const DynamicStreamIndex &);
+
+// Used for delegation
+const PortListTy getInSignals(const streamindex_p);
+
+const PortListTy getOutSignals(const streamindex_p);
+
+const PortListTy getInSignals(const scalarport_p P) {
   return getInSignals(*P);
 }
-const PortListTy oclacc::getOutSignals(const scalarport_p P) {
+const PortListTy getOutSignals(const scalarport_p P) {
   return getOutSignals(*P);
 }
 
 /// \brief Return all signals for a specific port depending on its dynamic type
-const PortListTy oclacc::getSignals(const block_p P) {
+const PortListTy getSignals(const block_p P) {
   return getSignals(*P);
 }
 
-const PortListTy oclacc::getSignals(const Block &R) {
+const PortListTy getSignals(const Block &R) {
   PortListTy L;
 
   // Inputs
@@ -66,11 +100,11 @@ const PortListTy oclacc::getSignals(const Block &R) {
   return L;
 }
 
-const PortListTy oclacc::getSignals(const kernel_p P) {
+const PortListTy getSignals(const kernel_p P) {
   return getSignals(*P);
 }
 
-const PortListTy oclacc::getSignals(const Kernel &R) {
+const PortListTy getSignals(const Kernel &R) {
   PortListTy L;
 
   // Scalars
@@ -92,7 +126,7 @@ const PortListTy oclacc::getSignals(const Kernel &R) {
   return L;
 }
 
-const PortListTy oclacc::getInSignals(const streamindex_p P) {
+const PortListTy getInSignals(const streamindex_p P) {
   if (P->isStatic()) {
     const staticstreamindex_p S = std::static_pointer_cast<StaticStreamIndex>(P);
     return getInSignals(*S);
@@ -102,19 +136,7 @@ const PortListTy oclacc::getInSignals(const streamindex_p P) {
   }
 }
 
-#if 0
-const PortListTy oclacc::getOutSignals(const port_p P) {
-  if (P->isScalar()) {
-    const scalarport_p S = std::static_pointer_cast<ScalarPort>(P);    
-    return getOutSignals(*S);
-  } else {
-    const streamport_p S = std::static_pointer_cast<StreamPort>(P);    
-    return getOutSignals(*S);
-  }
-}
-#endif
-
-const PortListTy oclacc::getOutSignals(const streamindex_p P) {
+const PortListTy getOutSignals(const streamindex_p P) {
   if (P->isStatic()) {
     const staticstreamindex_p S = std::static_pointer_cast<StaticStreamIndex>(P);
     return getOutSignals(*S);
@@ -123,14 +145,13 @@ const PortListTy oclacc::getOutSignals(const streamindex_p P) {
     return getOutSignals(*S);
   }
 }
-
 
 
 // Signal names:
 // <Name>_<ID From>_<ID To> to minimize efforts to connect ports
 
 /// \brief Return a list of all ScalarPorts
-const PortListTy oclacc::getInSignals(const ScalarPort &P) {
+const PortListTy getInSignals(const ScalarPort &P) {
   PortListTy L;
 
   unsigned BitWidth = P.getBitWidth();
@@ -172,11 +193,11 @@ const PortListTy oclacc::getInSignals(const ScalarPort &P) {
   return L;
 }
 
-const PortListTy oclacc::getSignals(const streamport_p P) {
+const PortListTy getSignals(const streamport_p P) {
   return getSignals(*P);
 }
 
-const PortListTy oclacc::getSignals(const StreamPort &P) {
+const PortListTy getSignals(const StreamPort &P) {
   PortListTy L;
 
   const std::string PName = P.getUniqueName();
@@ -204,7 +225,7 @@ const PortListTy oclacc::getSignals(const StreamPort &P) {
   return L;
 }
 
-const PortListTy oclacc::getOutSignals(const ScalarPort &P) {
+const PortListTy getOutSignals(const ScalarPort &P) {
   PortListTy L;
 
   if (!P.isPipelined())
@@ -228,7 +249,7 @@ const PortListTy oclacc::getOutSignals(const ScalarPort &P) {
   return L;
 }
 
-const PortListTy oclacc::getInSignals(const StaticStreamIndex &P) {
+const PortListTy getInSignals(const StaticStreamIndex &P) {
   PortListTy L;
 
   const std::string PName = P.getUniqueName();
@@ -250,7 +271,7 @@ const PortListTy oclacc::getInSignals(const StaticStreamIndex &P) {
   return L;
 }
 
-const PortListTy oclacc::getInSignals(const DynamicStreamIndex &P) {
+const PortListTy getInSignals(const DynamicStreamIndex &P) {
   PortListTy L;
 
   const std::string IndexName = P.getUniqueName();
@@ -270,7 +291,7 @@ const PortListTy oclacc::getInSignals(const DynamicStreamIndex &P) {
   return L;
 }
 
-const PortListTy oclacc::getOutSignals(const StaticStreamIndex &P) {
+const PortListTy getOutSignals(const StaticStreamIndex &P) {
   PortListTy L;
 
   streamport_p Stream = P.getStream();
@@ -299,7 +320,7 @@ const PortListTy oclacc::getOutSignals(const StaticStreamIndex &P) {
   return L;
 }
 
-const PortListTy oclacc::getOutSignals(const DynamicStreamIndex &P) {
+const PortListTy getOutSignals(const DynamicStreamIndex &P) {
   PortListTy L;
 
   const streamport_p Stream = P.getStream();
@@ -324,7 +345,7 @@ const PortListTy oclacc::getOutSignals(const DynamicStreamIndex &P) {
   return L;
 }
 
-const std::string oclacc::createPortList(const PortListTy &Ports) {
+const std::string createPortList(const PortListTy &Ports) {
   std::stringstream S;
 
   std::string Prefix = "";
@@ -351,6 +372,8 @@ const std::string oclacc::createPortList(const PortListTy &Ports) {
   }
   return S.str();
 }
+
+} // end ns
 
 KernelModule::KernelModule(Kernel &K) : VerilogModule(K), Comp(K) {
 }
