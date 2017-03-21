@@ -1,4 +1,5 @@
 #include "Kernel.h"
+#include "Utils.h"
 
 using namespace oclacc;
 
@@ -96,9 +97,9 @@ const Component::ConstantsType &Component::getConstVals() const {
 }
 
 void Kernel::dump() {
-  outs() << "----------------------\n";
+  outs() << Line << "\n";
   outs() << "Kernel " << getUniqueName() << "\n";
-  outs() << "----------------------\n";
+  outs() << Line << "\n";
 
   outs() << "InScalars:\n";
   for (const scalarport_p HWP : getInScalars()) {
@@ -118,11 +119,11 @@ void Kernel::dump() {
   for (const scalarport_p HWP : getOutScalars()) {
     outs() << " "<< HWP->getUniqueName() << "\n";
   }
-  outs() << "----------------------\n";
+  outs() << Line << "\n";
 }
 
 void Block::dump() {
-  outs() << "----------------------\n";
+  outs() << Line << "\n";
   outs() << "Block " << getUniqueName() << "\n";
   Block * B = static_cast<Block *>(this);
 
@@ -137,7 +138,7 @@ void Block::dump() {
     outs() << " " << C.first->getUniqueName();
   }
   outs() << "\n";
-  outs() << "----------------------\n";
+  outs() << Line << "\n";
 
   outs() << "InScalars:\n";
   for (const scalarport_p HWP : getInScalars()) {
