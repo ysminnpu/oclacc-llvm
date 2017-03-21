@@ -15,4 +15,6 @@ FileTy openFile(const std::string &);
 
 void changeDir(const std::string &);
 
+const std::string Line(79,'-');
+
 #endif /* UTILS_H */

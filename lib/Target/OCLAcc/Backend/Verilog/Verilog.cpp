@@ -7,8 +7,14 @@
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
 
+#include <cstdio>
 #include <sstream>
-
+#include <cstdlib>
+#include <set>
+#include <unistd.h>
+#include <memory>
+#include <regex>
+#include <map>
 
 #define DEBUG_TYPE "verilog"
 
@@ -44,6 +50,134 @@ void DesignFiles::addFile(const std::string S) {
   Files.push_back(S);
 }
 
+// Flopoco functions
+namespace flopoco {
+
+typedef std::set<std::string> ModuleListTy;
+
+ModuleListTy ModuleList;
+std::map<const std::string, unsigned> ModuleLatency;
+
+/// \brief Return latency of module \param M reported by Flopoco
+///
+///
+unsigned getLatency(const std::string M) {
+  FileTy Log = openFile(M+"log");
+
+  return 0;
+}
+
+/// \brief Generate modules
+unsigned generateModules() {
+  char *P = std::getenv("FLOPOCO");
+  if (!P)
+    llvm_unreachable("$FLOPOCO not set");
+
+  std::string Path(P);
+ 
+  if (! sys::fs::can_execute(P))
+    llvm_unreachable("Cannot execute $FLOPOCO");
+
+  FileTy Log = openFile("flopoco.log");
+
+  for (const std::string &M : ModuleList) {
+    std::stringstream CS;
+    CS << Path << " target=" << "Stratix5";
+    CS << " frequency=200";
+    CS << " plainVHDL=no";
+    CS << " " << M;
+    CS << " 2>&1";
+
+    DEBUG(dbgs() << "[exec] " << CS.str() << "\n");
+
+    (*Log) << "[exec] " << CS.str() << "\n";
+
+    std::array<char, 128> buffer;
+    std::string Result;
+    FILE* Pipe = popen(CS.str().c_str(), "r");
+
+    if (!Pipe)
+      llvm_unreachable("popen() $FLOPOCO failed");
+
+    while (!feof(Pipe)) {
+      if (fgets(buffer.data(), 128, Pipe) != NULL)
+        Result += buffer.data();
+    }
+
+    
+    if (int R = pclose(Pipe))
+      llvm_unreachable("Returned nonzero");
+
+    (*Log) << Result;
+    (*Log) << "\n";
+    Log->flush();
+
+    // Extract Name from Command; Pattern: name=<name>
+    std::regex RgxName("(?:name=)\\S+(?= )");
+    std::smatch NameMatch;
+    if (!std::regex_search(M, NameMatch, RgxName))
+      llvm_unreachable("Getting name failed");
+
+    std::string Name = NameMatch[0];
+    Name = Name.substr(Name.find("=")+1);
+
+    // Extract FileName from Command; Pattern: outputFile=<name>
+    std::regex RgxFileName("(?:outputFile=)\\S+(?= )");
+    std::smatch FileNameMatch;
+    if (!std::regex_search(M, FileNameMatch, RgxFileName))
+      llvm_unreachable("Getting outputFile failed");
+
+    std::string FileName = FileNameMatch[0];
+    FileName = FileName.substr(FileName.find("=")+1);
+
+    // Look for pipeline depth; Pattern: Entity: <name>
+    std::regex RgxNoPipe("(?:\\n\\s+Not pipelined)(?=\\n)");
+    std::regex RgxPipe("(?:\\n\\s+Pipeline depth = )\\d+(?=\\n)");
+
+    std::smatch Match;
+
+    unsigned Latency = 0;
+
+    if (std::regex_search(Result, Match, RgxNoPipe)) {
+      // pass
+    } else if (std::regex_search(Result, Match, RgxPipe)) {
+      std::smatch NumMatch;
+      std::string Res = Match[0];
+      std::regex_search(Res, NumMatch, std::regex("\\d+"));
+
+      Latency = stoul(NumMatch[0]);
+
+    } else
+      llvm_unreachable("Invalid flopoco output");
+
+    ModuleLatency[Name] = Latency;
+
+    TheFiles.addFile(FileName);
+
+    DEBUG(dbgs() << "Latency of " << Name << ": " << Latency << " clock cycles\n");
+  }
+
+  Log->close();
+
+  return 0;
+}
+
+const std::string printModules() {
+  std::stringstream SS;
+  for (const std::string &S : ModuleList) {
+    SS << S << "\n";
+  }
+
+  return SS.str();
+}
+
+/// \brief Add module to global module list
+void addModule(const std::string M) {
+  ModuleList.insert(M);
+}
+
+} // end ns flopoco
+
 
 Verilog::Verilog() {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
@@ -78,6 +212,8 @@ int Verilog::visit(DesignUnit &R) {
 
   // no need to call super::visit, all is done here.
 
+  FS->close();
+
   return 0;
 }
 
@@ -111,14 +247,13 @@ int Verilog::visit(Kernel &R) {
 
   TheFiles.write(R.getName()+".do");
 
+  // Dump and Generate Flopoco instances
+  DEBUG(dbgs() << Line << "\n");
+  DEBUG(dbgs() << "[flopoco_instances]\n");
+  DEBUG(dbgs() << flopoco::printModules());
+  DEBUG(dbgs() << Line << "\n");
 
-
-  // Write flopoco instances
-  FileTy FInstF = openFile(R.getName()+".flo");
-
-  (*FInstF) << FInst.str();
-
-  FInstF->close();
+  flopoco::generateModules();
 
   return 0;
 }
@@ -164,13 +299,19 @@ int Verilog::visit(Add &R) {
   const std::string Opt = std::to_string(conf::IntAdder_OptObjective);
   const std::string SRL = std::to_string(conf::IntAdder_SRL);
 
-  FInst << "# " << R.getUniqueName() << "\n";
-  FInst << "IntAdder" << " wIn=" << BW;
-  FInst << " arch=" << Arch;
-  FInst << " optObjective=" << Opt;
-  FInst << " SRL=" << SRL;
-  FInst << " name=IntAdder_" << BW;
-  FInst << "\n";
+  const std::string Name = "IntAdder_" + BW;
+
+  std::stringstream FInst;
+
+  FInst << "IntAdder" << " wIn=" << BW << " ";
+  FInst << "arch=" << Arch << " ";
+  FInst << "optObjective=" << Opt << " ";
+  FInst << "SRL=" << SRL << " ";
+  FInst << "name=" << Name << " ";
+  FInst << "outputFile=" << Name << ".vhd" << " ";
+
+  flopoco::addModule(FInst.str());
+
   return 0;
 }
 
@@ -188,12 +329,18 @@ int Verilog::visit(FAdd &R) {
   const std::string WE = std::to_string(R.getExponentBitWidth());
   const std::string WM = std::to_string(R.getMantissaBitWidth());
 
-  FInst << "# " << R.getUniqueName() << "\n";
-  FInst << "FPAdd" << " wE=" << WE << " wF=" << WM;
-  FInst << " sub=" << isSub;
-  FInst << " dualPath=" << dualPath;
-  FInst << " name=" << " FPAdd_" << WE << "_" << WM;
-  FInst << "\n";
+  const std::string Name = "FPAdd_" + WE + "_" + WM;
+
+  std::stringstream FInst;
+
+  FInst << "FPAdd" << " wE=" << WE << " wF=" << WM << " ";
+  FInst << "sub=" << isSub << " ";
+  FInst << "dualPath=" << dualPath << " ";
+  FInst << "name=" << Name << " ";
+  FInst << "outputFile=" << Name << ".vhd" << " ";
+
+  flopoco::addModule(FInst.str());
+
   return 0;
 }
 
@@ -209,11 +356,17 @@ int Verilog::visit(Mul &R) {
 
   bool isSigned = true;
 
-  FInst << "# " << R.getUniqueName() << "\n";
-  FInst << "IntMultiplier" << " wX=" << WX << " wY=" << WY << " WOut=" << WOut;
-  FInst << " signedIO=" << conf::to_string(isSigned);
-  FInst << " name=IntMultiplier_" << WX << "_" << WY << "_" << WOut;
-  FInst << "\n";
+  const std::string Name = "IntMultiplier_" + WX + "_" + WY + "_" + WOut;
+
+  std::stringstream FInst;
+
+  FInst << "IntMultiplier" << " wX=" << WX << " wY=" << WY << " WOut=" << WOut << " ";
+  FInst << "signedIO=" << conf::to_string(isSigned) << " ";
+  FInst << "name=" << Name << " ";
+  FInst << "outputFile=" << Name << ".vhd" << " ";
+
+  flopoco::addModule(FInst.str());
+
   return 0;
 }
 int Verilog::visit(FMul &R) {

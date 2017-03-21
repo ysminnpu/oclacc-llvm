@@ -22,7 +22,6 @@ class FPArith;
 class Mux;
 
 // Quick and dirty set various options for flopoco instances
-
 namespace conf {
 const bool FPAdd_DualPath = true;
 
@@ -32,6 +31,8 @@ const bool IntAdder_SRL = true;
 
 const std::string to_string(bool B);
 } // end ns conf
+
+// Anonymous Namespace for
 
 struct OpInstance {
   unsigned cycles;
@@ -66,10 +67,6 @@ class Verilog : public DFVisitor {
     OpMapTy Ops;
     // Map HW objects to OpInStances
     OpMapTy HWMap;
-
-    // Flopoco Instances
-    std::stringstream FInst;
-
 
   public:
     Verilog();
