@@ -162,7 +162,7 @@ void Block::dump() {
     outs() << " "<< S->getUniqueName() << "@" << HWP->getUniqueName() << "\n";
   }
 
-  outs() << "----------------------\n";
+  outs() << Line << "\n";
 }
 
 //
