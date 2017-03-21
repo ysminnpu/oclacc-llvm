@@ -37,7 +37,12 @@ void DesignFiles::write(const std::string Filename) {
   DoS << "vlib work\n";
 
   for (const std::string &S : Files) {
-    DoS << "vlog " << S << "\n";
+    if (ends_with(S, ".vhd")) {
+      DoS << "vcom " << S << "\n";
+    } else if (ends_with(S, ".v")) {
+      DoS << "vlog " << S << "\n";
+    } else
+      llvm_unreachable("Invalid filetype");
   }
 
   (*DoFile) << DoS.str();
@@ -214,6 +219,8 @@ int Verilog::visit(DesignUnit &R) {
 
   FS->close();
 
+  TheFiles.write(R.getName()+".do");
+
   return 0;
 }
 
@@ -245,7 +252,6 @@ int Verilog::visit(Kernel &R) {
 
   FS->close();
 
-  TheFiles.write(R.getName()+".do");
 
   // Dump and Generate Flopoco instances
   DEBUG(dbgs() << Line << "\n");
