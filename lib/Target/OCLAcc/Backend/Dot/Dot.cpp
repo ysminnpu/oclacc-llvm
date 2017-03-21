@@ -168,7 +168,7 @@ int Dot::visit(FPArith &R) {
 
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-  F() << "n" << R.getUID() << " [shape=pentagon,fillcolor=" << C_FPARITH << ",style=filled,label=\"" << R.getUniqueName() << "\"];" << "\n";
+  F() << "n" << R.getUID() << " [shape=pentagon,fillcolor=" << C_FPARITH << ",style=filled,label=\"" << R.getUniqueName() << "\n" << R.getOp() << "\"];" << "\n";
 
   super::visit(R);
 
