@@ -6,19 +6,23 @@
 
 namespace oclacc {
 
-ConstVal::ConstVal(const std::string &Name, uint64_t V, size_t W) : HW(Name, W), T(Unsigned), V(V) {
+ConstVal::ConstVal(const std::string &Name, const std::string Bits, size_t W) : HW(Name, W), T(Unsigned), Bits(Bits) {
 }
-ConstVal::ConstVal(const std::string &Name, Datatype T, uint64_t V, size_t W) : HW(Name, W), T(T), V(V) {
+ConstVal::ConstVal(const std::string &Name, Datatype T, const std::string Bits, size_t W) : HW(Name, W), T(T), Bits(Bits) {
 }
 
 const std::string ConstVal::dump(const std::string &Indent) const {
   std::stringstream ss;
-  ss << Indent << getName() << Strings_Datatype[T] << V;
+  ss << Indent << getName() << Strings_Datatype[T] << Bits;
   return ss.str();
 }
 
 const std::string ConstVal::getUniqueName() const {
   return getName();
+}
+
+const std::string &ConstVal::getBits() const {
+  return Bits;
 }
 
 #undef TYPENAME

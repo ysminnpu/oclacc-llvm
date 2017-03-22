@@ -38,8 +38,9 @@ class Port : public HW {
 /// Values defined in BBs. Normal Arguments may not change between WorkItems, so
 /// there is no need to propagate them between BBs.
 ///
-class ScalarPort : public Port { public: ScalarPort(const std::string &Name,
-    size_t W, const Datatype &T, bool Pipelined);
+class ScalarPort : public Port {
+  public:
+    ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined);
 
     bool isScalar() const;
 
@@ -87,7 +88,6 @@ class StreamPort : public Port {
     AccessListTy AccessList;
 
   public:
-
     StreamPort(const std::string &Name, size_t W, ocl::AddressSpace, const Datatype &T);
 
     DECLARE_VISIT;

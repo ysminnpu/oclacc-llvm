@@ -13,17 +13,8 @@ namespace oclacc {
 /// \brief Base class for all arithmetic operations
 class Arith : public HW
 {
-
   public:
     Arith(const std::string &Name, unsigned BitWidth) : HW(Name, BitWidth) { }
-
-    virtual unsigned getMaxBitWidth() const {
-      unsigned max = 0;
-      for (auto &I : Ins) {
-        max = std::max(max, I->getBitWidth() );
-      }
-      return max;
-    }
 
     virtual const std::string getOp() {
       return "Arith";
@@ -33,25 +24,17 @@ class Arith : public HW
 
 };
 
-class FPArith : public Arith {
-  private:
-    unsigned MantissaBitWidth;
-    unsigned ExponentBitWidth;
-
+class FPArith : public FPHW {
   public:
-
     FPArith (const std::string &Name, unsigned MantissaBitWidth, unsigned ExponentBitWidth) 
-      : Arith(Name, MantissaBitWidth + ExponentBitWidth), 
-        MantissaBitWidth(MantissaBitWidth),
-        ExponentBitWidth(ExponentBitWidth) {
+      : FPHW(Name, MantissaBitWidth, ExponentBitWidth) {
     }
 
-    unsigned getMantissaBitWidth() const {
-      return MantissaBitWidth;
+    virtual const std::string getOp() {
+      return "FPArith";
     }
-    unsigned getExponentBitWidth() const {
-      return ExponentBitWidth;
-    }
+
+    DECLARE_VISIT;
 };
 
 class Logic : public HW

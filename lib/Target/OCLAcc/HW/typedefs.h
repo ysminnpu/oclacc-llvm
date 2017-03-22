@@ -11,6 +11,9 @@ class HW;
 typedef std::shared_ptr<HW> base_p;
 typedef std::vector<base_p> HWList;
 
+class FPHW;
+typedef std::shared_ptr<FPHW> basefp_p;
+
 class Port;
 typedef std::shared_ptr<Port> port_p;
 
@@ -28,6 +31,12 @@ typedef std::shared_ptr<Block> block_p;
 
 class Component;
 typedef std::shared_ptr<Component> component_p;
+
+class Arith;
+typedef std::shared_ptr<Arith> arith_p;
+
+class FPArith;
+typedef std::shared_ptr<FPArith> fparith_p;
 
 class Add;
 typedef std::shared_ptr<Add> add_p;

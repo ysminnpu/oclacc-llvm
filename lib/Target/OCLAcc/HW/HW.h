@@ -71,6 +71,28 @@ class HW : public Identifiable, public Visitable
     virtual const std::string dump(const std::string &Indent="") const;
 };
 
+class FPHW : public HW {
+  private:
+    unsigned MantissaBitWidth;
+    unsigned ExponentBitWidth;
+
+  public:
+    FPHW (const std::string &Name, unsigned MantissaBitWidth, unsigned ExponentBitWidth) 
+      : HW(Name, MantissaBitWidth + ExponentBitWidth), 
+        MantissaBitWidth(MantissaBitWidth),
+        ExponentBitWidth(ExponentBitWidth) {
+    }
+    
+    NO_COPY_ASSIGN(FPHW);
+
+    unsigned getMantissaBitWidth() const {
+      return MantissaBitWidth;
+    }
+    unsigned getExponentBitWidth() const {
+      return ExponentBitWidth;
+    }
+};
+
 enum Datatype {
   Half,
   Float,

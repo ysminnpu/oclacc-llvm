@@ -939,35 +939,38 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
   BitWidthAnalysis &BWA = getAnalysis<BitWidthAnalysis>(const_cast<Function &>(*F));
   Loopus::BitWidthRetTy BW = BWA.getBitWidth(C, I);
 
-  std::stringstream CName;
+  std::string CName;
   const_p HWConst;
 
   const Type *CType = C->getType();
 
-  int Bits = BW.first;
+  int BitWidth = BW.first;
 
   if (const ConstantInt *IConst = dyn_cast<ConstantInt>(C)) {
+  
+    const APInt Int = IConst->getValue();
+
     switch (BW.second) {
       case Loopus::SExt:
         {
-          int64_t S = IConst->getSExtValue();
-          CName << S;
-          HWConst = std::make_shared<ConstVal>(CName.str(), S, Bits);
+          const std::string S = Int.toString(2, true);
+          CName = std::to_string(Int.getSExtValue());
+          HWConst = std::make_shared<ConstVal>(CName, S, BitWidth);
           break;
         }
       case Loopus::ZExt:
         {
-          uint64_t U = IConst->getZExtValue();
-          CName << U;
-          HWConst = std::make_shared<ConstVal>(CName.str(), U, Bits);
+          const std::string U = Int.toString(2, false);
+          CName = std::to_string(Int.getZExtValue());
+          HWConst = std::make_shared<ConstVal>(CName, U, BitWidth);
           break;
         }
       case Loopus::OneExt:
         {
           TODO("makeConstant OneExt");
-          int64_t S = IConst->getSExtValue();
-          CName << S;
-          HWConst = std::make_shared<ConstVal>(CName.str(), S, Bits);
+          const std::string S = Int.toString(2, true);
+          CName = std::to_string(Int.getSExtValue());
+          HWConst = std::make_shared<ConstVal>(CName, S, BitWidth);
           break;
         }
       default:
@@ -976,9 +979,9 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
         // The following code did not generate valid Bits:
         // %tmp12 = icmp sgt i32 %get_global_id_1, 0
         {
-          int64_t S = IConst->getSExtValue();
-          CName << S;
-          HWConst = std::make_shared<ConstVal>(CName.str(), S, Bits);
+          const std::string S = Int.toString(2, true);
+          CName = std::to_string(Int.getSExtValue());
+          HWConst = std::make_shared<ConstVal>(CName, S, BitWidth);
           break;
         }
     }
@@ -991,18 +994,20 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
     if (CType->isHalfTy()) 
       llvm_unreachable("Half floating point type not supported");
     else if (CType->isFloatTy()) {
-      float F = Float.convertToFloat();
-      CName << F;
       const APInt Bits = Float.bitcastToAPInt();
-      uint64_t V = *(Bits.getRawData());
-      HWConst = std::make_shared<ConstVal>(CName.str(), V, Bits.getBitWidth());
+
+      CName = std::to_string(Float.convertToFloat());
+      const std::string V = Bits.toString(2, false);
+
+      HWConst = std::make_shared<ConstVal>(CName, V, Bits.getBitWidth());
 
     } else if (CType->isDoubleTy()) {
-      double F = Float.convertToDouble();
-      CName << F;
       const APInt Bits = Float.bitcastToAPInt();
-      uint64_t V = *(Bits.getRawData());
-      HWConst = std::make_shared<ConstVal>(CName.str(), V, Bits.getBitWidth());
+
+      CName = std::to_string(Float.convertToDouble());
+      const std::string V = Bits.toString(2, false);
+
+      HWConst = std::make_shared<ConstVal>(CName, V, Bits.getBitWidth());
     } else
       llvm_unreachable("Unknown floating point type");
   } else 
@@ -1085,7 +1090,7 @@ void OCLAccHW::visitPHINode(PHINode &I) {
 
     if (!Cond && !NegCond) {
       // Unconditional branch from FromBB to BB
-      const_p HWConst = std::make_shared<ConstVal>("1", 1, 1);
+      const_p HWConst = std::make_shared<ConstVal>("1", "1", 1);
       HWBB->addConstVal(HWConst);
       HWM->addIn(HWP, HWConst);
       connect(HWConst, HWM);
