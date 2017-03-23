@@ -12,8 +12,8 @@ class ConstVal : public HW
     const Datatype T;
     std::string Bits;
 
-    ConstVal(const std::string &Name, const std::string Bits, size_t W);
-    ConstVal(const std::string &Name, Datatype T, const std::string Bits, size_t W);
+    ConstVal(const std::string Name, const std::string Bits, size_t W);
+    ConstVal(const std::string Name, Datatype T, const std::string Bits, size_t W);
 
     const std::string dump(const std::string &Indent) const;
 

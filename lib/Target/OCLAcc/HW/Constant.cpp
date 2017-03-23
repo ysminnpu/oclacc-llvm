@@ -6,9 +6,21 @@
 
 namespace oclacc {
 
-ConstVal::ConstVal(const std::string &Name, const std::string Bits, size_t W) : HW(Name, W), T(Unsigned), Bits(Bits) {
+ConstVal::ConstVal(const std::string Name, const std::string Bits, size_t W) : ConstVal(Name, Unsigned, Bits, W) {
+
 }
-ConstVal::ConstVal(const std::string &Name, Datatype T, const std::string Bits, size_t W) : HW(Name, W), T(T), Bits(Bits) {
+
+ConstVal::ConstVal(const std::string Name, Datatype T, const std::string Bits, size_t W) : HW(Name, W), T(T), Bits(Bits) {
+  std::string NewName = Name;
+  // skip Name[0] to keep constant zero
+  size_t i;
+  for (i = Name.length()-1; i > 0; i--) {
+    if (Name[i] != '0') break;
+  }
+  i++;
+  NewName.erase(i);
+
+  HW::Name = NewName;
 }
 
 const std::string ConstVal::dump(const std::string &Indent) const {
