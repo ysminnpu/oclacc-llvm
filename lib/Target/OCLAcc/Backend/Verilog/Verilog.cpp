@@ -26,6 +26,8 @@ const std::string conf::to_string(bool B) {
 
 DesignFiles TheFiles;
 
+OperatorInstances TheOps;
+
 void DesignFiles::write(const std::string Filename) {
   DEBUG(dbgs() << "Writing " + Filename + "...");
 
@@ -55,13 +57,60 @@ void DesignFiles::addFile(const std::string S) {
   Files.push_back(S);
 }
 
+bool OperatorInstances::existsOperator(const std::string OpName) {
+  return (Ops.find(OpName) != Ops.end());
+}
+
+void OperatorInstances::addOperator(const std::string HWName, const std::string OpName, unsigned Cycles) {
+  op_p O;
+
+  if (existsOperator(OpName)) {
+    O = getOperator(OpName);
+  } else {
+    O = std::make_shared<Operator>(OpName, Cycles);
+    NameMap[OpName] = O;
+    Ops.insert(OpName);
+  }
+
+  HWOp[HWName] = O;
+
+}
+
+op_p OperatorInstances::getOperator(const std::string OpName) {
+  if (!existsOperator(OpName))
+    llvm_unreachable("No Op");
+
+  OpMapConstItTy OI = NameMap.find(OpName);
+  if (OI == NameMap.end())
+    llvm_unreachable("No Namemapping");
+
+  return OI->second;
+}
+
+bool OperatorInstances::existsOperatorForHW(const std::string HWName) {
+  return HWOp.find(HWName) != HWOp.end();
+}
+
+op_p OperatorInstances::getOperatorForHW(const std::string HWName) {
+  assert(existsOperatorForHW(HWName));
+
+  OpMapConstItTy OI = HWOp.find(HWName);
+
+  return OI->second;
+}
+
+
 // Flopoco functions
 namespace flopoco {
 
-typedef std::set<std::string> ModuleListTy;
+typedef std::map<std::string, std::string> ModMapTy;
+typedef ModMapTy::const_iterator ModMapConstItTy;
+typedef std::pair<std::string, std::string> ModMapElem;
 
-ModuleListTy ModuleList;
-std::map<const std::string, unsigned> ModuleLatency;
+// Map Name to ModuleInstantiation
+ModMapTy ModuleMap;
+// Map HW.getUniqueName to Modulename
+ModMapTy NameHWMap;
 
 /// \brief Return latency of module \param M reported by Flopoco
 ///
@@ -85,12 +134,23 @@ unsigned generateModules() {
 
   FileTy Log = openFile("flopoco.log");
 
-  for (const std::string &M : ModuleList) {
+  for (const ModMapElem &M : ModuleMap) {
+
+    // Look up HWName to create Operator
+    const std::string Name = M.first;
+
+    ModMapConstItTy NM = NameHWMap.find(Name);
+    if (NM == NameHWMap.end())
+      llvm_unreachable("No HW Name mapping");
+
+    const std::string HWName = NM->second;
+    
+
     std::stringstream CS;
     CS << Path << " target=" << "Stratix5";
     CS << " frequency=200";
     CS << " plainVHDL=no";
-    CS << " " << M;
+    CS << " " << M.second;
     CS << " 2>&1";
 
     DEBUG(dbgs() << "[exec] " << CS.str() << "\n");
@@ -117,19 +177,11 @@ unsigned generateModules() {
     (*Log) << "\n";
     Log->flush();
 
-    // Extract Name from Command; Pattern: name=<name>
-    std::regex RgxName("(?:name=)\\S+(?= )");
-    std::smatch NameMatch;
-    if (!std::regex_search(M, NameMatch, RgxName))
-      llvm_unreachable("Getting name failed");
-
-    std::string Name = NameMatch[0];
-    Name = Name.substr(Name.find("=")+1);
 
     // Extract FileName from Command; Pattern: outputFile=<name>
     std::regex RgxFileName("(?:outputFile=)\\S+(?= )");
     std::smatch FileNameMatch;
-    if (!std::regex_search(M, FileNameMatch, RgxFileName))
+    if (!std::regex_search(M.second, FileNameMatch, RgxFileName))
       llvm_unreachable("Getting outputFile failed");
 
     std::string FileName = FileNameMatch[0];
@@ -155,7 +207,7 @@ unsigned generateModules() {
     } else
       llvm_unreachable("Invalid flopoco output");
 
-    ModuleLatency[Name] = Latency;
+    TheOps.addOperator(HWName, Name, Latency);
 
     TheFiles.addFile(FileName);
 
@@ -169,16 +221,17 @@ unsigned generateModules() {
 
 const std::string printModules() {
   std::stringstream SS;
-  for (const std::string &S : ModuleList) {
-    SS << S << "\n";
+  for (const ModMapElem &S : ModuleMap) {
+    SS << S.first << ":" << S.second << "\n";
   }
 
   return SS.str();
 }
 
 /// \brief Add module to global module list
-void addModule(const std::string M) {
-  ModuleList.insert(M);
+void addModule(const std::string HWName, const std::string Name, const std::string M) {
+  ModuleMap[Name] = M;
+  NameHWMap[Name] = HWName;
 }
 
 } // end ns flopoco
@@ -282,10 +335,24 @@ int Verilog::visit(Block &R) {
   if (R.isConditional())
     (*FS) << BM.declEnable();
 
-  (*FS) << BM.declFooter();
+
+  // Clean up Components
+  BlockComponents.str("// Component instances\n");
+  BlockSignals.str("// Component signals\n");
 
   // Create instances for all operations
   super::visit(R);
+
+  // Write signals
+  (*FS) << BlockSignals.str();
+
+  // Write component instantiations
+  (*FS) << BlockComponents.str();
+
+  // Schedule the created Operators
+  runAsapScheduler(R);
+
+  (*FS) << BM.declFooter();
 
   FS->close();
 
@@ -316,7 +383,7 @@ int Verilog::visit(Add &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(FInst.str());
+  flopoco::addModule(R.getUniqueName(), Name, FInst.str());
 
   return 0;
 }
@@ -333,19 +400,19 @@ int Verilog::visit(FAdd &R) {
   const std::string dualPath = conf::to_string(conf::FPAdd_DualPath);
 
   const std::string WE = std::to_string(R.getExponentBitWidth());
-  const std::string WM = std::to_string(R.getMantissaBitWidth());
+  const std::string WF = std::to_string(R.getMantissaBitWidth());
 
-  const std::string Name = "FPAdd_" + WE + "_" + WM;
+  const std::string Name = "FPAdd_" + WE + "_" + WF;
 
   std::stringstream FInst;
 
-  FInst << "FPAdd" << " wE=" << WE << " wF=" << WM << " ";
+  FInst << "FPAdd" << " wE=" << WE << " wF=" << WF << " ";
   FInst << "sub=" << isSub << " ";
   FInst << "dualPath=" << dualPath << " ";
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(FInst.str());
+  flopoco::addModule(R.getUniqueName(), Name, FInst.str());
 
   return 0;
 }
@@ -353,6 +420,7 @@ int Verilog::visit(FAdd &R) {
 int Verilog::visit(FSub &R) {
   return 0;
 }
+
 int Verilog::visit(Mul &R) {
   assert(R.getIns().size() == 2);
 
@@ -371,11 +439,98 @@ int Verilog::visit(Mul &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(FInst.str());
+  flopoco::addModule(R.getUniqueName(), Name, FInst.str());
+
+
 
   return 0;
 }
 int Verilog::visit(FMul &R) {
+  VISIT_ONCE(R);
+
+  assert(R.getIns().size() == 2);
+
+  const std::string RName = R.getUniqueName();
+
+  // Operands constant?
+  const_p In0 = std::dynamic_pointer_cast<ConstVal>(R.getIn(0));
+  const_p In1 = std::dynamic_pointer_cast<ConstVal>(R.getIn(1));
+
+  if (In0 || In1) {
+    assert(!(In0 && In1));
+    const_p ConstOp = In0 ? In0 : In1;
+
+    basefp_p VarOp = std::dynamic_pointer_cast<FPHW>(In0 ? R.getIn(1) : R.getIn(0));
+
+    // TODO will fail when ine input is of type Port and the other is constVal
+    assert(VarOp);
+
+    const std::string WEin = std::to_string(VarOp->getExponentBitWidth());
+    const std::string WFin = std::to_string(VarOp->getMantissaBitWidth());
+
+    const std::string WEout = std::to_string(R.getExponentBitWidth());
+    const std::string WFout = std::to_string(R.getMantissaBitWidth());
+
+    // Use the name as it will be converted.
+    const std::string constant = ConstOp->getName();
+
+    std::string ConstOpName = ConstOp->getName();
+    std::replace(ConstOpName.begin(), ConstOpName.end(), '.', '_');
+
+    const std::string Name = "FPConstMult_" + WEout + "_" + WFout + "_" + ConstOpName;
+    
+    std::stringstream FInst;
+
+    FInst << "FPConstMult" << " wE_in=" << WEin << " wF_in=" << WFin << " ";
+    FInst << "wE_out=" << WEout << " wF_out=" << WFout << " ";
+    FInst << "constant=\"" << constant << "\" ";
+    FInst << "cst_width=0 ";
+    FInst << "name=" << Name << " ";
+    FInst << "outputFile=" << Name << ".vhd" << " ";
+
+    flopoco::addModule(RName, Name, FInst.str());
+
+    // Add output signal
+    Signal S(R.getUniqueName(), R.getBitWidth(), Local, Wire);
+    BlockSignals << S.getDefStr() << ";\n";
+
+    // Instantiate component
+    BlockComponents << "// " << RName << "\n";
+    BlockComponents << Name << " " << Name << "_" << RName << "(\n";
+    BlockComponents << I(1) << ".clk(clk)," << "\n";
+    BlockComponents << I(1) << ".rst(rst)," << "\n";
+    BlockComponents << I(1) << ".X(" << VarOp->getUniqueName() << ")," << "\n";
+    BlockComponents << I(1) << ".R(" << R.getUniqueName()<< ")" << "\n";
+    BlockComponents << ");\n";
+
+  } else {
+    const std::string WE = std::to_string(R.getExponentBitWidth());
+    const std::string WF = std::to_string(R.getMantissaBitWidth());
+
+    const std::string WFout = WF;
+
+    const std::string Name = "FPMult_" + WE + "_" + WF;
+
+    std::stringstream FInst;
+
+    FInst << "FPMult" << " wE=" << WE << " wF=" << WF << " ";
+    FInst << "wFout=" << WFout << " ";
+    FInst << "name=" << Name << " ";
+    FInst << "outputFile=" << Name << ".vhd" << " ";
+
+    flopoco::addModule(RName, Name, FInst.str());
+
+    // Instantiate component
+    BlockComponents << "// " << RName << "\n";
+    BlockComponents << Name << " " << Name << "_" << RName << "(\n";
+    BlockComponents << I(1) << ".clk(clk)," << "\n";
+    BlockComponents << I(1) << ".rst(rst)," << "\n";
+    BlockComponents << I(1) << ".X(" << R.getIn(0)->getUniqueName() << ")," << "\n";
+    BlockComponents << I(1) << ".Y(" << R.getIn(1)->getUniqueName() << ")," <<"\n";
+    BlockComponents << I(1) << ".R(" << R.getUniqueName()<< ")" << "\n";
+    BlockComponents << ");\n";
+  }
+
   return 0;
 }
 int Verilog::visit(UDiv &R) {
@@ -413,6 +568,9 @@ int Verilog::visit(Or &R) {
 }
 int Verilog::visit(Xor &R) {
   return 0;
+}
+
+void Verilog::runAsapScheduler(const Block &R) {
 }
 
 

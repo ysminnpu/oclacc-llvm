@@ -6,42 +6,16 @@
 
 #include "../../HW/typedefs.h"
 #include "../../Utils.h"
+#include "Signal.h"
 
 #define I(C) std::string((C*2),' ')
 
 namespace oclacc {
 
-enum SignalDirection {
-  In,
-  Out
-};
-const std::string SignalDirection_S[] = {"input", "output"};
-
-enum SignalType {
-  Wire,
-  Reg
-};
-const std::string SignalType_S[] = {"wire", "reg"};
-
-struct Signal {
-  std::string Name;
-  unsigned BitWidth;
-  SignalDirection Direction;
-  SignalType Type;
-
-  Signal(std::string, unsigned, SignalDirection, SignalType);
-
-  const std::string getDirectionStr(void) const;
-  const std::string getTypeStr(void) const;
-};
-
-typedef std::vector<Signal> PortListTy;
-
-
 /// \brief Base class to implement Components
 class VerilogModule {
   public:
-    // cannot store const strings
+
   public:
     VerilogModule(Component &);
 

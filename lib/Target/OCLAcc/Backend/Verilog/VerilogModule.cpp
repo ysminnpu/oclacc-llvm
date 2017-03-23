@@ -1,5 +1,4 @@
 #include <memory>
-#include <iomanip>
 #include <sstream>
 
 #include "../../HW/Kernel.h"
@@ -12,15 +11,6 @@ using namespace oclacc;
 
 extern DesignFiles TheFiles;
 
-Signal::Signal(std::string Name, unsigned BitWidth, SignalDirection Direction, SignalType Type) : Name(Name), BitWidth(BitWidth), Direction(Direction), Type(Type) {
-}
-const std::string Signal::getDirectionStr(void) const {
-  return SignalDirection_S[Direction];
-}
-const std::string Signal::getTypeStr(void) const {
-  return SignalType_S[Type];
-}
-
 VerilogModule::VerilogModule(Component &C) : Comp(C) {
 }
 
@@ -29,6 +19,9 @@ BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B) {
 
 // Local Port functions
 namespace {
+
+Signal Clk("clk", 1, In, Wire);
+Signal Rst("rst", 1, In, Wire);
 
 // Components
 const PortListTy getSignals(const block_p);
@@ -75,6 +68,8 @@ const PortListTy getSignals(const block_p P) {
 
 const PortListTy getSignals(const Block &R) {
   PortListTy L;
+  L.push_back(Clk);
+  L.push_back(Rst);
 
   // Inputs
   for (const scalarport_p P : R.getInScalars()) {
@@ -107,6 +102,9 @@ const PortListTy getSignals(const kernel_p P) {
 const PortListTy getSignals(const Kernel &R) {
   PortListTy L;
 
+  L.push_back(Clk);
+  L.push_back(Rst);
+  
   // Scalars
   for (const scalarport_p P : R.getInScalars()) {
     const PortListTy SISC = getInSignals(P);
@@ -349,24 +347,9 @@ const std::string createPortList(const PortListTy &Ports) {
   std::stringstream S;
 
   std::string Prefix = "";
-  unsigned Lastwidth = 15;
 
   for (const Signal &P : Ports) {
-    S << Prefix << I(1) << std::setw(6) << std::left << P.getDirectionStr() << " " << std::setw(4) << P.getTypeStr() << " ";
-
-    unsigned B = P.BitWidth;
-
-    // Print width columnwise
-    if (B!=1) {
-      std::stringstream BWS;
-      BWS << "[" << B-1 << ":0]";
-
-      S << std::setw(6) << BWS.str();
-    } else
-      S << std::string(6, ' ');
-
-
-    S << " " << P.Name;
+    S << Prefix << I(1) << P.getDefStr();
 
     Prefix = ",\n";
   }
