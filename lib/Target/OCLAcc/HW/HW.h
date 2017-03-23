@@ -78,7 +78,7 @@ class FPHW : public HW {
 
   public:
     FPHW (const std::string &Name, unsigned MantissaBitWidth, unsigned ExponentBitWidth) 
-      : HW(Name, MantissaBitWidth + ExponentBitWidth), 
+      : HW(Name, MantissaBitWidth + ExponentBitWidth + 1), 
         MantissaBitWidth(MantissaBitWidth),
         ExponentBitWidth(ExponentBitWidth) {
     }
