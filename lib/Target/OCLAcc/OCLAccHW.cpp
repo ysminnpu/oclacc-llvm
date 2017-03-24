@@ -107,8 +107,8 @@ INITIALIZE_PASS_END(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
 char OCLAccHW::ID = 0;
 
 namespace llvm {
-  ModulePass *createOCLAccHWPass() { 
-    return new OCLAccHW(); 
+  ModulePass *createOCLAccHWPass() {
+    return new OCLAccHW();
   }
 }
 
@@ -200,7 +200,7 @@ bool OCLAccHW::runOnModule(Module &M) {
   for (Function *KF: Kernels) {
     // We do currently not support loops.
     SmallVector<std::pair<const BasicBlock*,const BasicBlock*>, 32 > Result;
-	  FindFunctionBackedges(*KF, Result);
+    FindFunctionBackedges(*KF, Result);
     if (! Result.empty()) {
       TODO("Handle Loops");
       llvm_unreachable("Stop.");
@@ -292,13 +292,13 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       const Value *V = U.get();
 
       // Do we already have a Mapping Value->HW valid in this BB?
-      if (existsHW(&BB, V)) 
+      if (existsHW(&BB, V))
         continue;
 
       // Constants are created when they are used, BasicBlocks are PHINode
       // Operands and can be skipped.
       //
-      if (isa<Constant>(V) || isa<BasicBlock>(V)) 
+      if (isa<Constant>(V) || isa<BasicBlock>(V))
         continue;
 
       // We handle Arguments and Instructions separately. Instructions can be
@@ -310,8 +310,8 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
         if (II->getParent() == &BB)
           continue;
 
-        
-        VS.push_back(II); 
+
+        VS.push_back(II);
       } else if (const Argument *A = dyn_cast<Argument>(V)) {
         // Only WI functions have to be passed from block to block. Other Arguments
         // are static and can be used directly. There must exist a ScalarPort for
@@ -393,12 +393,12 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     DEBUG(FindPaths::dump(Paths, dbgs()));
 #endif
 
-    if (IT->isIntegerTy() || IT->isFloatingPointTy()) { 
+    if (IT->isIntegerTy() || IT->isFloatingPointTy()) {
       for (const FindAllPaths::SinglePathTy P : Paths) {
 
-        for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt), E = P.end(); 
-            ToBBIt != E; 
-            FromBBIt = ToBBIt, ++ToBBIt ) 
+        for (FindAllPaths::SinglePathConstIt FromBBIt = P.begin(), ToBBIt = std::next(FromBBIt), E = P.end();
+            ToBBIt != E;
+            FromBBIt = ToBBIt, ++ToBBIt )
         {
           block_p HWFrom = getBlock(*FromBBIt);
           block_p HWTo = getBlock(*ToBBIt);
@@ -406,9 +406,9 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           scalarport_p HWOut;
           scalarport_p HWIn;
 
-          // The Ports are created with isPipelined==true to indicate, that is
+          // The Ports are created with isPipelined==true to indicate that it
           // will be passed from BB to BB and that we have to create additional
-          // signals for synchronization (_valid, _ack).
+          // signals for synchronization.
           //
           if (!HWFrom->containsOutScalarForValue(I)) {
             HWOut = makeHWBB<ScalarPort>(*FromBBIt, I, I->getName(), IT->getScalarSizeInBits(), getDatatype(IT), true);
@@ -433,7 +433,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           HWI = HWIn;
         }
       }
-    } 
+    }
     else if (IT->isPointerTy()) {
       IT->dump();
       llvm_unreachable("pointer operand in code. fixme.");
@@ -447,7 +447,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     const Type *IT = A->getType();
     const std::string Name = A->getName();
 
-    if (IT->isIntegerTy() || IT->isFloatingPointTy()) { 
+    if (IT->isIntegerTy() || IT->isFloatingPointTy()) {
       if (HWBB->containsInScalarForValue(A))
         continue;
 
@@ -461,7 +461,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     }
   }
 
-  // Is the Argument used to read from or write at? The list of read and write 
+  // Is the Argument used to read from or write at? The list of read and write
   // StreamPorts was collected by handleArguments(), when we had to find out, if
   // we have to create a read or write port for the kernel.
   //
@@ -500,7 +500,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
 ///  - Real scalars: same for all WIs, no propagation between BBs
 ///  - Streams: like real scalars
 ///
-/// The separation between WI and static scalars is respected when they are used. Their 
+/// The separation between WI and static scalars is respected when they are used. Their
 /// generation here only depends on their type.
 ///
 /// To simplify the connection of the definition and the use of StreamPorts, we
@@ -552,7 +552,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
       connect(HWS, HWSP);
     }
     // All other Arguments are connected when used.
-  } 
+  }
   // Create Ports for all Pointers. The direction of the Port will be defined
   // depending on its usage in the BBs.
   else if (const PointerType *PType = dyn_cast<PointerType>(AType)) {
@@ -586,11 +586,11 @@ void OCLAccHW::handleArgument(const Argument &A) {
       if (const StoreInst *I = dyn_cast<StoreInst>(CurrVal)) {
         isWritten = true;
         ArgStreamWrites[I->getParent()].push_back(&A);
-      } 
+      }
       else if (const LoadInst *I = dyn_cast<LoadInst>(CurrVal)) {
         isRead = true;
         ArgStreamReads[I->getParent()].push_back(&A);
-      } 
+      }
       else if (const GetElementPtrInst *I = dyn_cast<GetElementPtrInst>(CurrVal)) {
         for ( auto &Inst : CurrVal->uses() ) {
           Values.push_back(Inst.getUser());
@@ -798,12 +798,12 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   if (! HWStream)
     llvm_unreachable("Load base address is not a stream");
 
-  // Check if the load has the same BitWidth as the port. 
+  // Check if the load has the same BitWidth as the port.
   unsigned StreamBitWidth = HWStream->getBitWidth();
   assert(StreamBitWidth >= BitWidth);
 
   // TODO: If it is smaller, add a BitSelector.
-  if (StreamBitWidth > BitWidth) 
+  if (StreamBitWidth > BitWidth)
     TODO("Add BitSelector");
 
   // Streams are global, so we have to add the access to the corresponding
@@ -822,7 +822,7 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
 /// - Address may be constant or Values
 /// - If Value: Could be getElementPtrInst
 /// - If getElementPtrInst: Connect Base and Index
-/// 
+///
 void OCLAccHW::visitStoreInst(StoreInst &I)
 {
   // TODO atomic, volatile
@@ -852,7 +852,7 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   base_p HWOut;
 
   //Get Data to store
-  
+
   if (const Constant *ConstValue = dyn_cast<Constant>(DataVal) ) {
     const_p HWConst = makeConstant(ConstValue, &I);
     HWData = HWConst;
@@ -868,11 +868,11 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
 
   if ((HWStreamIndex = std::dynamic_pointer_cast<StreamIndex>(HWOut))) {
     HWStream = HWStreamIndex->getStream();
-  } 
+  }
   else if ((HWStream = std::dynamic_pointer_cast<StreamPort>(HWOut))) {
     HWStreamIndex = std::make_shared<StaticStreamIndex>("0", HWStream, 0, 1);
     HWStreamIndex->addOut(HWStream);
-  } 
+  }
   else {
     llvm_unreachable("Index base address only streams.");
   }
@@ -889,12 +889,12 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   if (! HWStream)
     llvm_unreachable("Load base address is not a stream");
 
-  // Check if the data to store has the same BitWidth as the port. 
+  // Check if the data to store has the same BitWidth as the port.
   unsigned StreamBitWidth = HWStream->getBitWidth();
   assert(StreamBitWidth >= BitWidth);
 
   // TODO: If it is smaller, add a BitSelector.
-  if (StreamBitWidth > BitWidth) 
+  if (StreamBitWidth > BitWidth)
     TODO("Add BitSelector");
 
   HWStream->addStore(HWStreamIndex);
@@ -939,7 +939,7 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
   streamindex_p HWStreamIndex;
 
   // Create Constant or look for computed Index
-  
+
   if (const Constant *ConstValue = dyn_cast<Constant>(IndexValue)) {
     const Type *CType = ConstValue->getType();
 
@@ -986,7 +986,7 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
   int BitWidth = BW.first;
 
   if (const ConstantInt *IConst = dyn_cast<ConstantInt>(C)) {
-  
+
     const APInt Int = IConst->getValue();
 
     switch (BW.second) {
@@ -1013,7 +1013,7 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
           break;
         }
       default:
-        // Fall back to sign extend. 
+        // Fall back to sign extend.
         // FIXME:
         // The following code did not generate valid Bits:
         // %tmp12 = icmp sgt i32 %get_global_id_1, 0
@@ -1024,13 +1024,13 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
           break;
         }
     }
-  } 
+  }
   else if (const ConstantFP *FConst = dyn_cast<ConstantFP>(C)) {
     assert(BW.second != Loopus::FPNoExt && "Constant is FP Type but FPNoExt is not set");
 
     const APFloat &Float = FConst->getValueAPF();
 
-    if (CType->isHalfTy()) 
+    if (CType->isHalfTy())
       llvm_unreachable("Half floating point type not supported");
     else if (CType->isFloatTy()) {
       const APInt Bits = Float.bitcastToAPInt();
@@ -1049,7 +1049,7 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
       HWConst = std::make_shared<ConstVal>(CName, V, Bits.getBitWidth());
     } else
       llvm_unreachable("Unknown floating point type");
-  } else 
+  } else
   {
     llvm_unreachable("Unsupported Constant Type");
   }
@@ -1067,7 +1067,7 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   std::string CN = Callee->getName().str();
 
   if (ocl::isArithmeticBuiltIn(CN)) {
-    
+
   } else if (ocl::isWorkItemBuiltIn(CN)) {
     llvm_unreachable("Run pass to inline WorkItem builtins");
 
@@ -1121,7 +1121,7 @@ void OCLAccHW::visitPHINode(PHINode &I) {
     port_p HWP = getHW<Port>(BB, V);
     block_p HWB = getBlock(FromBB);
 
-    // All incoming blocks should already have been visited, so we can use 
+    // All incoming blocks should already have been visited, so we can use
     // Conds and NegConds of BB to look for the IncomingBlock and the condition.
 
     const base_p Cond = HWBB->getCondForBlock(HWB);
@@ -1159,9 +1159,9 @@ void OCLAccHW::visitPHINode(PHINode &I) {
 
 //
 //bb0:
-// %12 = 
+// %12 =
 // %13 =
-// %cond = 
+// %cond =
 // br %cond, label %bb1, %bb2
 //
 //bb1:
@@ -1170,7 +1170,7 @@ void OCLAccHW::visitPHINode(PHINode &I) {
 //bb2:
 // %13 = phi [%12, bb1], [%13, bb2] ...
 //
-/// 
+///
 /// \brief Set conditions for each block
 void OCLAccHW::visitBranchInst(BranchInst &I) {
   if (I.isUnconditional()) {
@@ -1191,12 +1191,12 @@ void OCLAccHW::visitBranchInst(BranchInst &I) {
   block_p HWFalse = getBlock(FalseBB);
 
   const Type *CIT = Cond->getType();
-  
+
   bool isCondInTrue = isValueInBB(TrueBB, Cond);
   bool isCondInFalse = isValueInBB(FalseBB, Cond);
 
-  scalarport_p HWPort, HWCondTrue, HWCondFalse; 
- 
+  scalarport_p HWPort, HWCondTrue, HWCondFalse;
+
   // If the condition is already used by other ports, omit the creation of a new
   // OutScalar. Otherwise, create a new Output.
   if (!HWBB->containsOutScalarForValue(Cond)) {
@@ -1232,7 +1232,7 @@ void OCLAccHW::visitBranchInst(BranchInst &I) {
   // Set the conditions for each successor
   HWTrue->addCond(HWCondTrue, HWBB);
   HWFalse->addNegCond(HWCondFalse, HWBB);
-  
+
 }
 
 #ifdef TYPENAME
