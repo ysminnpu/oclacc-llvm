@@ -785,15 +785,31 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
     llvm_unreachable("Index base address only streams.");
   }
 
+  // We may have loads with different types using the same StreamIndex.
+  const Type *T = I.getType();
+  unsigned BitWidth = T->getPrimitiveSizeInBits();
+  // TODO: Maybe we should support Non-primitive types
+  assert(BitWidth);
+
+
   // get the stream to read from
   streamport_p HWStream = HWStreamIndex->getStream();
   //TODO This is the case for local arrays!
   if (! HWStream)
     llvm_unreachable("Load base address is not a stream");
 
-  HWStream->addLoad(HWStreamIndex);
+  // Check if the load has the same BitWidth as the port. 
+  unsigned StreamBitWidth = HWStream->getBitWidth();
+  assert(StreamBitWidth >= BitWidth);
 
+  // TODO: If it is smaller, add a BitSelector.
+  if (StreamBitWidth > BitWidth) 
+    TODO("Add BitSelector");
+
+  // Streams are global, so we have to add the access to the corresponding
+  // block, but tell the stream that it is used to load data.
   HWParent->addInStreamIndex(HWStreamIndex);
+  HWStream->addLoad(HWStreamIndex);
 
   BlockValueMap[I.getParent()][&I] = HWStreamIndex;
 }
@@ -809,6 +825,9 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
 /// 
 void OCLAccHW::visitStoreInst(StoreInst &I)
 {
+  // TODO atomic, volatile
+  assert(I.isSimple());
+
   const std::string Name = I.getName();
 
   const Value *DataVal = I.getValueOperand();
@@ -857,6 +876,26 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   else {
     llvm_unreachable("Index base address only streams.");
   }
+
+
+  // We may have stores with different types using the same StreamIndex.
+  const Type *T = I.getValueOperand()->getType();
+  unsigned BitWidth = T->getPrimitiveSizeInBits();
+
+  // TODO: Maybe we should support Non-primitive types
+  assert(BitWidth);
+
+  //TODO This is the case for local arrays!
+  if (! HWStream)
+    llvm_unreachable("Load base address is not a stream");
+
+  // Check if the data to store has the same BitWidth as the port. 
+  unsigned StreamBitWidth = HWStream->getBitWidth();
+  assert(StreamBitWidth >= BitWidth);
+
+  // TODO: If it is smaller, add a BitSelector.
+  if (StreamBitWidth > BitWidth) 
+    TODO("Add BitSelector");
 
   HWStream->addStore(HWStreamIndex);
 
@@ -916,7 +955,7 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
     HWIndex = getHW<HW>(I.getParent(), IndexValue);
 
     // No need to add StreamIndex to BlockValueMap so create object directly
-    HWStreamIndex = makeHWBB<DynamicStreamIndex>(I.getParent(), InstValue, Name, HWBase, HWIndex);
+    HWStreamIndex = makeHWBB<DynamicStreamIndex>(I.getParent(), InstValue, Name, HWBase, HWIndex, 64);
 
     HWIndex->addOut(HWStreamIndex);
   }

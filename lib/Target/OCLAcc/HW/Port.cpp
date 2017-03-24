@@ -101,7 +101,7 @@ const StreamPort::AccessListTy &StreamPort::getAccessList() const {
 ///
 /// In and Out used for data while the index depends on the actual subcalss
 /// type.
-StreamIndex::StreamIndex(const std::string &Name, streamport_p Stream) : HW(Name,0), Stream(Stream) {
+StreamIndex::StreamIndex(const std::string &Name, streamport_p Stream, unsigned BitWidth) : HW(Name,BitWidth), Stream(Stream) {
 }
 
 const streamport_p StreamIndex::getStream() const {
@@ -109,7 +109,7 @@ const streamport_p StreamIndex::getStream() const {
 }
 
 
-DynamicStreamIndex::DynamicStreamIndex(const std::string &Name, streamport_p Stream, base_p Index) : StreamIndex(Name, Stream), Index(Index) { }
+DynamicStreamIndex::DynamicStreamIndex(const std::string &Name, streamport_p Stream, base_p Index, unsigned BitWidth) : StreamIndex(Name, Stream, BitWidth), Index(Index) { }
 
 void DynamicStreamIndex::setIndex(base_p I) {
   Index = I;
@@ -123,8 +123,7 @@ bool DynamicStreamIndex::isStatic() const { return false;}
 ///
 /// The index is not represented as ConstantVal object to simplify offset
 /// analysis for stream optimization.
-StaticStreamIndex::StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t W) : StreamIndex(Name, Stream), Index(Index) {
-  setBitWidth(W);
+StaticStreamIndex::StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t BitWidth) : StreamIndex(Name, Stream, BitWidth), Index(Index) {
 }
 
 void StaticStreamIndex::setIndex(StaticStreamIndex::IndexTy I) {

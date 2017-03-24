@@ -24,6 +24,7 @@ class Port : public HW {
 
   private:
     const Datatype &PortType;
+    
   protected:
     bool Pipelined = false;
   public:
@@ -135,7 +136,7 @@ class StreamIndex : public HW {
     streamport_p Stream;
 
   protected:
-    StreamIndex(const std::string &Name, streamport_p Stream);
+    StreamIndex(const std::string &Name, streamport_p Stream, unsigned BitWidth);
 
   public:
     StreamIndex(const StreamIndex&) = delete;
@@ -155,7 +156,7 @@ class DynamicStreamIndex : public StreamIndex {
     base_p Index;
 
   public:
-    DynamicStreamIndex(const std::string &Name, streamport_p, base_p);
+    DynamicStreamIndex(const std::string &Name, streamport_p, base_p, unsigned BitWidth);
 
     DynamicStreamIndex(const DynamicStreamIndex&) = delete;
     DynamicStreamIndex& operator=(const DynamicStreamIndex&) = delete;
@@ -180,7 +181,7 @@ class StaticStreamIndex : public StreamIndex {
   private:
     IndexTy Index;
   public:
-    StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t W);
+    StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t BitWidth);
 
     StaticStreamIndex(const StaticStreamIndex&) = delete;
     StaticStreamIndex& operator=(const StaticStreamIndex&) = delete;

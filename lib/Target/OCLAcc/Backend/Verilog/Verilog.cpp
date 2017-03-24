@@ -3,6 +3,7 @@
 #include "Verilog.h"
 #include "FileHeader.h"
 #include "VerilogModule.h"
+#include "Naming.h"
 
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
@@ -27,6 +28,12 @@ const std::string conf::to_string(bool B) {
 DesignFiles TheFiles;
 
 OperatorInstances TheOps;
+
+// Local Port functions
+
+Signal Clk("clk", 1, In, Wire);
+Signal Rst("rst", 1, In, Wire);
+
 
 void DesignFiles::write(const std::string Filename) {
   DEBUG(dbgs() << "Writing " + Filename + "...");
@@ -259,6 +266,7 @@ Verilog::~Verilog() {
 /// them to the KernelInstance.
 /// 
 int Verilog::visit(DesignUnit &R) {
+  VISIT_ONCE(R);
   std::string TopFilename = "top.v";
   FileTy FS = openFile(TopFilename);
 
@@ -282,6 +290,7 @@ int Verilog::visit(DesignUnit &R) {
 /// TODO: Allow multiple instantiations of the same kernel.
 ///
 int Verilog::visit(Kernel &R) {
+  VISIT_ONCE(R);
   std::string KernelFilename = R.getName()+".v";
   FileTy FS = openFile(KernelFilename);
 
@@ -320,6 +329,7 @@ int Verilog::visit(Kernel &R) {
 /// \brief Define Block in new file
 ///
 int Verilog::visit(Block &R) {
+  VISIT_ONCE(R);
   std::string Filename = R.getName()+".v";
   // Local copy of FS since other Blocks create a new global FS for their
   // contents. This avoids passing the FS between functions.
@@ -337,14 +347,23 @@ int Verilog::visit(Block &R) {
 
 
   // Clean up Components
-  BlockComponents.str("// Component instances\n");
-  BlockSignals.str("// Component signals\n");
+  ConstSignals.str("");
+  ConstSignals << "// Constant signals\n";
+
+  BlockSignals.str("");
+  BlockSignals << "// Component signals\n";
+
+  BlockComponents.str("");
+  BlockComponents << "// Component instances\n";
 
   // Create instances for all operations
   super::visit(R);
 
   // Write signals
   (*FS) << BlockSignals.str();
+
+  // Write constant assignments
+  (*FS) << ConstSignals.str();
 
   // Write component instantiations
   (*FS) << BlockComponents.str();
@@ -366,6 +385,7 @@ int Verilog::visit(Block &R) {
 ///
 
 int Verilog::visit(Add &R) {
+  VISIT_ONCE(R);
   const std::string BW = std::to_string(R.getBitWidth());
   
   const std::string Arch = std::to_string(conf::IntAdder_Arch);
@@ -389,10 +409,12 @@ int Verilog::visit(Add &R) {
 }
 
 int Verilog::visit(Sub &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 
 int Verilog::visit(FAdd &R) {
+  VISIT_ONCE(R);
   assert(R.getIns().size() == 2);
 
   const std::string isSub = "false";
@@ -404,6 +426,8 @@ int Verilog::visit(FAdd &R) {
 
   const std::string Name = "FPAdd_" + WE + "_" + WF;
 
+  const std::string RName = R.getUniqueName();
+
   std::stringstream FInst;
 
   FInst << "FPAdd" << " wE=" << WE << " wF=" << WF << " ";
@@ -412,16 +436,35 @@ int Verilog::visit(FAdd &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(R.getUniqueName(), Name, FInst.str());
+  flopoco::addModule(RName, Name, FInst.str());
+
+  // Add output signal
+  Signal S(RName, R.getBitWidth(), Local, Wire);
+  BlockSignals << S.getDefStr() << ";\n";
+
+  // Instantiate component
+  BlockComponents << "// " << RName << "\n";
+  BlockComponents << Name << " " << Name << "_" << RName << "(\n";
+  BlockComponents << Indent(1) << ".clk(clk)," << "\n";
+  BlockComponents << Indent(1) << ".rst(rst)," << "\n";
+  BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
+  BlockComponents << Indent(1) << ".Y(" << getOpName(R.getIn(1)) << ")," << "\n";
+  BlockComponents << Indent(1) << ".Cin(" << RName << "_Cin" << ")," << "\n";
+  BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
+  BlockComponents << ");\n";
+
+  ConstSignals << "localparam " << RName << "_Cin = 0;" << "\n";
 
   return 0;
 }
 
 int Verilog::visit(FSub &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 
 int Verilog::visit(Mul &R) {
+  VISIT_ONCE(R);
   assert(R.getIns().size() == 2);
 
   const std::string WX = std::to_string(R.getIn(0)->getBitWidth());
@@ -432,6 +475,8 @@ int Verilog::visit(Mul &R) {
 
   const std::string Name = "IntMultiplier_" + WX + "_" + WY + "_" + WOut;
 
+  const std::string RName = R.getUniqueName();
+
   std::stringstream FInst;
 
   FInst << "IntMultiplier" << " wX=" << WX << " wY=" << WY << " WOut=" << WOut << " ";
@@ -439,12 +484,12 @@ int Verilog::visit(Mul &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(R.getUniqueName(), Name, FInst.str());
-
+  flopoco::addModule(RName, Name, FInst.str());
 
 
   return 0;
 }
+
 int Verilog::visit(FMul &R) {
   VISIT_ONCE(R);
 
@@ -491,16 +536,16 @@ int Verilog::visit(FMul &R) {
     flopoco::addModule(RName, Name, FInst.str());
 
     // Add output signal
-    Signal S(R.getUniqueName(), R.getBitWidth(), Local, Wire);
+    Signal S(RName, R.getBitWidth(), Local, Wire);
     BlockSignals << S.getDefStr() << ";\n";
 
     // Instantiate component
     BlockComponents << "// " << RName << "\n";
     BlockComponents << Name << " " << Name << "_" << RName << "(\n";
-    BlockComponents << I(1) << ".clk(clk)," << "\n";
-    BlockComponents << I(1) << ".rst(rst)," << "\n";
-    BlockComponents << I(1) << ".X(" << VarOp->getUniqueName() << ")," << "\n";
-    BlockComponents << I(1) << ".R(" << R.getUniqueName()<< ")" << "\n";
+    BlockComponents << Indent(1) << ".clk(clk)," << "\n";
+    BlockComponents << Indent(1) << ".rst(rst)," << "\n";
+    BlockComponents << Indent(1) << ".X(" << VarOp->getUniqueName() << ")," << "\n";
+    BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
     BlockComponents << ");\n";
 
   } else {
@@ -520,53 +565,69 @@ int Verilog::visit(FMul &R) {
 
     flopoco::addModule(RName, Name, FInst.str());
 
+    // Add output signal
+    Signal S(RName, R.getBitWidth(), Local, Wire);
+    BlockSignals << S.getDefStr() << ";\n";
+
     // Instantiate component
     BlockComponents << "// " << RName << "\n";
     BlockComponents << Name << " " << Name << "_" << RName << "(\n";
-    BlockComponents << I(1) << ".clk(clk)," << "\n";
-    BlockComponents << I(1) << ".rst(rst)," << "\n";
-    BlockComponents << I(1) << ".X(" << R.getIn(0)->getUniqueName() << ")," << "\n";
-    BlockComponents << I(1) << ".Y(" << R.getIn(1)->getUniqueName() << ")," <<"\n";
-    BlockComponents << I(1) << ".R(" << R.getUniqueName()<< ")" << "\n";
+    BlockComponents << Indent(1) << ".clk(clk)," << "\n";
+    BlockComponents << Indent(1) << ".rst(rst)," << "\n";
+    BlockComponents << Indent(1) << ".X(" << R.getIn(0)->getUniqueName() << ")," << "\n";
+    BlockComponents << Indent(1) << ".Y(" << R.getIn(1)->getUniqueName() << ")," <<"\n";
+    BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
     BlockComponents << ");\n";
   }
 
   return 0;
 }
 int Verilog::visit(UDiv &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(SDiv &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(FDiv &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(URem &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(SRem &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(FRem &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(Shl &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(LShr &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(AShr &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(And &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(Or &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 int Verilog::visit(Xor &R) {
+  VISIT_ONCE(R);
   return 0;
 }
 

@@ -12,11 +12,11 @@ const std::string HW::dump(const std::string &Indent) const {
   ss << Indent << abi::__cxa_demangle(typeid(this).name(),0,0,NULL) << " " << getUniqueName() << "\n";
   ss << Indent << "\tin:";
   for (auto I : Ins)
-    ss << " " << I->getUniqueName();
+    ss << " " << I->getUniqueName() << ",";
 
   ss << Indent << "\n\tout:";
   for (auto O : Outs)
-    ss << " " << O->getUniqueName();
+    ss << " " << O->getUniqueName() << ",";
   return ss.str();
 }
 

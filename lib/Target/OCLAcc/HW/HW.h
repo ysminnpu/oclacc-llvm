@@ -63,7 +63,7 @@ class HW : public Identifiable, public Visitable
     virtual const PortsTy &getOuts() const { return Outs;  }
 
     virtual unsigned getBitWidth() const { return BitWidth; }
-    virtual void setBitWidth(const unsigned W) { BitWidth=W; }
+    virtual void setBitWidth(unsigned W) { BitWidth=W; }
 
     const llvm::Value * getIR() const { return IR; }
     void setIR(const llvm::Value *P) { IR=P; }

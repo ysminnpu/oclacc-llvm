@@ -19,7 +19,10 @@ const std::string Signal::getTypeStr(void) const {
 const std::string Signal::getDefStr(void) const {
   std::stringstream S;
 
-  S << std::setw(6) << std::left << getDirectionStr() << " " << std::setw(4) << getTypeStr() << " ";
+  if (Direction != Local)
+    S << std::setw(6) << std::left << getDirectionStr() << " ";
+  
+  S << std::setw(4) << std::left << getTypeStr() << " ";
 
   // Print width columnwise
   if (BitWidth!=1) {

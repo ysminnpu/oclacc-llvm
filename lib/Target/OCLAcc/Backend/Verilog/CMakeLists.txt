@@ -6,4 +6,5 @@ add_llvm_library(LLVMOCLAccVerilogBackend
   VerilogModule.cpp
   Verilog.cpp
   Signal.cpp
+  Naming.cpp
 )

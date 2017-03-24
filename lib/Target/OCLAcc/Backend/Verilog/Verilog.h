@@ -99,6 +99,7 @@ class Verilog : public DFVisitor {
 
     // Components as instantiated by each component
     std::stringstream BlockSignals;
+    std::stringstream ConstSignals;
     std::stringstream BlockComponents;
 
   public:
