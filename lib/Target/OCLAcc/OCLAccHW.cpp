@@ -51,7 +51,7 @@
 #include <sstream>
 #include <unistd.h>
 
-#include "macros.h"
+#include "Macros.h"
 #include "OCLAccHW.h"
 #include "OCLAccTargetMachine.h"
 #include "OCLAccGenSubtargetInfo.inc"

@@ -9,11 +9,11 @@ Signal::Signal(const std::string Name, unsigned BitWidth, SignalDirection Direct
 }
 
 const std::string Signal::getDirectionStr(void) const {
-  return SignalDirection_S[Direction];
+  return std::string(SignalDirection_S[Direction]);
 }
 
 const std::string Signal::getTypeStr(void) const {
-  return SignalType_S[Type];
+  return std::string(Signal::SignalType_S[Type]);
 }
 
 const std::string Signal::getDefStr(void) const {
@@ -37,3 +37,6 @@ const std::string Signal::getDefStr(void) const {
   
   return S.str();
 }
+
+const char * Signal::SignalType_S[] = {"wire", "reg"};
+const char * Signal::SignalDirection_S[] = {"input", "output", ""};

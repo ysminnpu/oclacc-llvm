@@ -17,10 +17,6 @@
 #include "OCLAccHW.h"
 #include "OpenCLDefines.h"
 
-#include "kernel_builtins.h"
-
-#include "macros.h"
-
 #define DEBUG_TYPE "dot"
 
 using namespace llvm;

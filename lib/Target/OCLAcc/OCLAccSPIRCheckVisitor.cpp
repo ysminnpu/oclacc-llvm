@@ -11,7 +11,7 @@
 
 #include "kernel_builtins.h"
 
-#include "macros.h"
+#include "Macros.h"
 
 using namespace oclacc;
 

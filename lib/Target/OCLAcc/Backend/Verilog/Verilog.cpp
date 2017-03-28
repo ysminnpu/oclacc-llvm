@@ -4,6 +4,7 @@
 #include "FileHeader.h"
 #include "VerilogModule.h"
 #include "Naming.h"
+#include "VerilogMacros.h"
 
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
@@ -31,8 +32,8 @@ OperatorInstances TheOps;
 
 // Local Port functions
 
-Signal Clk("clk", 1, In, Wire);
-Signal Rst("rst", 1, In, Wire);
+Signal Clk("clk", 1, Signal::In, Signal::Wire);
+Signal Rst("rst", 1, Signal::In, Signal::Wire);
 
 
 void DesignFiles::write(const std::string Filename) {
@@ -302,7 +303,7 @@ int Verilog::visit(Kernel &R) {
   KernelModule KM(R);
   (*FS) << KM.declHeader();
 
-  (*FS) << "// Block wires";
+  (*FS) << "// Block wires\n";
   (*FS) << KM.declBlockWires();
 
   (*FS) << "// Block instantiations\n";
@@ -394,6 +395,8 @@ int Verilog::visit(Add &R) {
 
   const std::string Name = "IntAdder_" + BW;
 
+  const std::string RName = R.getUniqueName();
+
   std::stringstream FInst;
 
   FInst << "IntAdder" << " wIn=" << BW << " ";
@@ -403,15 +406,120 @@ int Verilog::visit(Add &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(R.getUniqueName(), Name, FInst.str());
+  flopoco::addModule(RName, Name, FInst.str());
+
+  // Add output signal
+  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
+  BlockSignals << S.getDefStr() << ";\n";
+
+  // Instantiate component
+  BlockComponents << "// " << RName << "\n";
+  BlockComponents << Name << " " << Name << "_" << RName << "(\n";
+  BlockComponents << Indent(1) << ".clk(clk)," << "\n";
+  BlockComponents << Indent(1) << ".rst(rst)," << "\n";
+  BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
+  BlockComponents << Indent(1) << ".Y(" << getOpName(R.getIn(1)) << ")," << "\n";
+  BlockComponents << Indent(1) << ".Cin(" << RName << "_Cin" << ")," << "\n";
+  BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
+  BlockComponents << ");\n";
+
+  ConstSignals << "localparam " << RName << "_Cin = 0;" << "\n";
 
   return 0;
 }
 
+/// \brief Generate Subtractor.
+///
+/// TODO: Use adder with negated 2nd operand.
 int Verilog::visit(Sub &R) {
   VISIT_ONCE(R);
+
+  const std::string BW = std::to_string(R.getBitWidth());
+  
+  const std::string Arch = std::to_string(conf::IntAdder_Arch);
+  const std::string Opt = std::to_string(conf::IntAdder_OptObjective);
+  const std::string SRL = std::to_string(conf::IntAdder_SRL);
+
+  const std::string Name = "IntAdder_" + BW;
+
+  const std::string RName = R.getUniqueName();
+
+  std::stringstream FInst;
+
+  FInst << "IntAdder" << " wIn=" << BW << " ";
+  FInst << "arch=" << Arch << " ";
+  FInst << "optObjective=" << Opt << " ";
+  FInst << "SRL=" << SRL << " ";
+  FInst << "name=" << Name << " ";
+  FInst << "outputFile=" << Name << ".vhd" << " ";
+
+  flopoco::addModule(RName, Name, FInst.str());
+
+  // Add output signal
+  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
+  BlockSignals << S.getDefStr() << ";\n";
+
+  // Inverted input
+  const std::string InvIn1Name = getOpName(R.getIn(1))+"_inv";
+  Signal InvIn1(InvIn1Name, R.getIn(1)->getBitWidth(), Signal::Local, Signal::Wire);
+  BlockSignals << InvIn1.getDefStr() << ";\n";
+  BlockSignals << "assign " << InvIn1Name << " = ~" << getOpName(R.getIn(1)) << ";\n"; 
+
+  // Instantiate component
+  BlockComponents << "// " << RName << "\n";
+  BlockComponents << Name << " " << Name << "_" << RName << "(\n";
+  BlockComponents << Indent(1) << ".clk(clk)," << "\n";
+  BlockComponents << Indent(1) << ".rst(rst)," << "\n";
+  BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
+  BlockComponents << Indent(1) << ".Y(" << InvIn1Name << ")," << "\n";
+  BlockComponents << Indent(1) << ".Cin(" << RName << "_Cin" << ")," << "\n";
+  BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
+  BlockComponents << ");\n";
+
+  ConstSignals << "localparam " << RName << "_Cin = 1;" << "\n";
   return 0;
 }
+
+int Verilog::visit(Mul &R) {
+  VISIT_ONCE(R);
+  assert(R.getIns().size() == 2);
+
+  const std::string WX = std::to_string(R.getIn(0)->getBitWidth());
+  const std::string WY = std::to_string(R.getIn(1)->getBitWidth());
+  const std::string WOut = std::to_string(R.getBitWidth());
+
+  bool isSigned = true;
+
+  const std::string Name = "IntMultiplier_" + WX + "_" + WY + "_" + WOut;
+
+  const std::string RName = R.getUniqueName();
+
+  std::stringstream FInst;
+
+  FInst << "IntMultiplier" << " wX=" << WX << " wY=" << WY << " WOut=" << WOut << " ";
+  FInst << "signedIO=" << conf::to_string(isSigned) << " ";
+  FInst << "name=" << Name << " ";
+  FInst << "outputFile=" << Name << ".vhd" << " ";
+
+  flopoco::addModule(RName, Name, FInst.str());
+
+  // Add output signal
+  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
+  BlockSignals << S.getDefStr() << ";\n";
+
+  // Instantiate component
+  BlockComponents << "// " << RName << "\n";
+  BlockComponents << Name << " " << Name << "_" << RName << "(\n";
+  BlockComponents << Indent(1) << ".clk(clk)," << "\n";
+  BlockComponents << Indent(1) << ".rst(rst)," << "\n";
+  BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
+  BlockComponents << Indent(1) << ".Y(" << getOpName(R.getIn(1)) << ")," << "\n";
+  BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
+  BlockComponents << ");\n";
+
+  return 0;
+}
+
 
 int Verilog::visit(FAdd &R) {
   VISIT_ONCE(R);
@@ -439,7 +547,7 @@ int Verilog::visit(FAdd &R) {
   flopoco::addModule(RName, Name, FInst.str());
 
   // Add output signal
-  Signal S(RName, R.getBitWidth(), Local, Wire);
+  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
   BlockSignals << S.getDefStr() << ";\n";
 
   // Instantiate component
@@ -449,44 +557,14 @@ int Verilog::visit(FAdd &R) {
   BlockComponents << Indent(1) << ".rst(rst)," << "\n";
   BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
   BlockComponents << Indent(1) << ".Y(" << getOpName(R.getIn(1)) << ")," << "\n";
-  BlockComponents << Indent(1) << ".Cin(" << RName << "_Cin" << ")," << "\n";
   BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
   BlockComponents << ");\n";
-
-  ConstSignals << "localparam " << RName << "_Cin = 0;" << "\n";
 
   return 0;
 }
 
 int Verilog::visit(FSub &R) {
   VISIT_ONCE(R);
-  return 0;
-}
-
-int Verilog::visit(Mul &R) {
-  VISIT_ONCE(R);
-  assert(R.getIns().size() == 2);
-
-  const std::string WX = std::to_string(R.getIn(0)->getBitWidth());
-  const std::string WY = std::to_string(R.getIn(1)->getBitWidth());
-  const std::string WOut = std::to_string(R.getBitWidth());
-
-  bool isSigned = true;
-
-  const std::string Name = "IntMultiplier_" + WX + "_" + WY + "_" + WOut;
-
-  const std::string RName = R.getUniqueName();
-
-  std::stringstream FInst;
-
-  FInst << "IntMultiplier" << " wX=" << WX << " wY=" << WY << " WOut=" << WOut << " ";
-  FInst << "signedIO=" << conf::to_string(isSigned) << " ";
-  FInst << "name=" << Name << " ";
-  FInst << "outputFile=" << Name << ".vhd" << " ";
-
-  flopoco::addModule(RName, Name, FInst.str());
-
-
   return 0;
 }
 
@@ -536,7 +614,7 @@ int Verilog::visit(FMul &R) {
     flopoco::addModule(RName, Name, FInst.str());
 
     // Add output signal
-    Signal S(RName, R.getBitWidth(), Local, Wire);
+    Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
     BlockSignals << S.getDefStr() << ";\n";
 
     // Instantiate component
@@ -566,7 +644,7 @@ int Verilog::visit(FMul &R) {
     flopoco::addModule(RName, Name, FInst.str());
 
     // Add output signal
-    Signal S(RName, R.getBitWidth(), Local, Wire);
+    Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
     BlockSignals << S.getDefStr() << ";\n";
 
     // Instantiate component

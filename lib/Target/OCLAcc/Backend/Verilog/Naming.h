@@ -25,34 +25,34 @@ const std::string getOpName(const DynamicStreamIndex &R);
 //const std::string getOpName(const ScalarPort &R);
 
 // Components
-const PortListTy getSignals(const block_p);
-const PortListTy getSignals(const Block &);
+const Signal::SignalListTy getSignals(const block_p);
+const Signal::SignalListTy getSignals(const Block &);
 
-const PortListTy getSignals(const kernel_p);
-const PortListTy getSignals(const Kernel &);
+const Signal::SignalListTy getSignals(const kernel_p);
+const Signal::SignalListTy getSignals(const Kernel &);
 
 // Streams
-const PortListTy getSignals(const streamport_p);
-const PortListTy getSignals(const StreamPort &);
+const Signal::SignalListTy getSignals(const streamport_p);
+const Signal::SignalListTy getSignals(const StreamPort &);
 
-const std::string createPortList(const PortListTy &);
+const std::string createPortList(const Signal::SignalListTy &);
 
 // Scalars
-const PortListTy getInSignals(const scalarport_p);
-const PortListTy getOutSignals(const scalarport_p);
+const Signal::SignalListTy getInSignals(const scalarport_p);
+const Signal::SignalListTy getOutSignals(const scalarport_p);
 
-const PortListTy getInSignals(const ScalarPort &);
-const PortListTy getOutSignals(const ScalarPort &);
+const Signal::SignalListTy getInSignals(const ScalarPort &);
+const Signal::SignalListTy getOutSignals(const ScalarPort &);
 
 // Used for delegation
-const PortListTy getInSignals(const streamindex_p);
-const PortListTy getOutSignals(const streamindex_p);
+const Signal::SignalListTy getInSignals(const streamindex_p);
+const Signal::SignalListTy getOutSignals(const streamindex_p);
 
-const PortListTy getOutSignals(const StaticStreamIndex &);
-const PortListTy getInSignals(const StaticStreamIndex &);
+const Signal::SignalListTy getOutSignals(const StaticStreamIndex &);
+const Signal::SignalListTy getInSignals(const StaticStreamIndex &);
 
-const PortListTy getInSignals(const DynamicStreamIndex &);
-const PortListTy getOutSignals(const DynamicStreamIndex &);
+const Signal::SignalListTy getInSignals(const DynamicStreamIndex &);
+const Signal::SignalListTy getOutSignals(const DynamicStreamIndex &);
 
 } // end ns oclacc
 

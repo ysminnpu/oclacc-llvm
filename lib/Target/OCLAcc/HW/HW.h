@@ -19,6 +19,7 @@ class HW : public Identifiable, public Visitable
     typedef std::vector<base_p> PortsTy;
     typedef PortsTy::iterator PortsItTy;
     typedef PortsTy::const_iterator PortsConstItTy;
+    typedef PortsTy::size_type PortsSizeTy;
 
   protected:
     unsigned BitWidth;

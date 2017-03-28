@@ -6,35 +6,39 @@
 
 namespace oclacc {
 
-enum SignalDirection {
-  In,
-  Out,
-  Local
+class Signal {
+  public:
+    enum SignalDirection {
+      In,
+      Out,
+      Local
+    };
+
+    enum SignalType {
+      Wire,
+      Reg
+    };
+
+    std::string Name;
+    unsigned BitWidth;
+    SignalDirection Direction;
+    SignalType Type;
+
+    typedef std::vector<Signal> SignalListTy;
+    typedef SignalListTy::const_iterator SignalListConstItTy;
+
+  private:
+    static const char *SignalType_S[];
+    static const char *SignalDirection_S[];
+
+  public:
+    /// \brief Signal to connect blocks and components
+    Signal(const std::string Name, unsigned BitWidth, SignalDirection Direction, Signal::SignalType Type);
+
+    const std::string getDirectionStr(void) const;
+    const std::string getTypeStr(void) const;
+    const std::string getDefStr(void) const;
 };
-
-const std::string SignalDirection_S[] = {"input", "output", ""};
-
-enum SignalType {
-  Wire,
-  Reg
-};
-const std::string SignalType_S[] = {"wire", "reg"};
-
-struct Signal {
-  std::string Name;
-  unsigned BitWidth;
-  SignalDirection Direction;
-  SignalType Type;
-
-  /// \brief Signal to connect blocks and components
-  Signal(const std::string Name, unsigned BitWidth, SignalDirection Direction, SignalType Type);
-
-  const std::string getDirectionStr(void) const;
-  const std::string getTypeStr(void) const;
-  const std::string getDefStr(void) const;
-};
-
-typedef std::vector<Signal> PortListTy;
 
 } // end ns oclacc
 

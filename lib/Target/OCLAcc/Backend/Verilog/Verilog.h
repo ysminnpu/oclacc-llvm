@@ -74,7 +74,6 @@ class OperatorInstances {
     // Lookup HWNames
     bool existsOperatorForHW(const std::string HWName);
     op_p getOperatorForHW(const std::string HWName);
-
 };
 
 

@@ -27,7 +27,12 @@ const std::string KernelModule::declHeader() const {
 
   S << "module " << Comp.getName() << "(\n";
 
-  PortListTy Ports = getSignals(Comp);
+  Signal::SignalListTy Ports = getSignals(Comp);
+  
+  // All Kernel Ports are wires.
+  for (Signal& S : Ports) {
+    S.Type = Signal::Wire;
+  }
   S << createPortList(Ports);
 
   S << "\n); // end ports\n";
@@ -42,7 +47,7 @@ const std::string BlockModule::declHeader() const {
 
   S << "module " << Comp.getName() << "(\n";
 
-  PortListTy Ports = getSignals(Comp);
+  Signal::SignalListTy Ports = getSignals(Comp);
   S << createPortList(Ports);
 
   S << "\n); // end ports\n";
@@ -84,7 +89,8 @@ const std::string VerilogModule::declFooter() const {
   return S.str();
 }
 
-/// \brief Declare Wires for the Blocks' Ports
+/// \brief Declare Wires for the Blocks' Ports and connect them with the
+/// Kernel inputs
 ///
 /// Iterate over all Blocks' ports and create wires for each port.
 /// Finally connect the kernel outsputs.
@@ -93,22 +99,50 @@ const std::string VerilogModule::declFooter() const {
 ///
 const std::string KernelModule::declBlockWires() const {
   std::stringstream S;
+
   for (block_p B : Comp.getBlocks()) {
     S << "// " << B->getUniqueName() << "\n";
 
-    // The EntryBlock must be skipped because Arguments also added to the first
-    // Block.
-    if (B->isEntryBlock())
-      continue;
-
-    // First create wires for each port used as input and output
+    // Create wires for each port used as input and output and assign them to
+    // their use in a component
     for (scalarport_p P : B->getInScalars()) {
+      // Non-pipelined Inputs are the same as the Kernel's.
       if (!P->isPipelined())
         continue;
 
-      for (const Signal &Sig : getInSignals(P)) {
-        S << Sig.getTypeStr() << " " << Sig.Name << ";\n";
-      }
+      // Make sure that the Block's ScalarInput is connected with the Kernel's
+      HW::PortsSizeTy NumIns = P->getIns().size();
+      assert(NumIns);
+
+      if (NumIns == 1) {
+        scalarport_p SI = std::static_pointer_cast<ScalarPort>(P->getIn(0));
+
+        Signal::SignalListTy KernelSigs = getOutSignals(SI);
+        Signal::SignalListTy BlockSigs = getInSignals(P);
+
+        assert(KernelSigs.size() == BlockSigs.size());
+
+
+        for (Signal::SignalListConstItTy
+            KI = KernelSigs.begin(),
+            BI = BlockSigs.begin(),
+            KE = KernelSigs.end();
+            KI != KE;
+            ++KI, ++BI) {
+
+          // Define Block's Port. All Ports are wires.
+          Signal LocDef(BI->Name, BI->BitWidth, Signal::Local, Signal::Wire);
+          S << LocDef.getDefStr() << ";\n";
+
+          // Kernel->Block
+          if (KI->Direction == Signal::Out) {
+            S << "assign " << BI->Name << " = " << KI->Name << ";\n"; 
+          } else if (KI->Direction == Signal::In) {
+            S << "assign " << KI->Name << " = " << BI->Name << ";\n"; 
+          }
+        }
+      } else 
+        TODO("Add Muxer");
     }
   }
   return S.str();
@@ -129,7 +163,7 @@ const std::string KernelModule::instBlocks() {
     const std::string BName = B->getUniqueName();
 
     // Walk through all Ports of the Block.
-    PortListTy Ports = getSignals(B);
+    Signal::SignalListTy Ports = getSignals(B);
 
     // Blocks must have any input and output
     assert(Ports.size());

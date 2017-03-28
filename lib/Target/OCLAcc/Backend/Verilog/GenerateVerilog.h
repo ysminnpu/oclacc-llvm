@@ -3,8 +3,6 @@
 
 #include "llvm/Pass.h"
 
-#include "Macros.h"
-
 namespace llvm {
 
 /// \brief Walk through BasicBlocks and add all Values defined in others as

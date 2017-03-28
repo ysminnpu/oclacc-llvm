@@ -1,7 +1,7 @@
 #ifndef RAM_H
 #define RAM_H
 
-#include "Macros.h"
+#include "VerilogMacros.h"
 
 #include <sstream>
 #include <cmath>
