@@ -36,6 +36,12 @@ class BlockModule : public VerilogModule {
 
     const std::string declEnable() const;
 
+    const std::string declFSMSignals() const;
+
+    const std::string declFSM() const;
+
+    const std::string declInScalarBuffer() const;
+
   private:
     Block &Comp;
 
@@ -54,7 +60,7 @@ class KernelModule : public VerilogModule{
 
     const std::string declBlockWires() const;
 
-    const std::string instBlocks();
+    const std::string instBlocks() const;
 
   private:
     Kernel &Comp;

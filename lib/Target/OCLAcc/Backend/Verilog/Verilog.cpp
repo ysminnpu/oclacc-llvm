@@ -56,6 +56,7 @@ void DesignFiles::write(const std::string Filename) {
   }
 
   (*DoFile) << DoS.str();
+  (*DoFile) << "quit\n";
   DoFile->close();
 
   DEBUG(dbgs() << "done\n");
@@ -359,12 +360,17 @@ int Verilog::visit(Block &R) {
 
   // Create instances for all operations
   super::visit(R);
+  (*FS) << BM.declInScalarBuffer();
 
   // Write signals
   (*FS) << BlockSignals.str();
 
   // Write constant assignments
   (*FS) << ConstSignals.str();
+
+  // State Machine
+  (*FS) << BM.declFSMSignals();
+  (*FS) << BM.declFSM();
 
   // Write component instantiations
   (*FS) << BlockComponents.str();
@@ -705,6 +711,21 @@ int Verilog::visit(Or &R) {
   return 0;
 }
 int Verilog::visit(Xor &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
+int Verilog::visit(StreamPort &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
+int Verilog::visit(StaticStreamIndex &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
+int Verilog::visit(DynamicStreamIndex &R) {
   VISIT_ONCE(R);
   return 0;
 }

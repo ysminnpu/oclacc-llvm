@@ -103,7 +103,7 @@ void Kernel::dump() {
 
   outs() << "InScalars:\n";
   for (const scalarport_p HWP : getInScalars()) {
-    outs() << " "<< HWP->getUniqueName() << "\n";
+    outs() << " "<< HWP->getUniqueName() << ": " << (HWP->isPipelined()? "pipelined" : "not pipelined") << "\n";
   }
   outs() << "Streams:\n";
   for (const streamport_p HWP : getStreams()) {
@@ -142,7 +142,7 @@ void Block::dump() {
 
   outs() << "InScalars:\n";
   for (const scalarport_p HWP : getInScalars()) {
-    outs() << " "<< HWP->getUniqueName() << "\n";
+    outs() << " "<< HWP->getUniqueName() << ": " << (HWP->isPipelined()? "pipelined" : "not pipelined") << "\n";
   }
 
   outs() << "InStreamIndices:\n";

@@ -6,6 +6,7 @@
 #include "Verilog.h"
 #include "VerilogModule.h"
 #include "Naming.h"
+#include "VerilogMacros.h"
 
 
 using namespace oclacc;
@@ -15,12 +16,21 @@ extern DesignFiles TheFiles;
 VerilogModule::VerilogModule(Component &C) : Comp(C) {
 }
 
+const std::string VerilogModule::declFooter() const {
+  std::stringstream S;
+  S << "endmodule " << " // " << Comp.getUniqueName() << "\n";
+  return S.str();
+}
+
+
 BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B) {
 }
 
 
 KernelModule::KernelModule(Kernel &K) : VerilogModule(K), Comp(K) {
 }
+
+// Kernel
 
 const std::string KernelModule::declHeader() const {
   std::stringstream S;
@@ -37,55 +47,6 @@ const std::string KernelModule::declHeader() const {
 
   S << "\n); // end ports\n";
 
-  return S.str();
-}
-
-/// \brief Separate functions because StreamPorts have to be instantiated
-/// differently
-const std::string BlockModule::declHeader() const {
-  std::stringstream S;
-
-  S << "module " << Comp.getName() << "(\n";
-
-  Signal::SignalListTy Ports = getSignals(Comp);
-  S << createPortList(Ports);
-
-  S << "\n); // end ports\n";
-
-  return S.str();
-}
-
-const std::string BlockModule::declEnable() const {
-  std::stringstream S;
-  
-  S << "// block enable\n";
-  S << "wire enable_" << Comp.getName() << ";\n";
-  S << "assign enable_" << Comp.getName() << " = ";
-
-  const Block::CondListTy &C = Comp.getConds();
-  const Block::CondListTy &NC = Comp.getNegConds();
-
-  for (Block::CondConstItTy I=C.begin(), E=C.end(); I != E; ++I) {
-    S << I->first->getUniqueName();
-    if (std::next(I) != E) {
-      S << " & ";
-    }
-  }
-  for (Block::CondConstItTy I=NC.begin(), E=NC.end(); I != E; ++I) {
-    S << "~" << I->first->getUniqueName();
-    if (std::next(I) != E) {
-      S << " & ";
-    }
-  }
-  S << ";\n";
-  S << "// end block enable\n";
-
-  return S.str();
-}
-
-const std::string VerilogModule::declFooter() const {
-  std::stringstream S;
-  S << "endmodule " << " // " << Comp.getUniqueName() << "\n";
   return S.str();
 }
 
@@ -157,7 +118,7 @@ const std::string KernelModule::declBlockWires() const {
 /// - Non-pipelined ScalarInputs need no synchronization signals.
 /// - Streams have separate address ports for each store and load
 
-const std::string KernelModule::instBlocks() {
+const std::string KernelModule::instBlocks() const {
   std::stringstream SBlock;
   for (block_p B : Comp.getBlocks()) {
     const std::string BName = B->getUniqueName();
@@ -182,4 +143,174 @@ const std::string KernelModule::instBlocks() {
     SBlock << "\n" << ");\n";
   }
   return SBlock.str();
+}
+
+// Block
+
+/// \brief Separate functions because StreamPorts have to be instantiated
+/// differently
+const std::string BlockModule::declHeader() const {
+  std::stringstream S;
+
+  S << "module " << Comp.getName() << "(\n";
+
+  Signal::SignalListTy Ports = getSignals(Comp);
+  S << createPortList(Ports);
+
+  S << "\n); // end ports\n";
+
+  return S.str();
+}
+
+const std::string BlockModule::declEnable() const {
+  std::stringstream S;
+  
+  S << "// block enable\n";
+  S << "wire enable_" << Comp.getName() << ";\n";
+  S << "assign enable_" << Comp.getName() << " = ";
+
+  const Block::CondListTy &C = Comp.getConds();
+  const Block::CondListTy &NC = Comp.getNegConds();
+
+  for (Block::CondConstItTy I=C.begin(), E=C.end(); I != E; ++I) {
+    S << I->first->getUniqueName();
+    if (std::next(I) != E) {
+      S << " & ";
+    }
+  }
+  for (Block::CondConstItTy I=NC.begin(), E=NC.end(); I != E; ++I) {
+    S << "~" << I->first->getUniqueName();
+    if (std::next(I) != E) {
+      S << " & ";
+    }
+  }
+  S << ";\n";
+  S << "// end block enable\n";
+
+  return S.str();
+}
+
+const std::string BlockModule::declFSMSignals() const {
+  std::stringstream S;
+  S << "// FSM signals\n";
+  S << "localparam state_free=0, state_busy=1, state_wait_output=2, state_wait_store=3, state_wait_load=4" << ";\n";
+
+  Signal State("state", 3, Signal::Local, Signal::Reg);
+  Signal NextState("next_state", 3, Signal::Local, Signal::Reg);
+  S << State.getDefStr() << ";\n";
+  S << NextState.getDefStr() << ";\n";
+
+  return S.str();
+}
+
+const std::string BlockModule::declFSM() const {
+  std::stringstream S;
+  unsigned II = 1;
+
+  S << "always @(posedge clk)" << "\n";
+  S << "begin\n";
+  S << Indent(II) << "if (rst)\n";
+    S << Indent(++II) << "begin\n";
+    // Reset all state, input buffers, ...
+    S << Indent(II) << "state <= state_free;" << "\n";
+
+    for (scalarport_p P : Comp.getInScalars()) {
+      if (!P->isPipelined()) continue;
+
+      S << Indent(II) << getOpName(P) << "_buf <= {" << P->getBitWidth() << "{1'b1}}" << ";\n";
+      S << Indent(II) << getOpName(P) << "_buf_valid <= 0" << ";\n";
+    }
+
+    S << Indent(II--) << "end\n";
+  S << Indent(II) << "else\n";
+    S << Indent(++II) << "begin\n";
+    S << Indent(II) << "state <= next_state;" << "\n";
+    S << Indent(II--) << "end\n";
+  S << "end\n";
+
+  // Asynchronous state and output
+  S << "always @(*)" << "\n";
+  S << "begin\n";
+  S << Indent(II) << "case (state)" << "\n";
+  S << Indent(II) << "state_free:" << "\n";
+  S << Indent(++II) << "begin" << "\n";
+
+    S << Indent(II) << "if(";
+    // All _valid signals of Scalars Inputs
+    std::string Prefix = "";
+    for (scalarport_p P : Comp.getInScalars()) {
+      if (P->isPipelined())
+        S << Prefix << getOpName(P) << "_buf_valid" << " == 1";
+      Prefix = " && ";
+    }
+    S << ")" << "\n";
+
+    // state_free
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II) << "next_state <= state_busy" << ";\n";
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II--) << "end" << "\n";
+
+  //S << Indent(II) << "state_busy:" << "\n";
+  //S << Indent(++II) << "begin" << "\n";
+  //S << Indent(II--) << "end" << "\n";
+
+  //S << Indent(II) << "state_wait_output:" << "\n";
+  //S << Indent(++II) << "begin" << "\n";
+  //S << Indent(II--) << "end" << "\n";
+
+  //S << Indent(II) << "state_wait_store:" << "\n";
+  //S << Indent(++II) << "begin" << "\n";
+  //S << Indent(II--) << "end" << "\n";
+
+  //S << Indent(II) << "state_wait_load:" << "\n";
+  //S << Indent(++II) << "begin" << "\n";
+  //S << Indent(II--) << "end" << "\n";
+
+  //S << Indent(II) << "default:" << "\n";
+  //S << Indent(++II) << "begin" << "\n";
+  //S << Indent(II--) << "end" << "\n";
+  S << Indent(II) << "endcase" << "\n";
+  S << "end\n";
+
+  // Synchronous outputs
+  S << "always @(posedge clk)" << "\n";
+  S << "begin\n";
+  S << Indent(II) << "case (state)" << "\n";
+  S << Indent(II) << "state_free:" << "\n";
+  S << Indent(++II) << "begin" << "\n";
+  // Buffer Inputs
+  for (scalarport_p P : Comp.getInScalars()) {
+    if (!P->isPipelined()) continue;
+
+    S << Indent(II) << "if (" << getOpName(P) << "_valid" << ")\n";
+      S << Indent(++II) << "begin\n";
+      S << Indent(II) << getOpName(P) << "_ack" << " <= 1;\n";
+      S << Indent(II) << getOpName(P) << "_buf" << " <= " << getOpName(P) << ";\n";
+      S << Indent(II) << getOpName(P) << "_buf_valid" << " <= 1;\n";
+      S << Indent(II--) << "end\n";
+
+  }
+  S << Indent(II--) << "end" << "\n";
+  S << Indent(II) << "endcase" << "\n";
+  S << "end\n";
+
+  return S.str();
+}
+
+const std::string BlockModule::declInScalarBuffer() const {
+  std::stringstream S;
+
+  S << "// InScalar buffer\n";
+  for (scalarport_p P : Comp.getInScalars()) {
+    if (!P->isPipelined()) continue;
+
+    Signal SP(getOpName(P)+"_buf", P->getBitWidth(), Signal::Local, Signal::Reg);
+    Signal SV(getOpName(P)+"_buf_valid", 1, Signal::Local, Signal::Reg);
+    S << SP.getDefStr() << ";\n";
+    S << SV.getDefStr() << ";\n";
+  }
+
+  return S.str();
 }

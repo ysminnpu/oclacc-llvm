@@ -38,20 +38,27 @@ const Signal::SignalListTy getSignals(const StreamPort &);
 const std::string createPortList(const Signal::SignalListTy &);
 
 // Scalars
-const Signal::SignalListTy getInSignals(const scalarport_p);
-const Signal::SignalListTy getOutSignals(const scalarport_p);
 
+const Signal::SignalListTy getInSignals(const scalarport_p);
 const Signal::SignalListTy getInSignals(const ScalarPort &);
+
+const Signal::SignalListTy getOutSignals(const scalarport_p);
 const Signal::SignalListTy getOutSignals(const ScalarPort &);
 
 // Used for delegation
 const Signal::SignalListTy getInSignals(const streamindex_p);
 const Signal::SignalListTy getOutSignals(const streamindex_p);
 
-const Signal::SignalListTy getOutSignals(const StaticStreamIndex &);
+const Signal::SignalListTy getInSignals(const staticstreamindex_p);
 const Signal::SignalListTy getInSignals(const StaticStreamIndex &);
 
+const Signal::SignalListTy getOutSignals(const staticstreamindex_p);
+const Signal::SignalListTy getOutSignals(const StaticStreamIndex &);
+
+const Signal::SignalListTy getInSignals(const dynamicstreamindex_p);
 const Signal::SignalListTy getInSignals(const DynamicStreamIndex &);
+
+const Signal::SignalListTy getOutSignals(const dynamicstreamindex_p);
 const Signal::SignalListTy getOutSignals(const DynamicStreamIndex &);
 
 } // end ns oclacc
