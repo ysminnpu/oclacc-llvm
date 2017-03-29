@@ -214,6 +214,8 @@ const std::string BlockModule::declFSMSignals() const {
   // CriticalPath counter
   Signal Count("counter", std::ceil(std::log2(CriticalPath))-1, Signal::Local, Signal::Reg);
   S << Count.getDefStr() << ";\n";
+  Signal CountEnabled("counter_enabled", 1, Signal::Local, Signal::Reg);
+  S << CountEnabled.getDefStr() << ";\n";
 
   return S.str();
 }
@@ -232,9 +234,11 @@ const std::string BlockModule::declFSM() const {
     for (scalarport_p P : Comp.getInScalars()) {
       if (!P->isPipelined()) continue;
 
-      S << Indent(II) << getOpName(P) << "_buf <= {" << P->getBitWidth() << "{1'b1}}" << ";\n";
+      S << Indent(II) << getOpName(P) << "_buf <= {" << P->getBitWidth() << "{1'b0}}" << ";\n";
       S << Indent(II) << getOpName(P) << "_buf_valid <= 0" << ";\n";
     }
+    S << Indent(II) << "counter <= {" << std::ceil(std::log2(CriticalPath))-1 << "{1'b0}}" << ";\n";
+    S << Indent(II) << "counter_enabled <= 0;\n";
 
     S << Indent(II--) << "end\n";
   S << Indent(II) << "else\n";
@@ -265,6 +269,8 @@ const std::string BlockModule::declFSM() const {
     S << Indent(II) << "next_state <= state_busy" << ";\n";
     S << Indent(II--) << "end" << "\n";
 
+    S << Indent(II) << "counter_enabled <= 1;\n";
+
   S << Indent(II--) << "end" << "\n";
 
   //S << Indent(II) << "state_busy:" << "\n";
@@ -294,20 +300,27 @@ const std::string BlockModule::declFSM() const {
   S << "begin\n";
   S << Indent(II) << "case (state)" << "\n";
   S << Indent(II) << "state_free:" << "\n";
-  S << Indent(++II) << "begin" << "\n";
-  // Buffer Inputs
-  for (scalarport_p P : Comp.getInScalars()) {
-    if (!P->isPipelined()) continue;
+    S << Indent(++II) << "begin" << "\n";
+    // Buffer Inputs
+    for (scalarport_p P : Comp.getInScalars()) {
+      if (!P->isPipelined()) continue;
 
-    S << Indent(II) << "if (" << getOpName(P) << "_valid" << ")\n";
-      S << Indent(++II) << "begin\n";
-      S << Indent(II) << getOpName(P) << "_ack" << " <= 1;\n";
-      S << Indent(II) << getOpName(P) << "_buf" << " <= " << getOpName(P) << ";\n";
-      S << Indent(II) << getOpName(P) << "_buf_valid" << " <= 1;\n";
-      S << Indent(II--) << "end\n";
+      S << Indent(II) << "if (" << getOpName(P) << "_valid" << ")\n";
+        S << Indent(++II) << "begin\n";
+        S << Indent(II) << getOpName(P) << "_ack" << " <= 1;\n";
+        S << Indent(II) << getOpName(P) << "_buf" << " <= " << getOpName(P) << ";\n";
+        S << Indent(II) << getOpName(P) << "_buf_valid" << " <= 1;\n";
+        S << Indent(II--) << "end\n";
 
-  }
-  S << Indent(II--) << "end" << "\n";
+    }
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II) << "state_busy:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II) << "if (counter_enabled)\n";
+    S << Indent(II+1) << "if (counter < " << CriticalPath << ") counter <= counter + 1;\n";
+    S << Indent(II--) << "end\n";
+
   S << Indent(II) << "endcase" << "\n";
   S << "end\n";
 
