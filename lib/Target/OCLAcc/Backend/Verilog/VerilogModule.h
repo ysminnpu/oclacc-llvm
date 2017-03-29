@@ -18,6 +18,7 @@ class VerilogModule {
 
   public:
     VerilogModule(Component &);
+    virtual ~VerilogModule();
 
     virtual const std::string declHeader() const = 0;
 
@@ -42,8 +43,22 @@ class BlockModule : public VerilogModule {
 
     const std::string declInScalarBuffer() const;
 
+    inline const std::string declBlockSignals() const { return BlockSignals.str(); }
+    inline const std::string declConstSignals() const { return ConstSignals.str(); }
+    inline const std::string declBlockComponents() const { return BlockComponents.str(); }
+
+    inline std::stringstream &getBlockSignals() { return BlockSignals; }
+    inline std::stringstream &getConstSignals() { return ConstSignals; }
+    inline std::stringstream &getBlockComponents() { return BlockComponents;}
+
   private:
     Block &Comp;
+    unsigned CriticalPath;
+
+    // Components as instantiated by each component
+    std::stringstream BlockSignals;
+    std::stringstream ConstSignals;
+    std::stringstream BlockComponents;
 
 };
 

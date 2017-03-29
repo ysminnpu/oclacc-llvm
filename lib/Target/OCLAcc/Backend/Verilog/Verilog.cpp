@@ -1,14 +1,5 @@
 #include "llvm/Support/raw_ostream.h"
 
-#include "Verilog.h"
-#include "FileHeader.h"
-#include "VerilogModule.h"
-#include "Naming.h"
-#include "VerilogMacros.h"
-
-#include "HW/Writeable.h"
-#include "HW/typedefs.h"
-
 #include <cstdio>
 #include <sstream>
 #include <cstdlib>
@@ -17,6 +8,16 @@
 #include <memory>
 #include <regex>
 #include <map>
+
+#include "Verilog.h"
+#include "FileHeader.h"
+#include "Naming.h"
+#include "VerilogMacros.h"
+
+#include "HW/Writeable.h"
+#include "HW/typedefs.h"
+#include "VerilogModule.h"
+
 
 #define DEBUG_TYPE "verilog"
 
@@ -339,46 +340,36 @@ int Verilog::visit(Block &R) {
 
   TheFiles.addFile(Filename);
 
+  BM = std::make_unique<BlockModule>(R);
+
   (*FS) << header();
 
-  BlockModule BM(R);
-  (*FS) << BM.declHeader();
+  (*FS) << BM->declHeader();
 
   if (R.isConditional())
-    (*FS) << BM.declEnable();
-
-
-  // Clean up Components
-  ConstSignals.str("");
-  ConstSignals << "// Constant signals\n";
-
-  BlockSignals.str("");
-  BlockSignals << "// Component signals\n";
-
-  BlockComponents.str("");
-  BlockComponents << "// Component instances\n";
+    (*FS) << BM->declEnable();
 
   // Create instances for all operations
   super::visit(R);
-  (*FS) << BM.declInScalarBuffer();
+
+  (*FS) << BM->declInScalarBuffer();
 
   // Write signals
-  (*FS) << BlockSignals.str();
+  (*FS) << BM->declBlockSignals();
 
   // Write constant assignments
-  (*FS) << ConstSignals.str();
+  (*FS) << BM->declConstSignals();
 
   // State Machine
-  (*FS) << BM.declFSMSignals();
-  (*FS) << BM.declFSM();
+  (*FS) << BM->declFSMSignals();
+  (*FS) << BM->declFSM();
 
   // Write component instantiations
-  (*FS) << BlockComponents.str();
+  (*FS) << BM->declBlockComponents();
 
-  // Schedule the created Operators
-  runAsapScheduler(R);
+  (*FS) << BM->declFooter();
 
-  (*FS) << BM.declFooter();
+  BM = nullptr;
 
   FS->close();
 
@@ -393,6 +384,11 @@ int Verilog::visit(Block &R) {
 
 int Verilog::visit(Add &R) {
   VISIT_ONCE(R);
+
+  std::stringstream &BlockSignals = BM->getBlockSignals();
+  std::stringstream &BlockComponents = BM->getBlockComponents();
+  std::stringstream &ConstSignals = BM->getConstSignals();
+
   const std::string BW = std::to_string(R.getBitWidth());
   
   const std::string Arch = std::to_string(conf::IntAdder_Arch);
@@ -439,6 +435,9 @@ int Verilog::visit(Add &R) {
 /// TODO: Use adder with negated 2nd operand.
 int Verilog::visit(Sub &R) {
   VISIT_ONCE(R);
+  std::stringstream &BlockSignals = BM->getBlockSignals();
+  std::stringstream &BlockComponents = BM->getBlockComponents();
+  std::stringstream &ConstSignals = BM->getConstSignals();
 
   const std::string BW = std::to_string(R.getBitWidth());
   
@@ -490,6 +489,9 @@ int Verilog::visit(Mul &R) {
   VISIT_ONCE(R);
   assert(R.getIns().size() == 2);
 
+  std::stringstream &BlockSignals = BM->getBlockSignals();
+  std::stringstream &BlockComponents = BM->getBlockComponents();
+
   const std::string WX = std::to_string(R.getIn(0)->getBitWidth());
   const std::string WY = std::to_string(R.getIn(1)->getBitWidth());
   const std::string WOut = std::to_string(R.getBitWidth());
@@ -531,6 +533,9 @@ int Verilog::visit(FAdd &R) {
   VISIT_ONCE(R);
   assert(R.getIns().size() == 2);
 
+  std::stringstream &BlockSignals = BM->getBlockSignals();
+  std::stringstream &BlockComponents = BM->getBlockComponents();
+
   const std::string isSub = "false";
 
   const std::string dualPath = conf::to_string(conf::FPAdd_DualPath);
@@ -571,6 +576,7 @@ int Verilog::visit(FAdd &R) {
 
 int Verilog::visit(FSub &R) {
   VISIT_ONCE(R);
+  std::stringstream &BlockComponents = BM->getBlockComponents();
   return 0;
 }
 
@@ -578,6 +584,9 @@ int Verilog::visit(FMul &R) {
   VISIT_ONCE(R);
 
   assert(R.getIns().size() == 2);
+
+  std::stringstream &BlockSignals = BM->getBlockSignals();
+  std::stringstream &BlockComponents = BM->getBlockComponents();
 
   const std::string RName = R.getUniqueName();
 
@@ -729,9 +738,5 @@ int Verilog::visit(DynamicStreamIndex &R) {
   VISIT_ONCE(R);
   return 0;
 }
-
-void Verilog::runAsapScheduler(const Block &R) {
-}
-
 
 #undef DEBUG_TYPE

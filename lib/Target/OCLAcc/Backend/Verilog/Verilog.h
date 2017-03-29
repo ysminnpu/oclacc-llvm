@@ -21,6 +21,7 @@ class StreamPort;
 class Arith;
 class FPArith;
 class Mux;
+class BlockModule;
 
 // Quick and dirty set various options for flopoco instances
 namespace conf {
@@ -96,10 +97,7 @@ class Verilog : public DFVisitor {
   private:
     typedef DFVisitor super;
 
-    // Components as instantiated by each component
-    std::stringstream BlockSignals;
-    std::stringstream ConstSignals;
-    std::stringstream BlockComponents;
+    std::unique_ptr<BlockModule> BM;
 
   public:
     Verilog();
@@ -133,8 +131,6 @@ class Verilog : public DFVisitor {
     int visit(And &);
     int visit(Or &);
     int visit(Xor &);
-
-    void runAsapScheduler(const Block &);
 };
 
 } // end ns oclacc

@@ -1,5 +1,6 @@
 #include <memory>
 #include <sstream>
+#include <cmath>
 
 #include "../../HW/Kernel.h"
 
@@ -16,6 +17,9 @@ extern DesignFiles TheFiles;
 VerilogModule::VerilogModule(Component &C) : Comp(C) {
 }
 
+VerilogModule::~VerilogModule() {
+}
+
 const std::string VerilogModule::declFooter() const {
   std::stringstream S;
   S << "endmodule " << " // " << Comp.getUniqueName() << "\n";
@@ -24,6 +28,12 @@ const std::string VerilogModule::declFooter() const {
 
 
 BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B) {
+  // Clean up Components
+  ConstSignals << "// Constant signals\n";
+
+  BlockSignals << "// Component signals\n";
+
+  BlockComponents << "// Component instances\n";
 }
 
 
@@ -195,10 +205,15 @@ const std::string BlockModule::declFSMSignals() const {
   S << "// FSM signals\n";
   S << "localparam state_free=0, state_busy=1, state_wait_output=2, state_wait_store=3, state_wait_load=4" << ";\n";
 
+  // InScalar buffer
   Signal State("state", 3, Signal::Local, Signal::Reg);
   Signal NextState("next_state", 3, Signal::Local, Signal::Reg);
   S << State.getDefStr() << ";\n";
   S << NextState.getDefStr() << ";\n";
+
+  // CriticalPath counter
+  Signal Count("counter", std::ceil(std::log2(CriticalPath))-1, Signal::Local, Signal::Reg);
+  S << Count.getDefStr() << ";\n";
 
   return S.str();
 }
@@ -314,3 +329,4 @@ const std::string BlockModule::declInScalarBuffer() const {
 
   return S.str();
 }
+
