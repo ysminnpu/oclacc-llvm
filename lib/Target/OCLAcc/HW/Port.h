@@ -14,20 +14,26 @@
 namespace oclacc {
 
 class Port : public HW {
-  protected:
-    Port(const std::string &, size_t, const Datatype &, bool);
-
-  public:
-    virtual bool isScalar() const=0;
-    const Datatype &getPortType();
-    bool isPipelined() const;
-
   private:
     const Datatype &PortType;
     
   protected:
     bool Pipelined = false;
+
+
+  protected:
+    Port(const std::string &, size_t, const Datatype &, bool);
+
   public:
+    virtual bool isScalar() const=0;
+
+    inline const Datatype &getPortType() {
+      return PortType;
+    }
+
+    inline bool isPipelined(void) const {
+      return Pipelined;
+    }
 };
 
 /// \brief Input or Output Port
@@ -44,7 +50,6 @@ class ScalarPort : public Port {
     ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined);
 
     bool isScalar() const;
-
 
     DECLARE_VISIT;
 };
@@ -93,15 +98,23 @@ class StreamPort : public Port {
 
     DECLARE_VISIT;
 
-    bool isScalar() const;
+    inline bool isScalar() const {
+      return false;
+    }
 
     // Combined
     const IndexListTy get(AccessTy) const;
     const StaticIndexListTy getStaticIndizes() const;
     const DynamicIndexListTy getDynamicIndizes() const;
 
-    const IndexListTy &getIndexList() const;
-    const AccessListTy &getAccessList() const;
+    inline const IndexListTy &getIndexList() const {
+      return IndexList;
+    }
+
+    inline const AccessListTy &getAccessList() const {
+      return AccessList;
+    }
+
 
     bool hasLoads() const;
     bool hasStores() const;
@@ -110,7 +123,11 @@ class StreamPort : public Port {
     //
     bool isLoad(StreamIndex *) const;
     bool isLoad(streamindex_p P) const { return isLoad(P.get()); } 
-    const IndexListTy getLoads() const;
+
+    inline const IndexListTy getLoads() const {
+      return get(Load);
+    }
+
     const StaticIndexListTy getStaticLoads() const;
     const DynamicIndexListTy getDynamicLoads() const;
 
@@ -120,7 +137,11 @@ class StreamPort : public Port {
     //
     bool isStore(StreamIndex *) const;
     bool isStore(streamindex_p P) const { return isStore(P.get()); }
-    const IndexListTy getStores() const;
+
+    inline const IndexListTy getStores() const {
+      return get(Store);
+    }
+
     const StaticIndexListTy getStaticStores() const;
     const DynamicIndexListTy getDynamicStores() const;
 
@@ -142,7 +163,13 @@ class StreamIndex : public HW {
     StreamIndex(const StreamIndex&) = delete;
     StreamIndex& operator=(const StreamIndex&) = delete;
 
-    const streamport_p getStream() const;
+    inline const streamport_p getStream() const {
+      return Stream;
+    }
+
+    inline unsigned getStreamBitWidth() const {
+      return Stream->getBitWidth();
+    }
 
     virtual bool isStatic() const = 0;
 
@@ -161,12 +188,17 @@ class DynamicStreamIndex : public StreamIndex {
     DynamicStreamIndex(const DynamicStreamIndex&) = delete;
     DynamicStreamIndex& operator=(const DynamicStreamIndex&) = delete;
 
+    void setIndex(base_p I) {
+      Index = I;
+    }
 
-    virtual void setIndex(base_p I);
+    base_p getIndex() const {
+      return Index;
+    }
 
-    base_p getIndex() const;
-
-    bool isStatic() const;
+    bool isStatic() const {
+      return false;
+    }
 
     DECLARE_VISIT;
 };
@@ -186,12 +218,22 @@ class StaticStreamIndex : public StreamIndex {
     StaticStreamIndex(const StaticStreamIndex&) = delete;
     StaticStreamIndex& operator=(const StaticStreamIndex&) = delete;
 
-    virtual void setIndex(IndexTy I);
-    IndexTy getIndex() const;
+    virtual void setIndex(IndexTy I) {
+      Index = I;
+    }
 
-    bool isStatic() const;
+    inline IndexTy getIndex() const {
+      return Index;
+    }
 
-    const std::string getUniqueName() const;
+    inline bool isStatic() const {
+      return true;
+    }
+
+    inline const std::string getUniqueName() const {
+      return getName();
+    }
+
 
     DECLARE_VISIT;
 };

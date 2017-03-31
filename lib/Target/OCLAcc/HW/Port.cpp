@@ -6,10 +6,6 @@ Port::Port(const std::string &Name,
     size_t W, const Datatype &T, 
     bool Pipelined=false) : HW(Name, W), PortType(T), Pipelined(Pipelined) { }
 
-const Datatype &Port::getPortType() { return PortType; }
-
-bool Port::isPipelined(void) const { return Pipelined; }
-
 /// Scalar Port
 ///
 ScalarPort::ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined) : Port(Name, W, T, Pipelined){ }
@@ -22,7 +18,6 @@ bool ScalarPort::isScalar() const { return true; }
 ///
 StreamPort::StreamPort(const std::string &Name, size_t W, ocl::AddressSpace, const Datatype &T) : Port(Name, W, T) { }
 
-bool StreamPort::isScalar() const { return false; }
 
 void StreamPort::addLoad(streamindex_p I) {
   IndexList.push_back(I);
@@ -37,14 +32,6 @@ const StreamPort::IndexListTy StreamPort::get(StreamPort::AccessTy A) const {
     }
   }
   return L;
-}
-
-const StreamPort::IndexListTy StreamPort::getLoads() const {
-  return get(Load);
-}
-
-const StreamPort::IndexListTy StreamPort::getStores() const {
-  return get(Store);
 }
 
 
@@ -89,14 +76,6 @@ bool StreamPort::isStore(StreamIndex *I) const {
   return false;
 }
 
-const StreamPort::IndexListTy &StreamPort::getIndexList() const {
-  return IndexList;
-}
-
-const StreamPort::AccessListTy &StreamPort::getAccessList() const {
-  return AccessList;
-}
-
 /// \brief StreamIndex
 ///
 /// In and Out used for data while the index depends on the actual subcalss
@@ -104,37 +83,14 @@ const StreamPort::AccessListTy &StreamPort::getAccessList() const {
 StreamIndex::StreamIndex(const std::string &Name, streamport_p Stream, unsigned BitWidth) : HW(Name,BitWidth), Stream(Stream) {
 }
 
-const streamport_p StreamIndex::getStream() const {
-  return Stream;
-}
-
 
 DynamicStreamIndex::DynamicStreamIndex(const std::string &Name, streamport_p Stream, base_p Index, unsigned BitWidth) : StreamIndex(Name, Stream, BitWidth), Index(Index) { }
-
-void DynamicStreamIndex::setIndex(base_p I) {
-  Index = I;
-}
-
-base_p DynamicStreamIndex::getIndex() const { return Index; }
-
-bool DynamicStreamIndex::isStatic() const { return false;}
 
 /// \brief Stream with compile-time constant Index 
 ///
 /// The index is not represented as ConstantVal object to simplify offset
 /// analysis for stream optimization.
 StaticStreamIndex::StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t BitWidth) : StreamIndex(Name, Stream, BitWidth), Index(Index) {
-}
-
-void StaticStreamIndex::setIndex(StaticStreamIndex::IndexTy I) {
-  Index = I;
-}
-StaticStreamIndex::IndexTy StaticStreamIndex::getIndex() const { return Index; }
-
-bool StaticStreamIndex::isStatic() const {return true;}
-
-const std::string StaticStreamIndex::getUniqueName() const {
-  return getName();
 }
 
 const StreamPort::StaticIndexListTy StreamPort::getStaticIndizes() const {
