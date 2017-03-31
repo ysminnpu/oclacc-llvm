@@ -2,8 +2,9 @@
 
 #include "llvm/Support/ErrorHandling.h"
 
-#include "../../HW/Kernel.h"
-#include "../../HW/Arith.h"
+#include "HW/Kernel.h"
+#include "HW/Arith.h"
+#include "HW/Constant.h"
 #include "Naming.h"
 #include "VerilogMacros.h"
 
@@ -13,7 +14,9 @@ extern Signal Clk;
 extern Signal Rst;
 
 const std::string oclacc::getOpName(const base_p P) {
-  if (staticstreamindex_p SI = std::dynamic_pointer_cast<StaticStreamIndex>(P)) {
+  if (const_p SI = std::dynamic_pointer_cast<ConstVal>(P)) {
+    return getOpName(*SI);
+  } else if (staticstreamindex_p SI = std::dynamic_pointer_cast<StaticStreamIndex>(P)) {
     return getOpName(*SI);
   } else if (dynamicstreamindex_p SC = std::dynamic_pointer_cast<DynamicStreamIndex>(P)) {
     return getOpName(*SC);
@@ -21,6 +24,19 @@ const std::string oclacc::getOpName(const base_p P) {
     return getOpName(*P);
   }
 }
+
+const std::string oclacc::getOpName(const ConstVal &P) {
+  std::stringstream Name;
+
+  std::string PName = P.getUniqueName();
+  if (PName[0] == '-')
+    PName[0] = '_';
+
+  Name << "const_" << PName;
+
+  return Name.str();
+}
+
 
 const std::string oclacc::getOpName(const StaticStreamIndex &P) {
   std::stringstream Name;
@@ -195,13 +211,14 @@ const Signal::SignalListTy oclacc::getInSignals(const ScalarPort &P) {
 
   const std::string PName = getOpName(P);
 
-  L.push_back(Signal(PName,BitWidth,Signal::In, Signal::Wire));
 
-  // Only pipelined ports have synchronization signals
+  // Only pipelined ports have buffer and synchronization signals
   if (P.isPipelined()) {
-    L.push_back(Signal(PName+"_valid", 1, Signal::In, Signal::Wire));
-    L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));
-  }
+    L.push_back(Signal(PName+"_unbuf",BitWidth,Signal::In, Signal::Wire));
+    L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::In, Signal::Wire));
+    L.push_back(Signal(PName+"_unbuf_ack", 1, Signal::Out, Signal::Reg));
+  } else
+    L.push_back(Signal(PName,BitWidth,Signal::In, Signal::Wire));
 
   return L;
 }
@@ -251,11 +268,11 @@ const Signal::SignalListTy oclacc::getOutSignals(const ScalarPort &P) {
 
   const std::string PName = getOpName(P);
 
-  L.push_back(Signal(PName, BitWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_unbuf", BitWidth, Signal::Out, Signal::Reg));
 
-  L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::Out, Signal::Reg));
 
-  L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_unbuf_ack", 1, Signal::In, Signal::Wire));
 
   return L;
 }
@@ -273,10 +290,10 @@ const Signal::SignalListTy oclacc::getInSignals(const StaticStreamIndex &P) {
 
   const std::string PName = getOpName(P);
 
-  L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName, DataWidth, Signal::In, Signal::Wire));
-  L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_unbuf_address", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_unbuf", DataWidth, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_unbuf_ack", 1, Signal::In, Signal::Wire));
 
   return L;
 }
@@ -293,10 +310,10 @@ const Signal::SignalListTy oclacc::getInSignals(const DynamicStreamIndex &P) {
 
   const std::string Name = getOpName(P);
 
-  L.push_back(Signal(Name+"_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(Name, DataWidth, Signal::In, Signal::Wire));
-  L.push_back(Signal(Name+"_valid", 1, Signal::In, Signal::Wire));
-  L.push_back(Signal(Name+"_ack", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(Name+"_unbuf_address", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(Name+"_unbuf", DataWidth, Signal::In, Signal::Wire));
+  L.push_back(Signal(Name+"_unbuf_valid", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(Name+"_unbuf_ack", 1, Signal::Out, Signal::Reg));
 
   return L;
 }

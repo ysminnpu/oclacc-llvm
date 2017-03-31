@@ -20,6 +20,7 @@ namespace oclacc {
 const std::string getOpName(const base_p P);
 
 const std::string getOpName(const HW &R);
+const std::string getOpName(const ConstVal &P);
 const std::string getOpName(const StaticStreamIndex &R);
 const std::string getOpName(const DynamicStreamIndex &R);
 //const std::string getOpName(const ScalarPort &R);

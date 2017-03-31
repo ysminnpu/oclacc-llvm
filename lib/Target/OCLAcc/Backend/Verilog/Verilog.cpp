@@ -349,10 +349,13 @@ int Verilog::visit(Block &R) {
   if (R.isConditional())
     (*FS) << BM->declEnable();
 
+  // Write constant assignments
+  (*FS) << BM->declConstValues();
+
   // Create instances for all operations
   super::visit(R);
 
-  (*FS) << BM->declInputBuffer();
+  (*FS) << BM->declPortControlSignals();
 
   // Write signals
   (*FS) << BM->declBlockSignals();

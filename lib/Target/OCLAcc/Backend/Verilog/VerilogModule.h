@@ -37,21 +37,25 @@ class BlockModule : public VerilogModule {
 
     const std::string declEnable() const;
 
-    const std::string declInputBuffer() const;
+    const std::string declConstValues() const;
+
+    const std::string declPortControlSignals() const;
 
     const std::string declFSMSignals() const;
 
     const std::string declFSM() const;
 
     inline const std::string declBlockSignals() const { return BlockSignals.str(); }
-    inline const std::string declConstSignals() const { return ConstSignals.str(); }
     inline const std::string declBlockComponents() const { return BlockComponents.str(); }
+    inline const std::string declConstSignals() const { return ConstSignals.str(); }
 
     inline std::stringstream &getBlockSignals() { return BlockSignals; }
     inline std::stringstream &getConstSignals() { return ConstSignals; }
     inline std::stringstream &getBlockComponents() { return BlockComponents;}
 
     void schedule(const OperatorInstances &);
+
+    unsigned getReadyCycle(const std::string) const;
 
   private:
     Block &Comp;
