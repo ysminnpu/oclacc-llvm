@@ -37,11 +37,11 @@ class BlockModule : public VerilogModule {
 
     const std::string declEnable() const;
 
+    const std::string declInputBuffer() const;
+
     const std::string declFSMSignals() const;
 
     const std::string declFSM() const;
-
-    const std::string declInScalarBuffer() const;
 
     inline const std::string declBlockSignals() const { return BlockSignals.str(); }
     inline const std::string declConstSignals() const { return ConstSignals.str(); }
@@ -50,6 +50,8 @@ class BlockModule : public VerilogModule {
     inline std::stringstream &getBlockSignals() { return BlockSignals; }
     inline std::stringstream &getConstSignals() { return ConstSignals; }
     inline std::stringstream &getBlockComponents() { return BlockComponents;}
+
+    void schedule(const OperatorInstances &);
 
   private:
     Block &Comp;

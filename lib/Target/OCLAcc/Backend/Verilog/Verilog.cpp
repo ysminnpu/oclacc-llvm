@@ -352,13 +352,16 @@ int Verilog::visit(Block &R) {
   // Create instances for all operations
   super::visit(R);
 
-  (*FS) << BM->declInScalarBuffer();
+  (*FS) << BM->declInputBuffer();
 
   // Write signals
   (*FS) << BM->declBlockSignals();
 
   // Write constant assignments
   (*FS) << BM->declConstSignals();
+
+  // Determine critical path
+  BM->schedule(TheOps);
 
   // State Machine
   (*FS) << BM->declFSMSignals();

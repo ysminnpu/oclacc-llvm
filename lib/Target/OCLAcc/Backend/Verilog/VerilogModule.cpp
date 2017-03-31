@@ -205,11 +205,12 @@ const std::string BlockModule::declFSMSignals() const {
   S << "// FSM signals\n";
   S << "localparam state_free=0, state_busy=1, state_wait_output=2, state_wait_store=3, state_wait_load=4" << ";\n";
 
-  // InScalar buffer
+  // States
   Signal State("state", 3, Signal::Local, Signal::Reg);
   Signal NextState("next_state", 3, Signal::Local, Signal::Reg);
   S << State.getDefStr() << ";\n";
   S << NextState.getDefStr() << ";\n";
+
 
   // CriticalPath counter
   Signal Count("counter", std::ceil(std::log2(CriticalPath))-1, Signal::Local, Signal::Reg);
@@ -224,6 +225,73 @@ const std::string BlockModule::declFSM() const {
   std::stringstream S;
   unsigned II = 1;
 
+  // Asynchronous state and output
+  S << "always @(*)" << "\n";
+  S << "begin\n";
+  S << Indent(II) << "case (state)" << "\n";
+  S << Indent(II) << "state_free:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+
+    S << Indent(II++) << "if(\n";
+    // All _valid signals of Scalars Inputs
+    std::vector<std::string> PortNames;
+
+    for (scalarport_p P : Comp.getInScalars()) {
+      if (P->isPipelined())
+        PortNames.push_back(getOpName(P));
+    }
+    for (streamindex_p P : Comp.getInStreamIndices()) {
+      PortNames.push_back(getOpName(P));
+    }
+
+    std::string Prefix = "";
+    for (const std::string &N : PortNames) {
+        S << Prefix << Indent(II) << N << "_buf_valid" << " == 1";
+      Prefix = " && \n";
+    }
+    S << "\n" << Indent(--II) << ")" << "\n";
+
+    // state_free
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II) << "next_state <= state_busy" << ";\n";
+    S << Indent(II--) << "end" << "\n";
+
+    S << Indent(II) << "counter_enabled <= 0;\n";
+
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II) << "state_busy:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II) << "counter_enabled <= 1;\n";
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II) << "state_wait_output:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II) << "counter_enabled <= 0;\n";
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II) << "state_wait_store:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II) << "counter_enabled <= 0;\n";
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II) << "state_wait_load:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II) << "counter_enabled <= 0;\n";
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II) << "default:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    // Make sure outputs are logik
+    S << Indent(II) << "next_state <= state;\n";
+    S << Indent(II) << "counter_enabled <= 0;\n";
+    S << Indent(II--) << "end" << "\n";
+
+  S << Indent(II) << "endcase" << "\n";
+  S << "end\n";
+
+
+  // Synchronous next_state
   S << "always @(posedge clk)" << "\n";
   S << "begin\n";
   S << Indent(II) << "if (rst)\n";
@@ -238,61 +306,12 @@ const std::string BlockModule::declFSM() const {
       S << Indent(II) << getOpName(P) << "_buf_valid <= 0" << ";\n";
     }
     S << Indent(II) << "counter <= {" << std::ceil(std::log2(CriticalPath))-1 << "{1'b0}}" << ";\n";
-    S << Indent(II) << "counter_enabled <= 0;\n";
 
     S << Indent(II--) << "end\n";
   S << Indent(II) << "else\n";
     S << Indent(++II) << "begin\n";
     S << Indent(II) << "state <= next_state;" << "\n";
     S << Indent(II--) << "end\n";
-  S << "end\n";
-
-  // Asynchronous state and output
-  S << "always @(*)" << "\n";
-  S << "begin\n";
-  S << Indent(II) << "case (state)" << "\n";
-  S << Indent(II) << "state_free:" << "\n";
-  S << Indent(++II) << "begin" << "\n";
-
-    S << Indent(II) << "if(";
-    // All _valid signals of Scalars Inputs
-    std::string Prefix = "";
-    for (scalarport_p P : Comp.getInScalars()) {
-      if (P->isPipelined())
-        S << Prefix << getOpName(P) << "_buf_valid" << " == 1";
-      Prefix = " && ";
-    }
-    S << ")" << "\n";
-
-    // state_free
-    S << Indent(++II) << "begin" << "\n";
-    S << Indent(II) << "next_state <= state_busy" << ";\n";
-    S << Indent(II--) << "end" << "\n";
-
-    S << Indent(II) << "counter_enabled <= 1;\n";
-
-  S << Indent(II--) << "end" << "\n";
-
-  //S << Indent(II) << "state_busy:" << "\n";
-  //S << Indent(++II) << "begin" << "\n";
-  //S << Indent(II--) << "end" << "\n";
-
-  //S << Indent(II) << "state_wait_output:" << "\n";
-  //S << Indent(++II) << "begin" << "\n";
-  //S << Indent(II--) << "end" << "\n";
-
-  //S << Indent(II) << "state_wait_store:" << "\n";
-  //S << Indent(++II) << "begin" << "\n";
-  //S << Indent(II--) << "end" << "\n";
-
-  //S << Indent(II) << "state_wait_load:" << "\n";
-  //S << Indent(++II) << "begin" << "\n";
-  //S << Indent(II--) << "end" << "\n";
-
-  //S << Indent(II) << "default:" << "\n";
-  //S << Indent(++II) << "begin" << "\n";
-  //S << Indent(II--) << "end" << "\n";
-  S << Indent(II) << "endcase" << "\n";
   S << "end\n";
 
   // Synchronous outputs
@@ -311,6 +330,15 @@ const std::string BlockModule::declFSM() const {
         S << Indent(II) << getOpName(P) << "_buf" << " <= " << getOpName(P) << ";\n";
         S << Indent(II) << getOpName(P) << "_buf_valid" << " <= 1;\n";
         S << Indent(II--) << "end\n";
+    }
+    
+    for (streamindex_p P : Comp.getInStreamIndices()) {
+      S << Indent(II) << "if (" << getOpName(P) << "_valid" << ")\n";
+        S << Indent(++II) << "begin\n";
+        S << Indent(II) << getOpName(P) << "_ack" << " <= 1;\n";
+        S << Indent(II) << getOpName(P) << "_buf" << " <= " << getOpName(P) << ";\n";
+        S << Indent(II) << getOpName(P) << "_buf_valid" << " <= 1;\n";
+        S << Indent(II--) << "end\n";
 
     }
     S << Indent(II--) << "end" << "\n";
@@ -318,8 +346,24 @@ const std::string BlockModule::declFSM() const {
   S << Indent(II) << "state_busy:" << "\n";
     S << Indent(++II) << "begin" << "\n";
     S << Indent(II) << "if (counter_enabled)\n";
-    S << Indent(II+1) << "if (counter < " << CriticalPath << ") counter <= counter + 1;\n";
+      S << Indent(++II) << "begin\n";
+      S << Indent(II+1) << "if (counter < " << CriticalPath << ") counter <= counter + 1;\n";
+      S << Indent(II+1) << "else counter <= {" << std::ceil(std::log2(CriticalPath))-1 << "{1'b0}}" << ";\n";
+      S << Indent(II--) << "end\n";
     S << Indent(II--) << "end\n";
+  
+  S << Indent(II) << "state_wait_output:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II--) << "end\n";
+
+  S << Indent(II) << "state_wait_store:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II--) << "end\n";
+
+  S << Indent(II) << "state_wait_load:" << "\n";
+    S << Indent(++II) << "begin" << "\n";
+    S << Indent(II--) << "end\n";
+
 
   S << Indent(II) << "endcase" << "\n";
   S << "end\n";
@@ -327,19 +371,33 @@ const std::string BlockModule::declFSM() const {
   return S.str();
 }
 
-const std::string BlockModule::declInScalarBuffer() const {
+const std::string BlockModule::declInputBuffer() const {
   std::stringstream S;
+
+  S << "// InStream buffer\n";
+  for (streamindex_p P : Comp.getInStreamIndices()) {
+    Signal SP(getOpName(P)+"_buf", P->getStreamBitWidth(), Signal::Local, Signal::Reg);
+    S << SP.getDefStr() << ";\n";
+
+    Signal SV(getOpName(P)+"_buf_valid", 1, Signal::Local, Signal::Reg);
+    S << SV.getDefStr() << ";\n";
+  }
 
   S << "// InScalar buffer\n";
   for (scalarport_p P : Comp.getInScalars()) {
     if (!P->isPipelined()) continue;
 
     Signal SP(getOpName(P)+"_buf", P->getBitWidth(), Signal::Local, Signal::Reg);
-    Signal SV(getOpName(P)+"_buf_valid", 1, Signal::Local, Signal::Reg);
     S << SP.getDefStr() << ";\n";
+
+    Signal SV(getOpName(P)+"_buf_valid", 1, Signal::Local, Signal::Reg);
     S << SV.getDefStr() << ";\n";
   }
 
   return S.str();
+}
+
+void BlockModule::schedule(const OperatorInstances &I) {
+  CriticalPath = 5;
 }
 
