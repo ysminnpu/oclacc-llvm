@@ -319,6 +319,12 @@ const std::string BlockModule::declFSM() const {
   // Synchronous outputs
   S << "always @(posedge clk)" << "\n";
   S << "begin\n";
+  
+  // Assign ack only for a single cycle
+  for (const std::string &N : PortNames) {
+    S << Indent(II) << N << "_ack <= 0;\n";
+  }
+
   S << Indent(II) << "case (state)" << "\n";
   S << Indent(II) << "state_free:" << "\n";
     S << Indent(++II) << "begin" << "\n";
