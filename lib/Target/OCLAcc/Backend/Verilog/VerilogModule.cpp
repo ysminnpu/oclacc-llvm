@@ -321,25 +321,25 @@ const std::string BlockModule::declFSM() const {
   S << Indent(II) << "state_free:" << "\n";
     S << Indent(++II) << "begin" << "\n";
     // Buffer Inputs
+    PortNames.clear();
+
     for (scalarport_p P : Comp.getInScalars()) {
       if (!P->isPipelined()) continue;
 
-      S << Indent(II) << "if (" << getOpName(P) << "_valid" << ")\n";
-        S << Indent(++II) << "begin\n";
-        S << Indent(II) << getOpName(P) << "_ack" << " <= 1;\n";
-        S << Indent(II) << getOpName(P) << "_buf" << " <= " << getOpName(P) << ";\n";
-        S << Indent(II) << getOpName(P) << "_buf_valid" << " <= 1;\n";
-        S << Indent(II--) << "end\n";
+      PortNames.push_back(getOpName(P));
     }
     
     for (streamindex_p P : Comp.getInStreamIndices()) {
-      S << Indent(II) << "if (" << getOpName(P) << "_valid" << ")\n";
-        S << Indent(++II) << "begin\n";
-        S << Indent(II) << getOpName(P) << "_ack" << " <= 1;\n";
-        S << Indent(II) << getOpName(P) << "_buf" << " <= " << getOpName(P) << ";\n";
-        S << Indent(II) << getOpName(P) << "_buf_valid" << " <= 1;\n";
-        S << Indent(II--) << "end\n";
+      PortNames.push_back(getOpName(P));
+    }
 
+    for (const std::string &N : PortNames) {
+      S << Indent(II) << "if (" << N << "_valid" << ")\n";
+      S << Indent(++II) << "begin\n";
+      S << Indent(II) << N << "_ack" << " <= 1;\n";
+      S << Indent(II) << N << "_buf" << " <= " << N << ";\n";
+      S << Indent(II) << N << "_buf_valid" << " <= 1;\n";
+      S << Indent(II--) << "end\n";
     }
     S << Indent(II--) << "end" << "\n";
 
