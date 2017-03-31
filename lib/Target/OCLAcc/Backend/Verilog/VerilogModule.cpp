@@ -379,84 +379,81 @@ const std::string BlockModule::declFSM() const {
   S << Indent(II) << "else\n";
     S << Indent(++II) << "begin\n";
     S << Indent(II) << "state <= next_state;" << "\n";
-    S << Indent(II--) << "end\n";
-  S << "end\n";
 
-  // Synchronous outputs
-  S << "always @(posedge clk)" << "\n";
-  S << "begin\n";
-  
-  // Assign ack only for a single cycle
-  for (const std::string &N : InputNames) {
-    S << Indent(II) << N << "_unbuf_ack <= 0;\n";
-  }
+    // Synchronous outputs
 
-  // Reset status signals in state_free
-  S << Indent(II) << "if (state == state_free)\n";
-  BEGIN;
-  for (const std::string &N : OutputNames) {
-    S << Indent(II) << N << "_fin <= 0;\n";
-  }
-  END;
-
-  // Allow others to acknowledge an output port in every state except state_free
-  S << Indent(II) << "if (state != state_free)\n";
-  BEGIN;
-  for (const std::string &N : OutputNames) {
-    S << Indent(II) << "if (" << N << "_ack == 1) " << N << "_fin <= 1;\n";
-  }
-  END;
-
-  S << Indent(II) << "case (state)" << "\n";
-  S << Indent(II) << "state_free:" << "\n";
-    BEGIN;
-
-    // Buffer Inputs
-
+    // Assign ack only for a single cycle
     for (const std::string &N : InputNames) {
-      S << Indent(II) << "if (" << N << "_unbuf_valid" << ")\n";
-      BEGIN;
-      S << Indent(II) << N << "_unbuf_ack" << " <= 1;\n";
-      S << Indent(II) << N << " <= " << N << "_unbuf;\n";
-      S << Indent(II) << N << "_valid" << " <= 1;\n";
-      END;
+      S << Indent(II) << N << "_unbuf_ack <= 0;\n";
     }
-    S << Indent(II--) << "end" << "\n";
 
-  S << Indent(II) << "state_busy:" << "\n";
+    // Reset status signals in state_free
+    S << Indent(II) << "if (state == state_free)\n";
     BEGIN;
-    S << Indent(II) << "if (counter_enabled)\n";
-      BEGIN;
-      S << Indent(II+1) << "if (counter < " << CriticalPath << ") counter <= counter + 1;\n";
-      S << Indent(II+1) << "else counter <= '0;\n";
-      END;
-
-      // Output gets ready, set valid
-      for (const std::string &N : OutputNames) {
-        unsigned C = getReadyCycle(N);
-
-        S << Indent(II) << "if (counter == " << C << ")\n";
-          BEGIN;
-          S << Indent(II) << N << "_valid <= 1;\n";
-          END;
-      }
+    for (const std::string &N : OutputNames) {
+      S << Indent(II) << N << "_fin <= 0;\n";
+    }
     END;
-  
-  S << Indent(II) << "state_wait_output:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
-    S << Indent(II--) << "end\n";
 
-  S << Indent(II) << "state_wait_store:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
-    S << Indent(II--) << "end\n";
+    // Allow others to acknowledge an output port in every state except state_free
+    S << Indent(II) << "if (state != state_free)\n";
+    BEGIN;
+    for (const std::string &N : OutputNames) {
+      S << Indent(II) << "if (" << N << "_ack == 1) " << N << "_fin <= 1;\n";
+    }
+    END;
 
-  S << Indent(II) << "state_wait_load:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
-    S << Indent(II--) << "end\n";
+    S << Indent(II) << "case (state)" << "\n";
+    S << Indent(II) << "state_free:" << "\n";
+      BEGIN;
+
+      // Buffer Inputs
+
+      for (const std::string &N : InputNames) {
+        S << Indent(II) << "if (" << N << "_unbuf_valid" << ")\n";
+        BEGIN;
+        S << Indent(II) << N << "_unbuf_ack" << " <= 1;\n";
+        S << Indent(II) << N << " <= " << N << "_unbuf;\n";
+        S << Indent(II) << N << "_valid" << " <= 1;\n";
+        END;
+      }
+      S << Indent(II--) << "end" << "\n";
+
+    S << Indent(II) << "state_busy:" << "\n";
+      BEGIN;
+      S << Indent(II) << "if (counter_enabled)\n";
+        BEGIN;
+        S << Indent(II+1) << "if (counter < " << CriticalPath << ") counter <= counter + 1;\n";
+        S << Indent(II+1) << "else counter <= '0;\n";
+        END;
+
+        // Output gets ready, set valid
+        for (const std::string &N : OutputNames) {
+          unsigned C = getReadyCycle(N);
+
+          S << Indent(II) << "if (counter == " << C << ")\n";
+            BEGIN;
+            S << Indent(II) << N << "_valid <= 1;\n";
+            END;
+        }
+      END;
+    
+    S << Indent(II) << "state_wait_output:" << "\n";
+      S << Indent(++II) << "begin" << "\n";
+      S << Indent(II--) << "end\n";
+
+    S << Indent(II) << "state_wait_store:" << "\n";
+      S << Indent(++II) << "begin" << "\n";
+      S << Indent(II--) << "end\n";
+
+    S << Indent(II) << "state_wait_load:" << "\n";
+      S << Indent(++II) << "begin" << "\n";
+      S << Indent(II--) << "end\n";
 
 
-  S << Indent(II) << "endcase" << "\n";
-  S << "end\n";
+    S << Indent(II) << "endcase" << "\n";
+    END;
+  END;
 
   return S.str();
 }
