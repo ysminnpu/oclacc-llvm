@@ -225,6 +225,17 @@ const std::string BlockModule::declFSM() const {
   std::stringstream S;
   unsigned II = 1;
 
+  // All _valid signals of Inputs
+  std::vector<std::string> PortNames;
+
+  for (scalarport_p P : Comp.getInScalars()) {
+    if (P->isPipelined())
+      PortNames.push_back(getOpName(P));
+  }
+  for (streamindex_p P : Comp.getInStreamIndices()) {
+    PortNames.push_back(getOpName(P));
+  }
+
   // Asynchronous state and output
   S << "always @(*)" << "\n";
   S << "begin\n";
@@ -233,16 +244,6 @@ const std::string BlockModule::declFSM() const {
     S << Indent(++II) << "begin" << "\n";
 
     S << Indent(II++) << "if(\n";
-    // All _valid signals of Scalars Inputs
-    std::vector<std::string> PortNames;
-
-    for (scalarport_p P : Comp.getInScalars()) {
-      if (P->isPipelined())
-        PortNames.push_back(getOpName(P));
-    }
-    for (streamindex_p P : Comp.getInStreamIndices()) {
-      PortNames.push_back(getOpName(P));
-    }
 
     std::string Prefix = "";
     for (const std::string &N : PortNames) {
@@ -296,16 +297,17 @@ const std::string BlockModule::declFSM() const {
   S << "begin\n";
   S << Indent(II) << "if (rst)\n";
     S << Indent(++II) << "begin\n";
-    // Reset all state, input buffers, ...
+    // Reset state
     S << Indent(II) << "state <= state_free;" << "\n";
 
-    for (scalarport_p P : Comp.getInScalars()) {
-      if (!P->isPipelined()) continue;
-
-      S << Indent(II) << getOpName(P) << "_buf <= {" << P->getBitWidth() << "{1'b0}}" << ";\n";
-      S << Indent(II) << getOpName(P) << "_buf_valid <= 0" << ";\n";
+    // Input buffers and valids
+    for (const std::string &N : PortNames) {
+      S << Indent(II) << N << "_buf <= '0;\n";
+      S << Indent(II) << N << "_buf_valid <= 0" << ";\n";
     }
-    S << Indent(II) << "counter <= {" << std::ceil(std::log2(CriticalPath))-1 << "{1'b0}}" << ";\n";
+
+    // counter
+    S << Indent(II) << "counter <= '0;\n";
 
     S << Indent(II--) << "end\n";
   S << Indent(II) << "else\n";
@@ -320,19 +322,8 @@ const std::string BlockModule::declFSM() const {
   S << Indent(II) << "case (state)" << "\n";
   S << Indent(II) << "state_free:" << "\n";
     S << Indent(++II) << "begin" << "\n";
+
     // Buffer Inputs
-    PortNames.clear();
-
-    for (scalarport_p P : Comp.getInScalars()) {
-      if (!P->isPipelined()) continue;
-
-      PortNames.push_back(getOpName(P));
-    }
-    
-    for (streamindex_p P : Comp.getInStreamIndices()) {
-      PortNames.push_back(getOpName(P));
-    }
-
     for (const std::string &N : PortNames) {
       S << Indent(II) << "if (" << N << "_valid" << ")\n";
       S << Indent(++II) << "begin\n";
@@ -348,7 +339,7 @@ const std::string BlockModule::declFSM() const {
     S << Indent(II) << "if (counter_enabled)\n";
       S << Indent(++II) << "begin\n";
       S << Indent(II+1) << "if (counter < " << CriticalPath << ") counter <= counter + 1;\n";
-      S << Indent(II+1) << "else counter <= {" << std::ceil(std::log2(CriticalPath))-1 << "{1'b0}}" << ";\n";
+      S << Indent(II+1) << "else counter <= '0;\n";
       S << Indent(II--) << "end\n";
     S << Indent(II--) << "end\n";
   
