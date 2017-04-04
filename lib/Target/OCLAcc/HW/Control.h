@@ -9,23 +9,6 @@
 namespace oclacc {
 
 
-class Tmp : public HW
-{
-  public:
-    base_p in;
-    Tmp(const std::string &Name) : HW(Name, 0)
-    {
-      //pass
-    }
-
-    DECLARE_VISIT;
-
-    virtual void addIn(base_p p)
-    {
-      in=p;
-    }
-};
-
 class Mux : public HW
 {
   public:
@@ -38,7 +21,7 @@ class Mux : public HW
     using HW::addIn;
 
   public:
-    Mux(const std::string &Name) : HW(Name,0) {
+    Mux(const std::string &Name, unsigned BitWidth) : HW(Name,BitWidth) {
     }
 
     Mux (const Mux &) = delete;

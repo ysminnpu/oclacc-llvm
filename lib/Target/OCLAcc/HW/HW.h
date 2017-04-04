@@ -31,6 +31,7 @@ class HW : public Identifiable, public Visitable
 
   public:
     HW(const std::string &Name, unsigned BitWidth, llvm::Value *IR=nullptr) : Identifiable(Name), BitWidth(BitWidth), IR(IR) { 
+      assert(BitWidth && "BitWidth must not be zero.");
     }
 
     virtual ~HW() = default;
