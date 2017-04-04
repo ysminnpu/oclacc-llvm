@@ -181,16 +181,18 @@ bool OCLAccHW::runOnModule(Module &M) {
 
   HWDesign.setName(ModuleName);
 
-  // Print current state of optimization
-  std::error_code EC;
-  std::string FileName = ModuleName+".final.ll";
-  raw_fd_ostream File(FileName, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
-  if (EC) {
-    errs() << "Failed to create " << FileName << "(" << __LINE__ << "): " << EC.message() << "\n";
-    return -1;
+  {
+    // Print current state of optimization
+    std::error_code EC;
+    std::string FileName = ModuleName+".final.ll";
+    raw_fd_ostream File(FileName, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+    if (EC) {
+      errs() << "Failed to create " << FileName << "(" << __LINE__ << "): " << EC.message() << "\n";
+      return -1;
+    }
+    PrintModulePass PrintPass(File);
+    PrintPass.run(M);
   }
-  PrintModulePass PrintPass(File);
-  PrintPass.run(M);
 
   // Process all kernel functions
   OpenCLMDKernels &CLK = getAnalysis<OpenCLMDKernels>();
@@ -206,18 +208,30 @@ bool OCLAccHW::runOnModule(Module &M) {
       llvm_unreachable("Stop.");
     }
 
-    handleKernel(*KF);
+    // Print bitwidth of functions
 
-#if 0
     FindAllPaths &AP = getAnalysis<FindAllPaths>(*KF);
     AP.dump();
-#endif
 
     // Print cfg
     if (CfgDot) {
       FunctionPass *CFG = createCFGPrinterPass();
       CFG->runOnFunction(*KF);
     }
+    {
+      std::error_code EC;
+      std::string FileName = ModuleName+"."+std::string(KF->getName())+".bitwidth";
+      raw_fd_ostream File(FileName, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
+      if (EC) {
+        errs() << "Failed to create " << FileName << "(" << __LINE__ << "): " << EC.message() << "\n";
+        return -1;
+      }
+      BitWidthAnalysis &BW = getAnalysis<BitWidthAnalysis>(*KF);
+      BW.print(File, KF);
+    }
+
+
+    handleKernel(*KF);
 
   }
 
@@ -983,6 +997,7 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
 
   const Type *CType = C->getType();
 
+  // BitWidth may be -1 and BW.second set to Loopus::ExtKind::Undef
   int BitWidth = BW.first;
 
   if (const ConstantInt *IConst = dyn_cast<ConstantInt>(C)) {
@@ -1020,7 +1035,7 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
         {
           const std::string S = Int.toString(2, true);
           CName = std::to_string(Int.getSExtValue());
-          HWConst = std::make_shared<ConstVal>(CName, S, BitWidth);
+          HWConst = std::make_shared<ConstVal>(CName, S, Int.getMinSignedBits());
           break;
         }
     }
@@ -1106,10 +1121,13 @@ void OCLAccHW::visitCmpInst(CmpInst &I) {
 /// \brief Create Multiplexer for all PHI Inputs
 ///
 void OCLAccHW::visitPHINode(PHINode &I) {
+  BitWidthAnalysis &BW = getAnalysis<BitWidthAnalysis>(const_cast<Function &>(*(I.getParent()->getParent())));
+  std::pair<int, Loopus::ExtKind> W = BW.getBitWidth(&I);
+
   const BasicBlock *BB = I.getParent();
   const block_p HWBB = getBlock(BB);
 
-  mux_p HWM = makeHWBB<Mux>(BB, &I, I.getName());
+  mux_p HWM = makeHWBB<Mux>(BB, &I, I.getName(), W.first);
 
   DEBUG(dbgs() << "Block " << BB->getName() << "\n";
   dbgs() << "\tPHI " << I.getName() << "\n";
