@@ -1612,54 +1612,22 @@ void BitWidthAnalysis::printBitWidth(raw_ostream &O, const struct BitWidth &BW) 
   O << "\n";
 }
 
-void BitWidthAnalysis::print(raw_ostream &O, const Module *M) const {
-  typedef std::set<const Function*> FuncSetTy;
-  FuncSetTy funcs;
-
-  if (M != 0) {
-    // The processed module is available so collect all functions in it
-    for (Module::const_iterator FIT = M->begin(), FEND = M->end();
-        FIT != FEND; ++FIT) {
-      funcs.insert(&*FIT);
-    }
-  } else {
-    // The processed module is not available so iterate over all processed
-    // instructions and collect all different functions
-    for (BitWidthMapTy::const_iterator INSIT = BWMap.cbegin(),
-        INSEND = BWMap.cend(); INSIT != INSEND; ++INSIT) {
-      const Value *V = INSIT->first;
-      const Function *F = 0;
-      if (isa<Instruction>(V) == true) {
-        F = dyn_cast<Instruction>(V)->getParent()->getParent();
-      } else if (isa<Argument>(V) == true) {
-        F = dyn_cast<Argument>(V)->getParent();
-      } else if (isa<BasicBlock>(V) == true) {
-        F = dyn_cast<BasicBlock>(V)->getParent();
-      }
-      if ((F != 0) && (funcs.count(F) == 0)) {
-        funcs.insert(F);
-      }
-    }
-  }
-
+void BitWidthAnalysis::print(raw_ostream &O, const Function *F) const {
   int alloverSavingsInsts = 0;
   // Now iterate over all collected functions
-  for (FuncSetTy::const_iterator FIT = funcs.cbegin(), FEND = funcs.cend();
-      FIT != FEND; ++FIT) {
-    for (const_inst_iterator FINSIT = inst_begin(*FIT), FINSEND = inst_end(*FIT);
-        FINSIT != FINSEND; ++FINSIT) {
-      // Fetch instruction
-      const Instruction *I = &*FINSIT;
-      const BitWidthMapTy::const_iterator IIT = BWMap.find(I);
-      O << "INSTR @" << I << ": " << *I << "\n";
-      if (IIT == BWMap.cend()) {
-        O << "   <no info available>\n";
-        continue;
-      } else {
-        O << "   ";
-        printBitWidth(O, IIT->second);
-        alloverSavingsInsts += (IIT->second.OutBitwidth - IIT->second.TypeWidth);
-      }
+  for (const_inst_iterator FINSIT = inst_begin(F), FINSEND = inst_end(F);
+      FINSIT != FINSEND; ++FINSIT) {
+    // Fetch instruction
+    const Instruction *I = &*FINSIT;
+    const BitWidthMapTy::const_iterator IIT = BWMap.find(I);
+    O << "INSTR @" << I << ": " << *I << "\n";
+    if (IIT == BWMap.cend()) {
+      O << "   <no info available>\n";
+      continue;
+    } else {
+      O << "   ";
+      printBitWidth(O, IIT->second);
+      alloverSavingsInsts += (IIT->second.OutBitwidth - IIT->second.TypeWidth);
     }
   }
 
@@ -1692,6 +1660,41 @@ void BitWidthAnalysis::print(raw_ostream &O, const Module *M) const {
   O << "SAVES\n";
   O << "   insts=" << alloverSavingsInsts << "\n";
   O << "   const=" << alloverSavingsConsts << "\n";
+}
+
+void BitWidthAnalysis::print(raw_ostream &O, const Module *M) const {
+  typedef std::set<const Function*> FuncSetTy;
+  FuncSetTy funcs;
+
+  if (M != 0) {
+    // The processed module is available so collect all functions in it
+    for (Module::const_iterator FIT = M->begin(), FEND = M->end();
+        FIT != FEND; ++FIT) {
+      funcs.insert(&*FIT);
+    }
+  } else {
+    // The processed module is not available so iterate over all processed
+    // instructions and collect all different functions
+    for (BitWidthMapTy::const_iterator INSIT = BWMap.cbegin(),
+        INSEND = BWMap.cend(); INSIT != INSEND; ++INSIT) {
+      const Value *V = INSIT->first;
+      const Function *F = 0;
+      if (isa<Instruction>(V) == true) {
+        F = dyn_cast<Instruction>(V)->getParent()->getParent();
+      } else if (isa<Argument>(V) == true) {
+        F = dyn_cast<Argument>(V)->getParent();
+      } else if (isa<BasicBlock>(V) == true) {
+        F = dyn_cast<BasicBlock>(V)->getParent();
+      }
+      if ((F != 0) && (funcs.count(F) == 0)) {
+        funcs.insert(F);
+      }
+    }
+  }
+
+  for (const Function *F : funcs)
+    print(O, F);
+  
 }
 
 void BitWidthAnalysis::getAnalysisUsage(AnalysisUsage &AU) const {

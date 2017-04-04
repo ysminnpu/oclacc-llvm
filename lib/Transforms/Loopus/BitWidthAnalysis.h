@@ -152,6 +152,7 @@ class BitWidthAnalysis : public llvm::FunctionPass {
 
     BitWidthAnalysis(void);
     void printBitWidth(llvm::raw_ostream &O, const struct BitWidth &BW) const;
+    virtual void print(llvm::raw_ostream &O, const llvm::Function *F) const;
     virtual void print(llvm::raw_ostream &O, const llvm::Module *M) const override;
     virtual void getAnalysisUsage(llvm::AnalysisUsage &AU) const override;
     virtual bool runOnFunction(llvm::Function &F) override;
