@@ -1,7 +1,8 @@
 #include <memory>
 #include <sstream>
 #include <cmath>
-#include <set>
+#include <unordered_set>
+#include <map>
 
 #include "../../HW/Kernel.h"
 
@@ -10,8 +11,6 @@
 #include "Naming.h"
 #include "VerilogMacros.h"
 
-#define BEGIN {S << Indent(++II) << "begin\n";}while(0);
-#define END {S << Indent(II--) << "end\n";}while(0);
 
 
 using namespace oclacc;
@@ -72,12 +71,300 @@ const std::string KernelModule::declHeader() const {
 ///
 /// All non-pipelined ScalarPorts and StreamPorts already exist as kernel ports.
 ///
+/// If a ScalarPort has multiple inputs, generate a Muxer to select a single
+/// one, depending on the condition which must be true for a transition of the
+/// originating Block to the input's Block.
+///
 const std::string KernelModule::declBlockWires() const {
   std::stringstream S;
 
-  for (block_p B : Comp.getBlocks()) {
-    S << "// " << B->getUniqueName() << "\n";
+  std::stringstream Wires;
+  Wires << "// Block wires\n";
 
+  std::stringstream Assignments;
+  Assignments << "// Block assignments\n";
+
+  std::stringstream Logic;
+  Assignments << "// Block port muxer\n";
+
+  // Collect all ScalarPorts with multiple Inputs or multiple Outputs.
+  // Inputs: generate Multiplexer, use <uniquename>_<src>_<dest> as Signal name
+  // Outputs: Acks must be logically OR'ed.
+  std::unordered_set<scalarport_p> SingleIns;
+  std::unordered_set<scalarport_p> SingleOuts;
+
+  std::unordered_set<scalarport_p> MultipleIns;
+  std::unordered_set<scalarport_p> MultipleOuts;
+
+  typedef std::map<std::string, std::vector<std::string> > OrMapTy;
+  typedef std::pair<std::string, std::vector<std::string> > OrMapElemTy;
+  OrMapTy OrMap;
+
+  typedef std::pair<Signal, Signal> SigPairTy;
+
+  typedef std::pair<std::string, std::vector<SigPairTy> > MuxCondElemTy;
+  typedef std::map<std::string, std::vector<SigPairTy > > MuxCondTy;
+  
+  typedef std::pair<std::string, MuxCondTy > MuxElemTy;
+  typedef std::map<std::string, MuxCondTy > MuxTy;
+
+  MuxTy Muxer;
+
+  for (block_p B : Comp.getBlocks()) {
+    for (scalarport_p P : B->getInScalars()) {
+      if (!P->isPipelined())
+        continue;
+
+      unsigned NumIns = P->getIns().size();
+      assert(NumIns && "Scalar Input in Block without source");
+
+      if (NumIns == 1)
+        SingleIns.insert(P);
+      else
+        MultipleIns.insert(P);
+    }
+    for (scalarport_p P : B->getOutScalars()) {
+      if (!P->isPipelined())
+        continue;
+
+      unsigned NumOuts = P->getOuts().size();
+      assert(NumOuts && "Scalar Output in Block without sink");
+
+      if (NumOuts == 1)
+        SingleOuts.insert(P);
+      else
+        MultipleOuts.insert(P);
+    }
+  }
+
+  // Input with a single source but maybe its source has multiple sinks
+  for (scalarport_p Sink : SingleIns) {
+    scalarport_p Src = std::static_pointer_cast<ScalarPort>(Sink->getIn(0));
+
+    unsigned NumSourceOuts = Src->getOuts().size();
+
+    Signal::SignalListTy SinkPortSigs = getInSignals(Sink);
+    Signal::SignalListTy SrcPortSigs;
+
+    // Kernel inputs use the same naming scheme as block inputs
+    if (Src->getParent()->isKernel())
+      SrcPortSigs = getInSignals(Src);
+    else
+      SrcPortSigs = getOutSignals(Src);
+
+    assert(SrcPortSigs.size() == SinkPortSigs.size());
+
+    for (Signal::SignalListConstItTy
+        SinkI = SinkPortSigs.begin(),
+        SrcI = SrcPortSigs.begin(),
+        SrcE = SrcPortSigs.end();
+        SrcI != SrcE;
+        ++SinkI, ++SrcI) {
+
+      // Define Block's Port. All Ports are wires.
+      Signal LocDef(SinkI->Name, SinkI->BitWidth, Signal::Local, Signal::Wire);
+      Wires << LocDef.getDefStr() << ";\n";
+
+      if (SinkI->Direction == Signal::Out) {
+        if (NumSourceOuts == 1)
+          Assignments << "assign " << SrcI->Name << " = " << SinkI->Name << ";\n"; 
+        //else
+        //  OrMap[SrcI->Name].push_back(TI->Name);
+      } else {
+          Assignments << "assign " << SinkI->Name << " = " << SrcI->Name << ";\n"; 
+      }
+    }   
+  }
+  
+  // Output with a single sink but its sink may have multiple sources
+  for (scalarport_p P : SingleOuts) {
+    scalarport_p SP = std::static_pointer_cast<ScalarPort>(P->getOut(0));
+
+    unsigned NumSinkInputs = SP->getIns().size();
+
+    Signal::SignalListTy ThisPortSigs = getOutSignals(P);
+    
+    // Multiple Sink imputs are handled later
+    Signal::SignalListTy SinkPortSigs = getInSignals(SP);
+
+    assert(SinkPortSigs.size() == ThisPortSigs.size());
+
+    for (Signal::SignalListConstItTy
+        TI = ThisPortSigs.begin(),
+        SI = SinkPortSigs.begin(),
+        SE = SinkPortSigs.end();
+        SI != SE;
+        ++TI, ++SI) {
+
+      Signal LocDef(TI->Name, TI->BitWidth, Signal::Local, Signal::Wire);
+      Wires << LocDef.getDefStr() << ";\n";
+
+      if (NumSinkInputs == 1) {
+        if (TI->Direction == Signal::Out)
+          Assignments << "assign " << SI->Name << " = " << TI->Name << ";\n"; 
+        else
+          Assignments << "assign " << TI->Name << " = " << SI->Name << ";\n"; 
+      } 
+    } 
+  }
+
+  for (scalarport_p Sink : MultipleIns) {
+    // Declare Signals for Mux Output and actual InScalar
+    Signal::SignalListTy SinkPortSigs = getInSignals(Sink);
+    for (const Signal &S : SinkPortSigs) {
+      Signal LocDef(S.Name, S.BitWidth, Signal::Local, Signal::Reg);
+      Wires << LocDef.getDefStr() << ";\n";
+    }
+
+    for (base_p SrcTmp : Sink->getIns()) {
+      scalarport_p Src = std::static_pointer_cast<ScalarPort>(SrcTmp);
+
+      Signal::SignalListTy SinkMuxPortSigs = getInMuxSignals(Sink, Src);
+      Signal::SignalListTy SrcPortSigs = getOutSignals(Src);
+
+      assert (SrcPortSigs.size() == SinkPortSigs.size());
+      assert (SrcPortSigs.size() == SinkMuxPortSigs.size());
+
+      for (Signal::SignalListConstItTy
+          SrcI = SrcPortSigs.begin(),
+          SinkI = SinkPortSigs.begin(),
+          SinkMuxI = SinkMuxPortSigs.begin(),
+          SinkE = SinkPortSigs.end();
+          //
+          SinkI != SinkE;
+          //
+          ++SinkI, ++SinkMuxI, ++SrcI) {
+
+        if (SrcI->Direction == Signal::Out) {
+          Signal LocDef(SinkMuxI->Name, SinkMuxI->BitWidth, Signal::Local, Signal::Wire);
+          Wires << LocDef.getDefStr() << ";\n";
+        } else {
+          Signal LocDef(SinkMuxI->Name, SinkMuxI->BitWidth, Signal::Local, Signal::Reg);
+          Wires << LocDef.getDefStr() << ";\n";
+        }
+
+        if (SrcI->Direction == Signal::Out)
+          Assignments << "assign " << SinkMuxI->Name << " = " << SrcI->Name << ";\n"; 
+        else {
+          if (Src->getOuts().size() > 1)
+            OrMap[SrcI->Name].push_back(SinkMuxI->Name);
+        }
+
+        // Sink has multiple inputs, must be added to multiplexer
+        block_p SrcB = std::static_pointer_cast<Block>(Src->getParent());
+        block_p SinkB = std::static_pointer_cast<Block>(Sink->getParent());
+
+        scalarport_p Cond = SinkB->getCondReachedByBlock(SrcB);
+        std::string Neg = "";
+        if (!Cond) {
+          Cond = SinkB->getNegCondReachedByBlock(SrcB);
+          Neg = "!";
+        }
+        assert(Cond);
+
+        Signal::SignalListTy CondSigs = getInSignals(Cond);
+
+        std::string CondName = Neg+CondSigs[0].Name;
+
+        Muxer[getOpName(Sink)][CondName].push_back(std::make_pair(*SinkI, *SinkMuxI));
+      } 
+    }
+  }
+
+  for (scalarport_p Src : MultipleOuts) {
+    Signal::SignalListTy SrcPortSigs = getOutSignals(Src);
+
+    for (const Signal &S : SrcPortSigs) {
+      Signal LocDef(S.Name, S.BitWidth, Signal::Local, Signal::Wire);
+      Wires << LocDef.getDefStr() << ";\n";
+    }
+
+
+    for (base_p SinkTmp : Src->getOuts()) {
+      scalarport_p Sink = std::static_pointer_cast<ScalarPort>(SinkTmp);
+
+      Signal::SignalListTy SinkPortSigs = getInSignals(Sink);
+
+      assert(SinkPortSigs.size() == SrcPortSigs.size());
+
+      if (Sink->getIns().size() == 1) {
+        for (Signal::SignalListConstItTy
+            SrcI = SrcPortSigs.begin(),
+            SinkI = SinkPortSigs.begin(),
+            SrcE = SrcPortSigs.end();
+            SrcI != SrcE;
+            ++SrcI, ++SinkI) {
+
+          if (SrcI->Direction == Signal::Out) {
+            //Assignments << "assign " << SinkI->Name << " = " << SrcI->Name << ";\n"; 
+          } else
+            OrMap[SrcI->Name].push_back(SinkI->Name);
+            //Assignments << "assign " << SrcI->Name << " = " << SinkI->Name << ";\n"; 
+        }
+      } else {
+        //multiplexer already created. Use Mux Portnames.
+      }
+    } 
+  }
+
+  for (const OrMapElemTy &O : OrMap) {
+    Assignments << "assign " << O.first << " = ";
+    std::string Prefix = "";
+    for(const std::string &S : O.second) {
+      Assignments << Prefix << S;
+      Prefix = " | ";
+    }
+    Assignments << ";\n";
+  }
+
+  unsigned II = 1;
+  for (const MuxElemTy &O : Muxer) {
+    Logic << "// Muxer " << O.first << "\n";
+    Logic << "always@(*)\n";
+      BEGIN(Logic);
+      // default outputs to zero
+      for (const MuxCondElemTy &ME : O.second) {
+        for (const SigPairTy &S : ME.second) {
+          if (S.first.Direction == Signal::In)
+            Logic << Indent(II) << S.first.Name << " <= '0;\n";
+        }
+        break;
+      }
+      for (const MuxCondElemTy &ME : O.second) {
+        for (const SigPairTy &S : ME.second) {
+          if (S.first.Direction == Signal::Out)
+            Logic << Indent(II) << S.second.Name << " <= '0;\n";
+        }
+      }
+
+      std::string Prefix = "";
+      for (const MuxCondElemTy &ME : O.second) {
+        Logic << Indent(II) << Prefix << "if (";
+        Logic << ME.first << " && "; 
+
+        std::string CondName = ME.first;
+        if (CondName.at(0) == '!')
+          CondName.erase(0,1);
+        Logic << CondName << "_valid)\n";
+
+        BEGIN(Logic);
+        for (const SigPairTy &S : ME.second) {
+          // first: Sink, second: Source
+          if (S.first.Direction == Signal::Out)
+            Logic << Indent(II) << S.second.Name << " <= " << S.first.Name << ";\n"; 
+          else
+            Logic << Indent(II) << S.first.Name << " <= " << S.second.Name << ";\n"; 
+        }
+        END(Logic);
+
+        Prefix = "else ";
+      }
+      
+      END(Logic);
+  }
+
+#if 0
+  for (block_p B : Comp.getBlocks()) {
     // Create wires for each port used as input and output and assign them to
     // their use in a component
     for (scalarport_p P : B->getInScalars()) {
@@ -86,40 +373,104 @@ const std::string KernelModule::declBlockWires() const {
         continue;
 
       // Make sure that the Block's ScalarInput is connected with the Kernel's
-      HW::PortsSizeTy NumIns = P->getIns().size();
-      assert(NumIns);
+      if (
 
+      // Only a single input, directly connect it.
       if (NumIns == 1) {
         scalarport_p SI = std::static_pointer_cast<ScalarPort>(P->getIn(0));
 
-        Signal::SignalListTy KernelSigs = getOutSignals(SI);
-        Signal::SignalListTy BlockSigs = getInSignals(P);
+        if (SI->getOuts().size() > 1) {
+          MultipleOuts.push_back(SI);
+        } else {
+            }
+          }
 
-        assert(KernelSigs.size() == BlockSigs.size());
+      } else {
+        // Input with multiple sources. This is a result of conditional jumps.
+        // To select the right input, generate a Muxer and use the Conditions to
+        // select it.
+
+        Block::SingleCondTy C = B->getCondForScalarPort(P);
+
+        const std::string ThisPortName = getOpName(P);
+        Signal PortMux(ThisPortName+"_mux", P->getBitWidth(), Signal::Local, Signal::Wire);
+        Wires << PortMux.getDefStr() << ";\n";
 
 
-        for (Signal::SignalListConstItTy
-            KI = KernelSigs.begin(),
-            BI = BlockSigs.begin(),
-            KE = KernelSigs.end();
-            KI != KE;
-            ++KI, ++BI) {
+        Signal::SignalListTy ThisPortSigs = getInSignals(P);
 
-          // Define Block's Port. All Ports are wires.
-          Signal LocDef(BI->Name, BI->BitWidth, Signal::Local, Signal::Wire);
-          S << LocDef.getDefStr() << ";\n";
+        for (std::pair<scalarport_p, Block::TFTy> Conds : C) {
+          scalarport_p FromPort = Conds.first;
+          Signal::SignalListTy FromPortSigs = getInSignals(FromPort);
 
-          // Kernel->Block
-          if (KI->Direction == Signal::Out) {
-            S << "assign " << BI->Name << " = " << KI->Name << ";\n"; 
-          } else if (KI->Direction == Signal::In) {
-            S << "assign " << KI->Name << " = " << BI->Name << ";\n"; 
+          base_p CondVal;
+          bool NegCond = false;
+
+          if (CondVal = Conds.second.first) {
+
+          }
+          else if (CondVal = Conds.second.first) {
           }
         }
-      } else 
-        TODO("Add Muxer");
+      }
     }
-  }
+    for (scalarport_p P : B->getOutScalars()) {
+      if (!P->isPipelined())
+        continue;
+
+      HW::PortsSizeTy NumOuts = P->getOuts().size();
+      assert(NumOuts);
+
+      Signal::SignalListTy OutSigs = getOutSignals(P);
+
+      for (const Signal &OS : OutSigs) {
+        Signal LocDef(OS.Name, OS.BitWidth, Signal::Local, Signal::Wire);
+        Wires << LocDef.getDefStr() << ";\n";
+      }
+
+      // Connect all inter-block scalarports.
+      // If an Output is connected to multiple Inputs, add a logical Or to all ack
+      // signals, otherwise directly connect source and sink.
+
+      for (base_p OP : P->getOuts()) {
+        scalarport_p SP = std::static_pointer_cast<ScalarPort>(OP);
+        Signal::SignalListTy InSigs = getInSignals(SP);
+
+        assert(OutSigs.size() == InSigs.size());
+
+        for (Signal::SignalListConstItTy
+            OI = OutSigs.begin(),
+            II = InSigs.begin(),
+            OE = OutSigs.end();
+            OI != OE;
+            ++OI, ++II) {
+
+            if (OI->Direction == Signal::Out) {
+              Assignments << "assign " << II->Name << " = " << OI->Name << ";\n"; 
+            } else {
+              MuxSigs[OI->Name].push_back(*II);
+            }
+        }
+      }
+
+      if (NumOuts > 1) {
+        std::string Prefix = "";
+        for (const std::pair<std::string, std::vector<Signal>> &Muxer : MuxSigs) {
+          Assignments << "assign " << Muxer.first << "_mux = ";
+
+          for (const Signal &MS : Muxer.second) {
+            Assignments << Prefix << MS.Name;
+            Prefix = " || ";
+          }
+
+          Assignments << ";\n";
+        }
+      }
+    }
+#endif
+  S << Wires.str();
+  S << Assignments.str();
+  S << Logic.str();
   return S.str();
 }
 
@@ -134,6 +485,9 @@ const std::string KernelModule::declBlockWires() const {
 
 const std::string KernelModule::instBlocks() const {
   std::stringstream SBlock;
+
+  SBlock << "// Block instantiations\n";
+
   for (block_p B : Comp.getBlocks()) {
     const std::string BName = B->getUniqueName();
 
@@ -176,6 +530,7 @@ const std::string BlockModule::declHeader() const {
   return S.str();
 }
 
+#if 0
 const std::string BlockModule::declEnable() const {
   std::stringstream S;
   
@@ -203,16 +558,19 @@ const std::string BlockModule::declEnable() const {
 
   return S.str();
 }
+#endif
 
 const std::string BlockModule::declConstValues() const {
   // Use a set to get unique definitions.
-  std::set<std::string> SS;
+  std::unordered_set<std::string> SS;
   std::stringstream S;
 
   S << "// ConstVals\n";
   for (const const_p C : Comp.getConstVals()) {
     Signal CS(getOpName(*C), C->getBitWidth(), Signal::Local, Signal::Reg);
-    SS.insert(CS.getDefStr());
+
+    std::string Decl = CS.getDefStr() + " = " + C->getBits();
+    SS.insert(Decl);
   }
 
   for (const std::string &US : SS) {
@@ -251,26 +609,24 @@ const std::string BlockModule::declFSM() const {
   std::string Prefix;
   unsigned II = 1;
 
-  // All _valid signals of Inputs
-  std::vector<std::string> InputNames;
+  // All _valid signals of Inputs and Outputs
+  std::vector<std::string> ScalarInputNames;
+  std::vector<std::string> ScalarOutputNames;
 
   for (scalarport_p P : Comp.getInScalars()) {
-    if (P->isPipelined())
-      InputNames.push_back(getOpName(P));
-  }
-  for (streamindex_p P : Comp.getInStreamIndices()) {
-    InputNames.push_back(getOpName(P));
+    if (P->isPipelined()) {
+      ScalarInputNames.push_back(getOpName(P));
+    }
   }
 
-  // And of Outputs
-  std::vector<std::string> OutputNames;
   for (scalarport_p P : Comp.getOutScalars()) {
     if (P->isPipelined())
-      InputNames.push_back(getOpName(P));
+      ScalarOutputNames.push_back(getOpName(P));
   }
-  for (streamindex_p P: Comp.getOutStreamIndices()) {
-    OutputNames.push_back(getOpName(P));
-  }
+
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
 
   // Asynchronous state and output
   S << "always @(*)" << "\n";
@@ -287,7 +643,7 @@ const std::string BlockModule::declFSM() const {
     S << Indent(II++) << "if(\n";
 
     Prefix = "";
-    for (const std::string &N : InputNames) {
+    for (const std::string &N : ScalarInputNames) {
         S << Prefix << Indent(II) << N << "_valid" << " == 1";
       Prefix = " && \n";
     }
@@ -306,11 +662,15 @@ const std::string BlockModule::declFSM() const {
     S << Indent(II) << "counter_enabled <= 1;\n";
 
     // Enable outputs starting at correct cycle
-    for (streamindex_p SI : Comp.getOutStreamIndices()) {
-      const std::string Name = getOpName(SI);
+    for (streamindex_p SI : Comp.getStaticOutStreamIndices()) {
+      assert(SI->getIns().size() == 1);
+
+      base_p Val = SI->getIn(0);
+      const std::string Name = getOpName(Val);
       unsigned C = getReadyCycle(Name);
 
-      S << Indent(II++) << "if (counter == " << C << ")\n";
+      S << Indent(II) << "// " << Name << "\n";
+      S << Indent(II++) << "if (counter >= " << C << " && " << Name << "_fin == 0)\n";
       S << Indent(II--) << "next_state <= state_wait_store;\n";
     }
 
@@ -322,33 +682,56 @@ const std::string BlockModule::declFSM() const {
     S << Indent(II--) << "end" << "\n";
 
   S << Indent(II) << "state_wait_output:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
-    
-    S << Indent(II) << "counter_enabled <= 0;\n";
+    if (Comp.getOutScalars().size()) {
+      S << Indent(++II) << "begin" << "\n";
+      
+      // When all outputs and stores are acknoledged, return to state_free
+      Prefix = "";
+      S << Indent(II++) << "if (\n";
+      for (const std::string N : ScalarOutputNames) {
+        S << Prefix << Indent(II) << N << "_fin == 1";
+        Prefix = " &&\n";
+      }
+      S << "\n" << Indent(II) << ")\n";
+      S << Indent((II--)+1) << "next_state <= state_free;\n";
 
-    // When all outputs and stores are acknoledged, return to state_free
-    Prefix = "";
-    S << Indent(II++) << "if (\n";
-    for (const std::string N : OutputNames) {
-      S << Prefix << Indent(II) << N << "_fin == 1";
-      Prefix = " &&\n";
+      S << Indent(II--) << "end" << "\n";
+    } else {
+      S << Indent(II+1) << "next_state <= state_free;\n";
     }
-    S << "\n" << Indent(II) << ")\n";
-    S << Indent((II--)+1) << "next_state <= state_free;\n";
 
-    S << Indent(II--) << "end" << "\n";
 
   S << Indent(II) << "state_wait_store:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
-    S << Indent(II--) << "end" << "\n";
+    BEGIN(S);
+
+      for (dynamicstreamindex_p SI : Comp.getDynamicOutStreamIndices()) {
+        streamport_p SP = SI->getStream();
+        base_p Val = SI->getIn(0);
+
+        const std::string Name = getOpName(SI);
+        const std::string StreamName = getOpName(SP);
+        const std::string ValName = getOpName(Val);
+
+        unsigned C = getReadyCycle(Name);
+
+        S << Indent(II) << "if (counter >= " << C << " && " << Name << "_fin == 0)\n";
+          BEGIN(S);
+          S << Indent(II) << Name << "_buf <= " << ValName << ";\n";
+          END(S);
+      }
+    END(S);
 
   S << Indent(II) << "state_wait_load:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
-    S << Indent(II--) << "end" << "\n";
+    BEGIN(S);
+    END(S);
 
 
   S << Indent(II) << "endcase" << "\n";
-  S << "end\n";
+  END(S);
+
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////
 
 
   // Synchronous next_state
@@ -360,13 +743,13 @@ const std::string BlockModule::declFSM() const {
     S << Indent(II) << "state <= state_free;" << "\n";
 
     // Input buffers and valids
-    for (const std::string &N : InputNames) {
+    for (const std::string &N : ScalarInputNames) {
       S << Indent(II) << N << " <= '0;\n";
       S << Indent(II) << N << "_valid <= 0" << ";\n";
     }
 
     // Outout buffers and valids
-    for (const std::string &N : OutputNames) {
+    for (const std::string &N : ScalarOutputNames) {
       S << Indent(II) << N << " <= '0;\n";
       S << Indent(II) << N << "_valid <= 0;\n";
       S << Indent(II) << N << "_fin <= 0;\n";
@@ -383,60 +766,89 @@ const std::string BlockModule::declFSM() const {
     // Synchronous outputs
 
     // Assign ack only for a single cycle
-    for (const std::string &N : InputNames) {
-      S << Indent(II) << N << "_unbuf_ack <= 0;\n";
+    for (const std::string &N : ScalarInputNames) {
+      S << Indent(II) << N << "_ack <= 0;\n";
     }
 
     // Reset status signals in state_free
     S << Indent(II) << "if (state == state_free)\n";
-    BEGIN;
-    for (const std::string &N : OutputNames) {
+    BEGIN(S);
+    for (const std::string &N : ScalarInputNames) {
+      S << Indent(II) << N << " <= '0;\n";
+      S << Indent(II) << N << "_valid <= 0;\n";
+    }
+    for (const std::string &N : ScalarOutputNames) {
+      S << Indent(II) << N << " <= '0;\n";
+      S << Indent(II) << N << "_valid <= 0;\n";
       S << Indent(II) << N << "_fin <= 0;\n";
     }
-    END;
+    END(S);
 
     // Allow others to acknowledge an output port in every state except state_free
     S << Indent(II) << "if (state != state_free)\n";
-    BEGIN;
-    for (const std::string &N : OutputNames) {
-      S << Indent(II) << "if (" << N << "_ack == 1) " << N << "_fin <= 1;\n";
+    BEGIN(S);
+    for (const std::string &N : ScalarOutputNames) {
+      S << Indent(II) << "if (" << N << "_ack == 1)\n";
+          BEGIN(S);
+          S << Indent(II) << N << " <= '0;\n";
+          S << Indent(II) << N << "_fin <= 1;\n";
+          S << Indent(II) << N << "_valid <= 0;\n";
+          END(S);
     }
-    END;
+    END(S);
 
     S << Indent(II) << "case (state)" << "\n";
     S << Indent(II) << "state_free:" << "\n";
-      BEGIN;
+      BEGIN(S);
 
       // Buffer Inputs
 
-      for (const std::string &N : InputNames) {
+      for (const std::string &N : ScalarInputNames) {
         S << Indent(II) << "if (" << N << "_unbuf_valid" << ")\n";
-        BEGIN;
-        S << Indent(II) << N << "_unbuf_ack" << " <= 1;\n";
+        BEGIN(S);
+        S << Indent(II) << N << "_ack" << " <= 1;\n";
         S << Indent(II) << N << " <= " << N << "_unbuf;\n";
         S << Indent(II) << N << "_valid" << " <= 1;\n";
-        END;
+        END(S);
       }
       S << Indent(II--) << "end" << "\n";
 
     S << Indent(II) << "state_busy:" << "\n";
-      BEGIN;
+      BEGIN(S);
       S << Indent(II) << "if (counter_enabled)\n";
-        BEGIN;
+        BEGIN(S);
         S << Indent(II+1) << "if (counter < " << CriticalPath << ") counter <= counter + 1;\n";
-        S << Indent(II+1) << "else counter <= '0;\n";
-        END;
+        END(S);
 
-        // Output gets ready, set valid
-        for (const std::string &N : OutputNames) {
-          unsigned C = getReadyCycle(N);
+        // Output gets ready, set valid and buffer output values, then wait for
+        // ack
+        for (const scalarport_p P : Comp.getOutScalars()) {
+          assert(P->getIns().size() == 1);
 
-          S << Indent(II) << "if (counter == " << C << ")\n";
-            BEGIN;
-            S << Indent(II) << N << "_valid <= 1;\n";
-            END;
+          const std::string Name = getOpName(P);
+          unsigned C = getReadyCycle(Name);
+
+          base_p Val = P->getIn(0);
+
+          const std::string VName = getOpName(Val);
+
+
+          S << Indent(II) << "if (counter >= " << C << " && " << Name << "_valid == 0 && " << Name << "_fin == 0)\n";
+            BEGIN(S);
+            S << Indent(II) << Name << " <= " << VName << ";\n";
+            S << Indent(II) << Name << "_valid <= 1;\n";
+            END(S);
         }
-      END;
+
+        for (streamindex_p SI : Comp.getStaticOutStreamIndices()) {
+          assert(SI->getIns().size() == 1);
+
+          base_p Val = SI->getIn(0);
+          const std::string Name = getOpName(Val);
+          unsigned C = getReadyCycle(Name);
+        }
+
+      END(S);
     
     S << Indent(II) << "state_wait_output:" << "\n";
       S << Indent(++II) << "begin" << "\n";
@@ -452,8 +864,8 @@ const std::string BlockModule::declFSM() const {
 
 
     S << Indent(II) << "endcase" << "\n";
-    END;
-  END;
+    END(S);
+  END(S);
 
   return S.str();
 }
@@ -481,16 +893,13 @@ const std::string BlockModule::declPortControlSignals() const {
     S << SV.getDefStr() << ";\n";
   }
 
-  S << "// OutScalar fin\n";
+  S << "// OutScalar internal\n";
   for (const scalarport_p P : Comp.getOutScalars()) {
-    Signal SP(getOpName(P), P->getBitWidth(), Signal::Local, Signal::Reg);
-    S << SP.getDefStr() << ";\n";
-
     Signal SF(getOpName(P)+"_fin", 1, Signal::Local, Signal::Reg);
     S << SF.getDefStr() << ";\n";
   }
 
-  S << "// OutStream fin\n";
+  S << "// OutStream internal\n";
   for (const streamindex_p P : Comp.getOutStreamIndices()) {
     Signal SF(getOpName(P)+"_fin", 1, Signal::Local, Signal::Reg);
     S << SF.getDefStr() << ";\n";

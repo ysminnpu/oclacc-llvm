@@ -43,6 +43,11 @@ const std::string createPortList(const Signal::SignalListTy &);
 const Signal::SignalListTy getInSignals(const scalarport_p);
 const Signal::SignalListTy getInSignals(const ScalarPort &);
 
+const Signal::SignalListTy getInMuxSignals(const ScalarPort &, const ScalarPort &);
+inline const Signal::SignalListTy getInMuxSignals(const scalarport_p Sink, const scalarport_p Src) {
+  return getInMuxSignals(*Sink, *Src);
+}
+
 const Signal::SignalListTy getOutSignals(const scalarport_p);
 const Signal::SignalListTy getOutSignals(const ScalarPort &);
 

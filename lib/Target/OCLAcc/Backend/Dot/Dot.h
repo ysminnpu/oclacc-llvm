@@ -56,7 +56,8 @@ class Dot: public DFVisitor {
     virtual int visit(Block &);
     virtual int visit(Arith &);
     virtual int visit(FPArith &);
-    virtual int visit(Compare &);
+    virtual int visit(IntCompare &);
+    virtual int visit(FPCompare &);
     virtual int visit(ConstVal &);
     virtual int visit(ScalarPort &);
     virtual int visit(StreamPort &);

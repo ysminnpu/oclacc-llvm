@@ -178,7 +178,22 @@ int Dot::visit(FPArith &R) {
   return 0;
 }
 
-int Dot::visit(Compare &R) {
+int Dot::visit(IntCompare &R) {
+  VISIT_ONCE(R);
+
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+  F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=" << C_COMPARE << ",style=filled,label=\"" << R.getUniqueName() << "\n" << R.getOp() << "\"];\n";
+
+  super::visit(R);
+  
+  for ( base_p p : R.getOuts() ) {
+    Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_COMPARE << ",fontcolor=" << C_COMPARE << ",label=" << R.getBitWidth() << "];\n";
+  }
+
+  return 0;
+}
+int Dot::visit(FPCompare &R) {
   VISIT_ONCE(R);
 
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");

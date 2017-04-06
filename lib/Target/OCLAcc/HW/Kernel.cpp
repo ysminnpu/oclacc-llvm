@@ -1,6 +1,8 @@
 #include "Kernel.h"
 #include "Utils.h"
 
+#define DEBUG_TYPE "kernel"
+
 using namespace oclacc;
 
 //
@@ -170,66 +172,65 @@ void Block::dump() {
 //
 Block::Block (const std::string &Name, bool EntryBlock) : Component(Name), EntryBlock(EntryBlock) { }
 
-bool Block::isBlock() { return true; }
-bool Block::isKernel() { return false; }
-
 void Block::addOp(base_p P) { Ops.push_back(P); }
 const std::vector<base_p> &Block::getOps() const { return Ops; }
 
-kernel_p Block::getParent() const {
-  return Parent;
-}
 
-void Block::setParent(kernel_p P) {
-  Parent = P;
-}
-
-void Block::addCond(base_p P, block_p B) {
-  Conds.push_back(std::make_pair(P, B));
-}
-
-void Block::addNegCond(base_p P, block_p B) {
-  NegConds.push_back(std::make_pair(P, B));
-}
-
-const Block::CondListTy& Block::getConds() const {
-  return Conds;
-}
-
-// There must be a single condition to reach the Block from B
-const base_p Block::getCondForBlock(block_p B) const {
-  base_p R = nullptr;
+// FIXME:
+// There must be a single condition to reach the Block from B. By iterating over
+// all conditions, we check that invariant. Can be deleted for optimization
+const scalarport_p Block::getCondReachedByBlock(block_p B) const {
+  scalarport_p R = nullptr;
   for (const Block::CondTy &C : getConds()) {
     if (C.second == B) {
       assert(!R);
-      R = C.first;
+      R = std::static_pointer_cast<ScalarPort>(C.first);
     }
   }
   return R;
 }
 
-const Block::CondListTy& Block::getNegConds() const {
-  return NegConds;
-}
-
-bool Block::isEntryBlock() const {
-  return EntryBlock;
-}
-
-const base_p Block::getNegCondForBlock(block_p B) const {
-  base_p R = nullptr;
+const scalarport_p Block::getNegCondReachedByBlock(block_p B) const {
+  scalarport_p R = nullptr;
   for (const Block::CondTy &C : getNegConds()) {
     if (C.second == B) {
       assert(!R);
-      R = C.first;
+      R = std::static_pointer_cast<ScalarPort>(C.first);
     }
   }
   return R;
 }
 
-bool Block::isConditional() const {
-  return !(getConds().empty() 
-    && getNegConds().empty());
+const Block::SingleCondTy Block::getCondForScalarPort(scalarport_p P) const {
+  // EntryBlock has no conditions
+  assert(!isEntryBlock());
+  assert(P->getIns().size() > 1);
+
+  Block::SingleCondTy R;
+
+  block_p PB = std::static_pointer_cast<Block>(P->getParent());
+
+  DEBUG(dbgs() << "Conditions for Scalarport " << P->getUniqueName() << "(" << PB->getUniqueName() << "):\n");
+
+  // Walk through ScalarInputs, look up From and then Condition
+  for (base_p I : P->getIns()) {
+    scalarport_p SSP = std::static_pointer_cast<ScalarPort>(I);
+
+    block_p IB = std::static_pointer_cast<Block>(SSP->getParent());
+
+    scalarport_p C = PB->getCondReachedByBlock(IB);
+
+    scalarport_p NC = PB->getNegCondReachedByBlock(IB);
+
+    DEBUG(
+        if (C) dbgs() << "  from " << SSP->getUniqueName() << ": " << C->getUniqueName() << "(" << IB->getUniqueName() << ")\n";
+        if (NC) dbgs() << "  form " << SSP->getUniqueName() << ": !" << NC->getUniqueName() << "(" << IB->getUniqueName() << ")\n";
+        );
+
+    R[SSP] = std::make_pair(C,NC);
+  } 
+
+  return R;
 }
 
 // InStreams
@@ -247,6 +248,23 @@ bool Block::containsInStreamIndexForValue(const Value *V) {
 const Block::StreamIndicesTy &Block::getInStreamIndices() const {
   return InStreamIndices; 
 }
+const Block::StaticStreamIndicesTy &Block::getStaticInStreamIndices() const {
+  StaticStreamIndicesTy S;
+  for (const streamindex_p SI : getInStreamIndices()) {
+    if (staticstreamindex_p SSI = std::dynamic_pointer_cast<StaticStreamIndex>(SI))
+      S.push_back(SSI);
+  }
+   
+  return S;
+}
+const Block::DynamicStreamIndicesTy &Block::getDynamicInStreamIndices() const {
+  DynamicStreamIndicesTy S;
+  for (const streamindex_p SI : getInStreamIndices()) {
+    if (dynamicstreamindex_p DSI = std::dynamic_pointer_cast<DynamicStreamIndex>(SI))
+      S.push_back(DSI);
+  }
+  return S;
+}
 
 // OutStreams
 void Block::addOutStreamIndex(streamindex_p P) { 
@@ -263,14 +281,28 @@ bool Block::containsOutStreamIndexForValue(const Value *V) {
 const Block::StreamIndicesTy &Block::getOutStreamIndices() const {
   return OutStreamIndices;
 }
+const Block::StaticStreamIndicesTy &Block::getStaticOutStreamIndices() const {
+  StaticStreamIndicesTy S;
+  for (const streamindex_p SI : getOutStreamIndices()) {
+    if (staticstreamindex_p SSI = std::dynamic_pointer_cast<StaticStreamIndex>(SI))
+      S.push_back(SSI);
+  }
+   
+  return S;
+}
+const Block::DynamicStreamIndicesTy &Block::getDynamicOutStreamIndices() const {
+  DynamicStreamIndicesTy S;
+  for (const streamindex_p SI : getOutStreamIndices()) {
+    if (dynamicstreamindex_p DSI = std::dynamic_pointer_cast<DynamicStreamIndex>(SI))
+      S.push_back(DSI);
+  }
+  return S;
+}
 
 // 
 // Kernel
 //
 Kernel::Kernel (const std::string &Name, bool WorkItem) : Component(Name), WorkItem(WorkItem) { }
-
-bool Kernel::isBlock() { return false; }
-bool Kernel::isKernel() { return true; }
 
 void Kernel::addBlock(block_p p) { Blocks.push_back(p); }
 const Kernel::BlocksTy &Kernel::getBlocks() const { return Blocks; }
@@ -337,4 +369,9 @@ bool Kernel::containsInOutStreamForValue(const Value *V) {
 const Kernel::StreamsTy &Kernel::getInOutStreams() const { 
   return InOutStreams;
 }
+#endif
+
+
+#ifdef DEBUG_TYPE
+#undef DEBUG_TYPE
 #endif

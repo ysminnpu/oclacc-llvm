@@ -49,6 +49,8 @@ class Or;
 class Xor;
 
 class Compare;
+class IntCompare;
+class FPCompare;
 class Mux;
 class Reg;
 class Ram;
@@ -106,6 +108,8 @@ class BaseVisitor
     virtual int visit( Xor & )  = 0;
 
     virtual int visit( Compare & ) = 0;
+    virtual int visit( IntCompare & ) = 0;
+    virtual int visit( FPCompare & ) = 0;
     virtual int visit( Mux & ) = 0;
     virtual int visit( Reg & ) = 0;
     virtual int visit( Ram & ) = 0;

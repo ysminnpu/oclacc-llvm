@@ -99,6 +99,11 @@ class Verilog : public DFVisitor {
 
     std::unique_ptr<BlockModule> BM;
 
+    unsigned II=0;
+
+    void handleInferableMath(const Arith &R, const std::string Op);
+
+
   public:
     Verilog();
     ~Verilog();
@@ -131,6 +136,11 @@ class Verilog : public DFVisitor {
     int visit(And &);
     int visit(Or &);
     int visit(Xor &);
+
+    // Compare
+    int visit(IntCompare &);
+    int visit(FPCompare &);
+
 };
 
 } // end ns oclacc

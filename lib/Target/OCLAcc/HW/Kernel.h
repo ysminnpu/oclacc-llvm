@@ -45,12 +45,12 @@ class Component : public Identifiable, public Visitable {
     typedef std::vector<const_p> ConstantsType;
     ConstantsType ConstVals;
 
-    virtual bool isBlock() = 0;
-    virtual bool isKernel() = 0;
-
   public:
     const llvm::Value * getIR() const;
     void setIR(const llvm::Value *);
+
+    virtual bool isBlock() = 0;
+    virtual bool isKernel() = 0;
 
     // InScalars
     void addInScalar(scalarport_p);
@@ -89,7 +89,13 @@ class Block : public Component {
     typedef CondListTy::const_iterator CondConstItTy;
 
     typedef std::vector<streamindex_p> StreamIndicesTy;
+    typedef std::vector<staticstreamindex_p> StaticStreamIndicesTy;
+    typedef std::vector<dynamicstreamindex_p> DynamicStreamIndicesTy;
     typedef std::map<const llvm::Value *, streamindex_p> StreamIndexMapTy;
+
+    // TrueFalse Type
+    typedef std::pair<base_p, base_p> TFTy;
+    typedef std::map<scalarport_p, TFTy> SingleCondTy;
 
   private:
     std::vector<base_p> Ops;
@@ -106,10 +112,6 @@ class Block : public Component {
 
     bool EntryBlock;
 
-  protected:
-    bool isBlock();
-    bool isKernel();
-
   public:
     Block (const std::string &, bool);
 
@@ -118,25 +120,52 @@ class Block : public Component {
     void addOp(base_p);
     const std::vector<base_p> &getOps() const;
 
-    kernel_p getParent() const;
+    inline kernel_p getParent() const {
+      return Parent;
+    }
 
-    void setParent(kernel_p P);
+    inline void setParent(kernel_p P) {
+      Parent = P;
+    }
 
-    void addCond(base_p, block_p);
+    /// \brief If \p P is true, this Block is the successor of \p B
+    inline void addCond(base_p P, block_p B) {
+      Conds.push_back(std::make_pair(P, B));
+    }
 
-    void addNegCond(base_p, block_p);
+    /// \brief If \p P is false, this Block is the successor of \p B
+    inline void addNegCond(base_p P, block_p B) {
+      NegConds.push_back(std::make_pair(P, B));
+    }
 
-    bool isConditional() const;
+    inline const CondListTy& getConds() const {
+      return Conds;
+    }
+    inline const CondListTy& getNegConds() const {
+      return NegConds;
+    }
 
-    const CondListTy &getConds() const;
-    
-    const base_p getCondForBlock(block_p) const;
+    virtual inline bool isBlock() override {
+      return true;
+    }
+    virtual inline bool isKernel() override {
+      return false;
+    }
 
-    const CondListTy &getNegConds() const;
+    inline bool isConditional() const {
+      return !(getConds().empty() && getNegConds().empty());
+    }
 
-    const base_p getNegCondForBlock(block_p) const;
+    const scalarport_p getCondReachedByBlock(block_p) const;
+    const scalarport_p getNegCondReachedByBlock(block_p) const;
 
-    bool isEntryBlock() const;
+    /// \brief Return Condition for a Scalar Input Port. Only makes sense if
+    /// ScalarPort has multiple inputs.
+    const SingleCondTy getCondForScalarPort(scalarport_p) const;
+
+    inline bool isEntryBlock() const {
+      return EntryBlock;
+    }
 
     // InStreams
     void addInStreamIndex(streamindex_p);
@@ -144,6 +173,8 @@ class Block : public Component {
     bool containsInStreamIndexForValue(const Value *);
 
     const StreamIndicesTy &getInStreamIndices() const;
+    const StaticStreamIndicesTy &getStaticInStreamIndices() const;
+    const DynamicStreamIndicesTy &getDynamicInStreamIndices() const;
 
     // OutStreams
     void addOutStreamIndex(streamindex_p);
@@ -151,6 +182,8 @@ class Block : public Component {
     bool containsOutStreamIndexForValue(const Value *);
 
     const StreamIndicesTy &getOutStreamIndices() const;
+    const StaticStreamIndicesTy &getStaticOutStreamIndices() const;
+    const DynamicStreamIndicesTy &getDynamicOutStreamIndices() const;
     
     virtual void dump();
 
@@ -185,16 +218,18 @@ class Kernel : public Component {
     StreamMapTy InOutStreamsMap;
 #endif
 
-
-  protected:
-    bool isBlock();
-    bool isKernel();
-
   public:
 
     Kernel (const std::string &, bool);
 
     NO_COPY_ASSIGN(Kernel)
+
+    virtual inline bool isBlock() override {
+      return false;
+    }
+    virtual inline bool isKernel() override {
+      return true;
+    }
 
     void addBlock(block_p p);
     const BlocksTy &getBlocks() const;

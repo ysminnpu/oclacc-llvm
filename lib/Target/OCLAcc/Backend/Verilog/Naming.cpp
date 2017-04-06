@@ -109,14 +109,6 @@ const std::string oclacc:getOpName(const ScalarPort &P) {
 }
 #endif
 
-// Used for delegation
-const Signal::SignalListTy oclacc::getInSignals(const scalarport_p P) {
-  return getInSignals(*P);
-}
-const Signal::SignalListTy oclacc::getOutSignals(const scalarport_p P) {
-  return getOutSignals(*P);
-}
-
 /// \brief Return all signals for a specific port depending on its dynamic type
 const Signal::SignalListTy oclacc::getSignals(const block_p P) {
   return getSignals(*P);
@@ -201,24 +193,44 @@ const Signal::SignalListTy oclacc::getOutSignals(const streamindex_p P) {
 }
 
 
+// Used for delegation
+const Signal::SignalListTy oclacc::getInSignals(const scalarport_p P) {
+  return getInSignals(*P);
+}
+
 /// \brief Return a list of all ScalarPorts
 const Signal::SignalListTy oclacc::getInSignals(const ScalarPort &P) {
   Signal::SignalListTy L;
 
   unsigned BitWidth = P.getBitWidth();
 
-  const HW::PortsTy Ins = P.getIns();
-
   const std::string PName = getOpName(P);
-
 
   // Only pipelined ports have buffer and synchronization signals
   if (P.isPipelined()) {
     L.push_back(Signal(PName+"_unbuf",BitWidth,Signal::In, Signal::Wire));
     L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::In, Signal::Wire));
-    L.push_back(Signal(PName+"_unbuf_ack", 1, Signal::Out, Signal::Reg));
+    L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));
   } else
     L.push_back(Signal(PName,BitWidth,Signal::In, Signal::Wire));
+
+  return L;
+}
+
+const Signal::SignalListTy oclacc::getInMuxSignals(const ScalarPort &Sink, const ScalarPort &Src) {
+  Signal::SignalListTy L;
+
+  assert(Sink.isPipelined());
+  assert(Src.isPipelined());
+
+  unsigned BitWidth = Sink.getBitWidth();
+  const std::string SrcName = getOpName(Src);
+  const std::string SinkName = getOpName(Sink);
+
+  // Only logic, no registers
+  L.push_back(Signal(SinkName+"_"+SrcName, BitWidth, Signal::In, Signal::Wire));
+  L.push_back(Signal(SinkName+"_"+SrcName+"_valid", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(SinkName+"_"+SrcName+"_ack", BitWidth, Signal::Out, Signal::Wire));
 
   return L;
 }
@@ -255,6 +267,11 @@ const Signal::SignalListTy oclacc::getSignals(const StreamPort &P) {
   return L;
 }
 
+
+const Signal::SignalListTy oclacc::getOutSignals(const scalarport_p P) {
+  return getOutSignals(*P);
+}
+
 const Signal::SignalListTy oclacc::getOutSignals(const ScalarPort &P) {
   Signal::SignalListTy L;
 
@@ -268,11 +285,11 @@ const Signal::SignalListTy oclacc::getOutSignals(const ScalarPort &P) {
 
   const std::string PName = getOpName(P);
 
-  L.push_back(Signal(PName+"_unbuf", BitWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"", BitWidth, Signal::Out, Signal::Reg));
 
-  L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
 
-  L.push_back(Signal(PName+"_unbuf_ack", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
 
   return L;
 }
@@ -284,17 +301,17 @@ const Signal::SignalListTy oclacc::getInSignals(const staticstreamindex_p P) {
 const Signal::SignalListTy oclacc::getInSignals(const StaticStreamIndex &P) {
   Signal::SignalListTy L;
 
-  // TODO: Store bitwidth for constant addresses
+  // TODO: Load bitwidth for constant addresses
   unsigned AddressWidth = P.getBitWidth();
   unsigned DataWidth = P.getStream()->getBitWidth();
 
   const std::string PName = getOpName(P);
 
-  L.push_back(Signal(PName+"_unbuf_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName+"_unbuf_address_valid", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_address_valid", AddressWidth, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_unbuf", DataWidth, Signal::In, Signal::Wire));
-  L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName+"_unbuf_ack", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));
 
   return L;
 }
@@ -311,11 +328,11 @@ const Signal::SignalListTy oclacc::getInSignals(const DynamicStreamIndex &P) {
 
   const std::string PName = getOpName(P);
 
-  L.push_back(Signal(PName+"_unbuf_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName+"_unbuf_address_valid", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_address_valid", AddressWidth, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_unbuf", DataWidth, Signal::In, Signal::Wire));
   L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::In, Signal::Wire));
-  L.push_back(Signal(PName+"_unbuf_ack", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));
 
   return L;
 }
@@ -335,7 +352,7 @@ const Signal::SignalListTy oclacc::getOutSignals(const StaticStreamIndex &P) {
   unsigned DataWidth = P.getStream()->getBitWidth();
 
   L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName, DataWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_buf", DataWidth, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
 
@@ -362,7 +379,7 @@ const Signal::SignalListTy oclacc::getOutSignals(const DynamicStreamIndex &P) {
   unsigned DataWidth = P.getStream()->getBitWidth();
 
   L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName, DataWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_buf", DataWidth, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
 

@@ -4,9 +4,10 @@
 #include <sstream>
 #include <vector>
 
-#include "../../HW/typedefs.h"
-#include "../../Utils.h"
+#include "HW/typedefs.h"
+#include "Utils.h"
 #include "Signal.h"
+#include "Naming.h"
 
 #define I(C) std::string((C*2),' ')
 
@@ -35,7 +36,7 @@ class BlockModule : public VerilogModule {
 
     virtual const std::string declHeader() const;
 
-    const std::string declEnable() const;
+    //const std::string declEnable() const;
 
     const std::string declConstValues() const;
 
@@ -46,16 +47,21 @@ class BlockModule : public VerilogModule {
     const std::string declFSM() const;
 
     inline const std::string declBlockSignals() const { return BlockSignals.str(); }
-    inline const std::string declBlockComponents() const { return BlockComponents.str(); }
     inline const std::string declConstSignals() const { return ConstSignals.str(); }
+    inline const std::string declBlockAssignments() const { return ConstSignals.str(); }
+    inline const std::string declBlockComponents() const { return BlockComponents.str(); }
 
     inline std::stringstream &getBlockSignals() { return BlockSignals; }
     inline std::stringstream &getConstSignals() { return ConstSignals; }
+    inline std::stringstream &getBlockAssignments() { return BlockAssignments;}
     inline std::stringstream &getBlockComponents() { return BlockComponents;}
 
     void schedule(const OperatorInstances &);
 
     unsigned getReadyCycle(const std::string) const;
+    inline unsigned getReadyCycle(base_p P) const {
+        return getReadyCycle(getOpName(P));
+    }
 
   private:
     Block &Comp;
@@ -64,6 +70,7 @@ class BlockModule : public VerilogModule {
     // Components as instantiated by each component
     std::stringstream BlockSignals;
     std::stringstream ConstSignals;
+    std::stringstream BlockAssignments;
     std::stringstream BlockComponents;
 
 };

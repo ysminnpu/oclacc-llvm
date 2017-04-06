@@ -31,11 +31,11 @@ class DFVisitor : public BaseVisitor
     DFVisitor() {};
 
   public:
-    virtual int visit(Visitable &R) {
+    virtual int visit(Visitable &R) override {
       return 0;
     }
 
-    virtual int visit(FPArith &R) {
+    virtual int visit(FPArith &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for (base_p p : R.getOuts()) {
@@ -44,8 +44,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(Arith &R)
-    {
+    virtual int visit(Arith &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for (base_p p : R.getOuts()) {
@@ -54,29 +53,44 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(Add &R)  { return visit(static_cast<Arith &>(R));}
-    virtual int visit(Sub &R)  { return visit(static_cast<Arith &>(R));}
-    virtual int visit(Mul &R)  { return visit(static_cast<Arith &>(R));}
-    virtual int visit(UDiv &R) { return visit(static_cast<Arith &>(R));}
-    virtual int visit(SDiv &R) { return visit(static_cast<Arith &>(R));}
-    virtual int visit(URem &R) { return visit(static_cast<Arith &>(R));}
-    virtual int visit(SRem &R) { return visit(static_cast<Arith &>(R));}
+    virtual int visit(Add &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(Sub &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(Mul &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(UDiv &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(SDiv &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(URem &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(SRem &R) override { return visit(static_cast<Arith &>(R));}
 
-    virtual int visit(FAdd &R) { return visit(static_cast<FPArith &>(R));}
-    virtual int visit(FSub &R) { return visit(static_cast<FPArith &>(R));}
-    virtual int visit(FMul &R) { return visit(static_cast<FPArith &>(R));}
-    virtual int visit(FDiv &R) { return visit(static_cast<FPArith &>(R));}
-    virtual int visit(FRem &R) { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FAdd &R) override { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FSub &R) override { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FMul &R) override { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FDiv &R) override { return visit(static_cast<FPArith &>(R));}
+    virtual int visit(FRem &R) override { return visit(static_cast<FPArith &>(R));}
 
-    virtual int visit(Shl &R)  { return visit(static_cast<Arith &>(R));}
-    virtual int visit(LShr &R) { return visit(static_cast<Arith &>(R)); }
-    virtual int visit(AShr &R) { return visit(static_cast<Arith &>(R));}
-    virtual int visit(And &R)  { return visit(static_cast<Arith &>(R)); }
-    virtual int visit(Or &R)   { return visit(static_cast<Arith &>(R));}
-    virtual int visit(Xor &R)  { return visit(static_cast<Arith &>(R)); }
+    virtual int visit(Shl &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(LShr &R) override { return visit(static_cast<Arith &>(R)); }
+    virtual int visit(AShr &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(And &R) override { return visit(static_cast<Arith &>(R)); }
+    virtual int visit(Or &R) override { return visit(static_cast<Arith &>(R));}
+    virtual int visit(Xor &R) override { return visit(static_cast<Arith &>(R)); }
 
-    virtual int visit(Compare &R)
-    {
+    virtual int visit(Compare &R) override {
+      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+      for ( base_p p : R.getOuts() ) {
+        p->accept(*this);
+      }
+      return 0;
+    }
+    virtual int visit(IntCompare &R) override {
+      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+      for ( base_p p : R.getOuts() ) {
+        p->accept(*this);
+      }
+      return 0;
+    }
+    virtual int visit(FPCompare &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for ( base_p p : R.getOuts() ) {
@@ -88,8 +102,7 @@ class DFVisitor : public BaseVisitor
     //
     //Mux
     //
-    virtual int visit(Mux &R)
-    {
+    virtual int visit(Mux &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for ( base_p p : R.getOuts() ) {
@@ -102,8 +115,7 @@ class DFVisitor : public BaseVisitor
     //
     //Mem
     //
-    virtual int visit(Reg &R)
-    {
+    virtual int visit(Reg &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
       
       for ( base_p p : R.getOuts() ) {
@@ -112,8 +124,7 @@ class DFVisitor : public BaseVisitor
 
       return 0;
     }
-    virtual int visit(Ram &R)
-    {
+    virtual int visit(Ram &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       R.index->accept(*this);
@@ -124,8 +135,7 @@ class DFVisitor : public BaseVisitor
 
       return 0;
     }
-    virtual int visit(Fifo &R)
-    {
+    virtual int visit(Fifo &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for ( base_p p : R.getOuts() ) {
@@ -138,8 +148,7 @@ class DFVisitor : public BaseVisitor
     //
     //Constants
     //
-    virtual int visit(ConstVal &R)
-    {
+    virtual int visit(ConstVal &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
       
       for ( base_p p : R.getOuts() ) {
@@ -151,8 +160,7 @@ class DFVisitor : public BaseVisitor
     //
     //Design Unit
     //
-    virtual int visit(DesignUnit &R)
-    {
+    virtual int visit(DesignUnit &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for ( kernel_p p : R.Kernels ) {
@@ -165,8 +173,7 @@ class DFVisitor : public BaseVisitor
     ///
     /// visit Kernel
     ///
-    virtual int visit(Kernel &R)
-    {
+    virtual int visit(Kernel &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for ( block_p P : R.getBlocks()) {
@@ -187,8 +194,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(Block &R)
-    {
+    virtual int visit(Block &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       for ( port_p P : R.getInScalars() ) {
@@ -209,10 +215,9 @@ class DFVisitor : public BaseVisitor
     }
 
 
-    virtual int visit(ScalarPort &R) { 
+    virtual int visit(ScalarPort &R) override { 
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-      //for (base_p P : R.getIns())
       //  P->accept(*this);
 
       //for (base_p P : R.getOuts())
@@ -221,8 +226,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(StreamPort &R)
-    {
+    virtual int visit(StreamPort &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       //for ( streamindex_p P : R.getIndexList() ) {
@@ -231,8 +235,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(StreamIndex &R)
-    {
+    virtual int visit(StreamIndex &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       R.getStream()->accept(*this);
@@ -246,8 +249,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(DynamicStreamIndex &R)
-    {
+    virtual int visit(DynamicStreamIndex &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       R.getIndex()->accept(*this);
@@ -259,8 +261,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
 
-    virtual int visit(StaticStreamIndex &R)
-    {
+    virtual int visit(StaticStreamIndex &R) override {
       DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
 
       R.getStream()->accept(*this);

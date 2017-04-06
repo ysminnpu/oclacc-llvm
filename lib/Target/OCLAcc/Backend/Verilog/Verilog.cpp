@@ -305,10 +305,8 @@ int Verilog::visit(Kernel &R) {
   KernelModule KM(R);
   (*FS) << KM.declHeader();
 
-  (*FS) << "// Block wires\n";
   (*FS) << KM.declBlockWires();
 
-  (*FS) << "// Block instantiations\n";
   (*FS) << KM.instBlocks();
 
   (*FS) << KM.declFooter();
@@ -346,8 +344,8 @@ int Verilog::visit(Block &R) {
 
   (*FS) << BM->declHeader();
 
-  if (R.isConditional())
-    (*FS) << BM->declEnable();
+  //if (R.isConditional())
+  //  (*FS) << BM->declEnable();
 
   // Write constant assignments
   (*FS) << BM->declConstValues();
@@ -362,6 +360,9 @@ int Verilog::visit(Block &R) {
 
   // Write constant assignments
   (*FS) << BM->declConstSignals();
+
+  // Write assignments
+  (*FS) << BM->declBlockAssignments();
 
   // Determine critical path
   BM->schedule(TheOps);
@@ -382,57 +383,49 @@ int Verilog::visit(Block &R) {
   return 0;
 }
 
+// Ports
+int Verilog::visit(StreamPort &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
+int Verilog::visit(StaticStreamIndex &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
+int Verilog::visit(DynamicStreamIndex &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
 // The following methods create arithmetic cores. The block then instantiates
 // them and takes care of the critical path.
 
 /// \brief Generate Stream as BRAM with Addressgenerator
-///
+
+void Verilog::handleInferableMath(const Arith &R, const std::string Op) {
+  std::stringstream &BlockSignals = BM->getBlockSignals();
+  std::stringstream &BlockAssignments = BM->getBlockAssignments();
+
+  const std::string Op0 = getOpName(R.getIn(0));
+  const std::string Op1 = getOpName(R.getIn(1));
+  const std::string Res = getOpName(R);
+
+  const std::string RName = getOpName(R);
+
+  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
+  BlockSignals << S.getDefStr() << ";\n";
+
+  BlockAssignments << "assign " << Res << " = " << Op0 << " " << Op << " " << Op1 << ";\n";
+}
 
 int Verilog::visit(Add &R) {
   VISIT_ONCE(R);
 
-  std::stringstream &BlockSignals = BM->getBlockSignals();
-  std::stringstream &BlockComponents = BM->getBlockComponents();
-  std::stringstream &ConstSignals = BM->getConstSignals();
+  handleInferableMath(R, "+");
 
-  const std::string BW = std::to_string(R.getBitWidth());
-  
-  const std::string Arch = std::to_string(conf::IntAdder_Arch);
-  const std::string Opt = std::to_string(conf::IntAdder_OptObjective);
-  const std::string SRL = std::to_string(conf::IntAdder_SRL);
-
-  const std::string Name = "IntAdder_" + BW;
-
-  const std::string RName = R.getUniqueName();
-
-  std::stringstream FInst;
-
-  FInst << "IntAdder" << " wIn=" << BW << " ";
-  FInst << "arch=" << Arch << " ";
-  FInst << "optObjective=" << Opt << " ";
-  FInst << "SRL=" << SRL << " ";
-  FInst << "name=" << Name << " ";
-  FInst << "outputFile=" << Name << ".vhd" << " ";
-
-  flopoco::addModule(RName, Name, FInst.str());
-
-  // Add output signal
-  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
-  BlockSignals << S.getDefStr() << ";\n";
-
-  // Instantiate component
-  BlockComponents << "// " << RName << "\n";
-  BlockComponents << Name << " " << Name << "_" << RName << "(\n";
-  BlockComponents << Indent(1) << ".clk(clk)," << "\n";
-  BlockComponents << Indent(1) << ".rst(rst)," << "\n";
-  BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
-  BlockComponents << Indent(1) << ".Y(" << getOpName(R.getIn(1)) << ")," << "\n";
-  BlockComponents << Indent(1) << ".Cin(" << RName << "_Cin" << ")," << "\n";
-  BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
-  BlockComponents << ");\n";
-
-  ConstSignals << "localparam " << RName << "_Cin = 0;" << "\n";
-
+  super::visit(R);
   return 0;
 }
 
@@ -441,53 +434,10 @@ int Verilog::visit(Add &R) {
 /// TODO: Use adder with negated 2nd operand.
 int Verilog::visit(Sub &R) {
   VISIT_ONCE(R);
-  std::stringstream &BlockSignals = BM->getBlockSignals();
-  std::stringstream &BlockComponents = BM->getBlockComponents();
-  std::stringstream &ConstSignals = BM->getConstSignals();
 
-  const std::string BW = std::to_string(R.getBitWidth());
-  
-  const std::string Arch = std::to_string(conf::IntAdder_Arch);
-  const std::string Opt = std::to_string(conf::IntAdder_OptObjective);
-  const std::string SRL = std::to_string(conf::IntAdder_SRL);
+  handleInferableMath(R, "-");
 
-  const std::string Name = "IntAdder_" + BW;
-
-  const std::string RName = R.getUniqueName();
-
-  std::stringstream FInst;
-
-  FInst << "IntAdder" << " wIn=" << BW << " ";
-  FInst << "arch=" << Arch << " ";
-  FInst << "optObjective=" << Opt << " ";
-  FInst << "SRL=" << SRL << " ";
-  FInst << "name=" << Name << " ";
-  FInst << "outputFile=" << Name << ".vhd" << " ";
-
-  flopoco::addModule(RName, Name, FInst.str());
-
-  // Add output signal
-  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
-  BlockSignals << S.getDefStr() << ";\n";
-
-  // Inverted input
-  const std::string InvIn1Name = getOpName(R.getIn(1))+"_inv";
-  Signal InvIn1(InvIn1Name, R.getIn(1)->getBitWidth(), Signal::Local, Signal::Wire);
-  BlockSignals << InvIn1.getDefStr() << ";\n";
-  BlockSignals << "assign " << InvIn1Name << " = ~" << getOpName(R.getIn(1)) << ";\n"; 
-
-  // Instantiate component
-  BlockComponents << "// " << RName << "\n";
-  BlockComponents << Name << " " << Name << "_" << RName << "(\n";
-  BlockComponents << Indent(1) << ".clk(clk)," << "\n";
-  BlockComponents << Indent(1) << ".rst(rst)," << "\n";
-  BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
-  BlockComponents << Indent(1) << ".Y(" << InvIn1Name << ")," << "\n";
-  BlockComponents << Indent(1) << ".Cin(" << RName << "_Cin" << ")," << "\n";
-  BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
-  BlockComponents << ");\n";
-
-  ConstSignals << "localparam " << RName << "_Cin = 1;" << "\n";
+  super::visit(R);
   return 0;
 }
 
@@ -531,6 +481,7 @@ int Verilog::visit(Mul &R) {
   BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
   BlockComponents << ");\n";
 
+  super::visit(R);
   return 0;
 }
 
@@ -577,12 +528,12 @@ int Verilog::visit(FAdd &R) {
   BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
   BlockComponents << ");\n";
 
+  super::visit(R);
   return 0;
 }
 
 int Verilog::visit(FSub &R) {
   VISIT_ONCE(R);
-  std::stringstream &BlockComponents = BM->getBlockComponents();
   return 0;
 }
 
@@ -679,70 +630,140 @@ int Verilog::visit(FMul &R) {
     BlockComponents << ");\n";
   }
 
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(UDiv &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(SDiv &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(FDiv &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(URem &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(SRem &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(FRem &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(Shl &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(LShr &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(AShr &R) {
   VISIT_ONCE(R);
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(And &R) {
   VISIT_ONCE(R);
+
+  handleInferableMath(R, "&");
+
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(Or &R) {
   VISIT_ONCE(R);
+
+  handleInferableMath(R, "|");
+
+  super::visit(R);
   return 0;
 }
 int Verilog::visit(Xor &R) {
   VISIT_ONCE(R);
+
+  handleInferableMath(R, "^");
+
+  super::visit(R);
   return 0;
 }
 
-int Verilog::visit(StreamPort &R) {
+int Verilog::visit(IntCompare &R) {
   VISIT_ONCE(R);
+
+  std::stringstream &BlockSignals = BM->getBlockSignals();
+  std::stringstream &BlockComponents = BM->getBlockComponents();
+
+  const std::string Op0 = getOpName(R.getIn(0));
+  const std::string Op1 = getOpName(R.getIn(1));
+  const std::string Res = getOpName(R);
+
+  unsigned BitWidth = R.getBitWidth();
+  unsigned BitWidthOp0 = R.getIn(0)->getBitWidth();
+  unsigned BitWidthOp1 = R.getIn(1)->getBitWidth();
+
+  Signal Diff(Res+"_diff", std::max(BitWidthOp0, BitWidthOp1), Signal::Local, Signal::Reg);
+  BlockSignals << Diff.getDefStr() << ";\n";
+
+  Signal RSig(Res, BitWidth, Signal::Local, Signal::Reg);
+  BlockSignals << RSig.getDefStr() << ";\n";
+
+  BlockComponents << "always@(" << Op0 <<", " << Op1 << ")\n";
+  BEGIN(BlockComponents);
+    BlockComponents << Indent(II) << Res << "_diff <= " << Op0 << " - " << Op1 << ";\n";
+
+  switch (R.getPred()) {
+    case llvm::CmpInst::Predicate::ICMP_EQ:
+      BlockComponents << Indent(II) << "if (" << Res << "_diff == 0" << ") " << Res << " <= 1;\n";
+      break;
+    case llvm::CmpInst::Predicate::ICMP_NE:
+      break;
+    case llvm::CmpInst::Predicate::ICMP_UGT:
+      break;
+    case llvm::CmpInst::Predicate::ICMP_UGE:
+      break;
+    case llvm::CmpInst::Predicate::ICMP_ULT:
+      break;
+    case llvm::CmpInst::Predicate::ICMP_ULE:
+      break;
+    case llvm::CmpInst::Predicate::ICMP_SGT:
+      BlockComponents << Indent(II) << "if (" << Res << "_diff > 0" << ") " << Res << " <= 1;\n";
+      break;
+    case llvm::CmpInst::Predicate::ICMP_SGE:
+      BlockComponents << Indent(II) << "if (" << Res << "_diff >= 0" << ") " << Res << " <= 1;\n";
+      break;
+    case llvm::CmpInst::Predicate::ICMP_SLT:
+      BlockComponents << Indent(II) << "if (" << Res << "_diff < 0" << ") " << Res << " <= 1;\n";
+      break;
+    case llvm::CmpInst::Predicate::ICMP_SLE:
+      break;
+    default:
+      llvm_unreachable("Invalid predicate for icmp.");
+  }
+    END(BlockComponents);
+
+  super::visit(R);
   return 0;
 }
 
-int Verilog::visit(StaticStreamIndex &R) {
+int Verilog::visit(FPCompare &R) {
   VISIT_ONCE(R);
-  return 0;
-}
-
-int Verilog::visit(DynamicStreamIndex &R) {
-  VISIT_ONCE(R);
-  return 0;
+  super::visit(R);
 }
 
 #undef DEBUG_TYPE

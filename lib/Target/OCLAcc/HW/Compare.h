@@ -19,7 +19,7 @@ class Compare : public HW {
     Compare(const std::string &Name, Compare::PredTy P) : HW(Name, 1), Pred(P) {
     }
 
-    const std::string getPredAsString(PredTy P) {
+    inline const std::string getPredAsString(PredTy P) {
       switch (P) {
         case  0: return "FCMP_FALSE";
         case  1: return "FCMP_OEQ";
@@ -52,8 +52,12 @@ class Compare : public HW {
       }
     }
 
-    const std::string getOp() {
+    inline const std::string getOp() {
       return getPredAsString(Pred);
+    }
+
+    inline PredTy getPred() const {
+      return Pred;
     }
 
     DECLARE_VISIT;
@@ -63,12 +67,14 @@ class IntCompare : public Compare {
   public:
     IntCompare(const std::string &Name, Compare::PredTy P) : Compare(Name, P) {
     }
+    DECLARE_VISIT;
 };
 
 class FPCompare : public Compare {
   public:
     FPCompare(const std::string &Name, Compare::PredTy P) : Compare(Name, P) {
     }
+    DECLARE_VISIT;
 };
 
 }

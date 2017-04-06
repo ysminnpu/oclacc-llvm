@@ -1142,8 +1142,8 @@ void OCLAccHW::visitPHINode(PHINode &I) {
     // All incoming blocks should already have been visited, so we can use
     // Conds and NegConds of BB to look for the IncomingBlock and the condition.
 
-    const base_p Cond = HWBB->getCondForBlock(HWB);
-    const base_p NegCond = HWBB->getNegCondForBlock(HWB);
+    const base_p Cond = HWBB->getCondReachedByBlock(HWB);
+    const base_p NegCond = HWBB->getNegCondReachedByBlock(HWB);
 
     if (!Cond && !NegCond) {
       // Unconditional branch from FromBB to BB
@@ -1191,13 +1191,31 @@ void OCLAccHW::visitPHINode(PHINode &I) {
 ///
 /// \brief Set conditions for each block
 void OCLAccHW::visitBranchInst(BranchInst &I) {
+  const BasicBlock *BB = I.getParent();
+  block_p HWBB = getBlock(BB);
+
   if (I.isUnconditional()) {
     // No condition, so all Ports can be used when ready.
+    const_p HWConst = std::make_shared<ConstVal>("true", "1", 1);
+    HWBB->addConstVal(HWConst);
+
+    BasicBlock *SuccBB = I.getSuccessor(0);
+
+    block_p HWSucc = getBlock(SuccBB);
+
+    scalarport_p HWOut = makeHWBB<ScalarPort>(BB, &I, "uncond", 1, oclacc::Integer, true);
+    connect(HWConst, HWOut);
+    HWBB->addOutScalar(HWOut);
+    
+    scalarport_p HWIn = makeHWBB<ScalarPort>(SuccBB, &I, "uncond", 1, oclacc::Integer, true);
+    HWSucc->addInScalar(HWIn);
+
+    connect(HWOut, HWIn);
+
+    HWSucc->addCond(HWIn, HWBB);
     return;
   }
 
-  const BasicBlock *BB = I.getParent();
-  block_p HWBB = getBlock(BB);
 
   const Value *Cond = I.getCondition();
   base_p HWCond = getHW<HW>(BB, Cond);

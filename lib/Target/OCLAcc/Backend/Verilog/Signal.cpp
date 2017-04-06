@@ -1,11 +1,14 @@
 #include <sstream>
 #include <iomanip>
 
+#include <llvm/Support/Debug.h>
+
 #include "Signal.h"
 
 using namespace oclacc;
 
 Signal::Signal(const std::string Name, unsigned BitWidth, SignalDirection Direction, SignalType Type) : Name(Name), BitWidth(BitWidth), Direction(Direction), Type(Type) {
+  assert(BitWidth && "BitWidth must not be zero.");
 }
 
 const std::string Signal::getDirectionStr(void) const {
@@ -25,7 +28,7 @@ const std::string Signal::getDefStr(void) const {
   S << std::setw(4) << std::left << getTypeStr() << " ";
 
   // Print width columnwise
-  if (BitWidth!=1) {
+  if (BitWidth>1) {
     std::string BWS = "[" + std::to_string(BitWidth-1) + ":0]";
 
     /// Separate, otherwise setw() works incorrectly
