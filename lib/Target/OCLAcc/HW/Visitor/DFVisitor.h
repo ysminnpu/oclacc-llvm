@@ -18,6 +18,8 @@
 
 //#define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
 #define TYPENAME(x) x.getName()
+#define DEBUG_TYPE "dfvisitor"
+#define DEBUG_FUNC do {DEBUG(dbgs() << __PRETTY_FUNCTION__ << ": " << R.getUniqueName() << "\n");} while (0);
 
 namespace oclacc {
 
@@ -36,7 +38,7 @@ class DFVisitor : public BaseVisitor
     }
 
     virtual int visit(FPArith &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for (base_p p : R.getOuts()) {
         p->accept(*this);
@@ -45,7 +47,7 @@ class DFVisitor : public BaseVisitor
     }
 
     virtual int visit(Arith &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for (base_p p : R.getOuts()) {
         p->accept(*this);
@@ -75,7 +77,7 @@ class DFVisitor : public BaseVisitor
     virtual int visit(Xor &R) override { return visit(static_cast<Arith &>(R)); }
 
     virtual int visit(Compare &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( base_p p : R.getOuts() ) {
         p->accept(*this);
@@ -83,7 +85,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
     virtual int visit(IntCompare &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( base_p p : R.getOuts() ) {
         p->accept(*this);
@@ -91,7 +93,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
     virtual int visit(FPCompare &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( base_p p : R.getOuts() ) {
         p->accept(*this);
@@ -103,7 +105,7 @@ class DFVisitor : public BaseVisitor
     //Mux
     //
     virtual int visit(Mux &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( base_p p : R.getOuts() ) {
         p->accept(*this);
@@ -116,7 +118,7 @@ class DFVisitor : public BaseVisitor
     //Mem
     //
     virtual int visit(Reg &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
       
       for ( base_p p : R.getOuts() ) {
         p->accept(*this);
@@ -125,7 +127,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
     virtual int visit(Ram &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       R.index->accept(*this);
 
@@ -136,7 +138,7 @@ class DFVisitor : public BaseVisitor
       return 0;
     }
     virtual int visit(Fifo &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( base_p p : R.getOuts() ) {
         p->accept(*this);
@@ -149,7 +151,7 @@ class DFVisitor : public BaseVisitor
     //Constants
     //
     virtual int visit(ConstVal &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
       
       for ( base_p p : R.getOuts() ) {
         p->accept(*this);
@@ -161,7 +163,7 @@ class DFVisitor : public BaseVisitor
     //Design Unit
     //
     virtual int visit(DesignUnit &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( kernel_p p : R.Kernels ) {
         p->accept(*this);
@@ -174,7 +176,7 @@ class DFVisitor : public BaseVisitor
     /// visit Kernel
     ///
     virtual int visit(Kernel &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( block_p P : R.getBlocks()) {
         P->accept(*this);
@@ -195,7 +197,7 @@ class DFVisitor : public BaseVisitor
     }
 
     virtual int visit(Block &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       for ( port_p P : R.getInScalars() ) {
         P->accept(*this);
@@ -216,7 +218,7 @@ class DFVisitor : public BaseVisitor
 
 
     virtual int visit(ScalarPort &R) override { 
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       //  P->accept(*this);
 
@@ -227,7 +229,7 @@ class DFVisitor : public BaseVisitor
     }
 
     virtual int visit(StreamPort &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       //for ( streamindex_p P : R.getIndexList() ) {
       //  P->accept(*this);
@@ -236,7 +238,7 @@ class DFVisitor : public BaseVisitor
     }
 
     virtual int visit(StreamIndex &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
       R.getStream()->accept(*this);
 
@@ -250,10 +252,10 @@ class DFVisitor : public BaseVisitor
     }
 
     virtual int visit(DynamicStreamIndex &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
-      R.getIndex()->accept(*this);
-      R.getStream()->accept(*this);
+      //R.getIndex()->accept(*this);
+      //R.getStream()->accept(*this);
 
       for (base_p P : R.getOuts())
         P->accept(*this);
@@ -262,12 +264,12 @@ class DFVisitor : public BaseVisitor
     }
 
     virtual int visit(StaticStreamIndex &R) override {
-      DEBUG_WITH_TYPE("DFVisitor", dbgs() << __PRETTY_FUNCTION__ << "\n");
+      DEBUG_FUNC;
 
-      R.getStream()->accept(*this);
+      //R.getStream()->accept(*this);
 
-      for (base_p P : R.getIns())
-        P->accept(*this);
+      //for (base_p P : R.getIns())
+      //  P->accept(*this);
 
       for (base_p P : R.getOuts())
         P->accept(*this);
@@ -279,5 +281,13 @@ class DFVisitor : public BaseVisitor
 } //ns oclacc
 
 #undef TYPENAME
+#ifdef DEBUG_TYPE
+#undef DEBUG_TYPE
+#endif
+
+#ifdef DEBUG_FUNC
+#undef DEBUG_FUNC
+#endif
+
 
 #endif /* DF_H */
