@@ -324,9 +324,9 @@ int Dot::visit(StaticStreamIndex &R) {
   // Depending on being a Load or Store, the arrow direction must be correct.
   streamport_p HWStream = R.getStream();
   if (HWStream->isLoad(&R) )
-    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
+    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
   else
-    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
+    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
 
   super::visit(R);
 
@@ -339,9 +339,9 @@ int Dot::visit(DynamicStreamIndex &R) {
 
   streamport_p HWStream = R.getStream();
   if (HWStream->isLoad(&R) )
-    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
+    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
   else
-    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
+    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
 
   super::visit(R);
 
