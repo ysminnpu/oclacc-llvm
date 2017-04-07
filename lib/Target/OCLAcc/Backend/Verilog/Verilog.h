@@ -113,6 +113,7 @@ class Verilog : public DFVisitor {
     int visit(Block &);
 
     // Ports
+    int visit(ScalarPort &);
     int visit(StreamPort &);
     int visit(StaticStreamIndex &);
     int visit(DynamicStreamIndex &);

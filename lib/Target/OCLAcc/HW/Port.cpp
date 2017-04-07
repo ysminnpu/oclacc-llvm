@@ -2,9 +2,8 @@
 
 using namespace oclacc;
 
-Port::Port(const std::string &Name, 
-    size_t W, const Datatype &T, 
-    bool Pipelined=false) : HW(Name, W), PortType(T), Pipelined(Pipelined) { }
+Port::Port(const std::string &Name, size_t W, const Datatype &T, bool Pipelined=false) 
+  : HW(Name, W), PortType(T), Pipelined(Pipelined) { }
 
 /// Scalar Port
 ///

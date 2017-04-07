@@ -13,6 +13,9 @@
 
 namespace oclacc {
 
+class OperatorInstances;
+
+
 /// \brief Base class to implement Components
 class VerilogModule {
   public:

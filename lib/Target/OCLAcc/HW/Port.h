@@ -15,7 +15,7 @@ namespace oclacc {
 
 class Port : public HW {
   private:
-    const Datatype &PortType;
+    const Datatype PortType;
     
   protected:
     bool Pipelined = false;
@@ -27,7 +27,7 @@ class Port : public HW {
   public:
     virtual bool isScalar() const=0;
 
-    inline const Datatype &getPortType() {
+    inline const Datatype getPortType() const {
       return PortType;
     }
 

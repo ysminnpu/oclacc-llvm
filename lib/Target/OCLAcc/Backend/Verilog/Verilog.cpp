@@ -384,6 +384,11 @@ int Verilog::visit(Block &R) {
 }
 
 // Ports
+int Verilog::visit(ScalarPort &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
 int Verilog::visit(StreamPort &R) {
   VISIT_ONCE(R);
   return 0;

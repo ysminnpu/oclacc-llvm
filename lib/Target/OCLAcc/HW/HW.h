@@ -96,21 +96,25 @@ class FPHW : public HW {
 };
 
 enum Datatype {
+  Undef,
   Half,
   Float,
   Double,
   Signed,
   Unsigned,
   Integer,
-  Invalid,
+  Invalid
 };
 
 static const char * const Strings_Datatype[] {
-  "Half",  // 0
-  "Float",  // 0
-  "Signed",   // 1
-  "Unsigned" // 2
-  "Invalid" // 2
+  "Undef",
+  "Half",
+  "Float", 
+  "Dounle",
+  "Signed",
+  "Unsigned",
+  "Integer",
+  "Invalid"
 };
 
 

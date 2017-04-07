@@ -22,8 +22,14 @@ FlopocoFPFormat::~FlopocoFPFormat() {
 
 int FlopocoFPFormat::visit(ScalarPort &R) {
   VISIT_ONCE(R);
-  if (R.getParent()->isBlock())
+  if (R.getParent()->isBlock() &&
+      ( R.getPortType() == Half ||
+        R.getPortType() == Float ||
+        R.getPortType() == Double ))
+  {
     R.setBitWidth(R.getBitWidth()+2);
+    errs() << "set bitwidth for " << R.getUniqueName() << " of type " << Strings_Datatype[R.getPortType()] << "\n";
+  }
   super::visit(R);
   return 0;
 }
@@ -31,6 +37,7 @@ int FlopocoFPFormat::visit(ScalarPort &R) {
 int FlopocoFPFormat::visit(FPArith &R) {
   VISIT_ONCE(R);
   R.setBitWidth(R.getBitWidth()+2);
+    errs() << "set bitwidth for " << R.getUniqueName() << "\n";
   super::visit(R);
   return 0;
 }
@@ -38,6 +45,7 @@ int FlopocoFPFormat::visit(FPArith &R) {
 int FlopocoFPFormat::visit(FPCompare &R) {
   VISIT_ONCE(R);
   R.setBitWidth(R.getBitWidth()+2);
+    errs() << "set bitwidth for " << R.getUniqueName() << "\n";
   super::visit(R);
 }
 

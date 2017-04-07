@@ -16,6 +16,7 @@
 #include "OCLAccHWVisitor.h"
 #include "OCLAccHW.h"
 #include "OpenCLDefines.h"
+#include "FlopocoFPFormat.h"
 
 #define DEBUG_TYPE "verilog"
 
@@ -61,6 +62,9 @@ GenerateVerilog *createGenerateVerilog() {
 bool GenerateVerilog::runOnModule(Module &M) {
   OCLAccHW&HWP = getAnalysis<OCLAccHW>();
   DesignUnit &Design = HWP.getDesign(); 
+
+  FlopocoFPFormat F;
+  Design.accept(F);
 
   Verilog V;
   Design.accept(V);
