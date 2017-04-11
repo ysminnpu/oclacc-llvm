@@ -212,8 +212,13 @@ const std::string KernelModule::declBlockWires() const {
     // Declare Signals for Mux Output and actual InScalar
     Signal::SignalListTy SinkPortSigs = getInSignals(Sink);
     for (const Signal &S : SinkPortSigs) {
-      Signal LocDef(S.Name, S.BitWidth, Signal::Local, Signal::Reg);
-      Wires << LocDef.getDefStr() << ";\n";
+        if (S.Direction == Signal::Out) {
+          Signal LocDef(S.Name, S.BitWidth, Signal::Local, Signal::Wire);
+          Wires << LocDef.getDefStr() << ";\n";
+        } else {
+          Signal LocDef(S.Name, S.BitWidth, Signal::Local, Signal::Reg);
+          Wires << LocDef.getDefStr() << ";\n";
+        }
     }
 
     for (base_p SrcTmp : Sink->getIns()) {

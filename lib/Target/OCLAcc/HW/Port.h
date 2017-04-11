@@ -34,6 +34,11 @@ class Port : public HW {
     inline bool isPipelined(void) const {
       return Pipelined;
     }
+
+    inline bool isFP() const {
+      return PortType == Half || PortType == Float || PortType == Double;
+    }
+
 };
 
 /// \brief Input or Output Port
@@ -146,6 +151,7 @@ class StreamPort : public Port {
     const DynamicIndexListTy getDynamicStores() const;
 
     void addStore(streamindex_p);
+
 };
 
 /// \brief StreamIndex

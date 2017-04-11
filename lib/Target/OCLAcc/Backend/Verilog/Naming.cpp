@@ -308,7 +308,7 @@ const Signal::SignalListTy oclacc::getInSignals(const StaticStreamIndex &P) {
   const std::string PName = getOpName(P);
 
   L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName+"_address_valid", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_address_valid", 1, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_unbuf", DataWidth, Signal::In, Signal::Wire));
   L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::In, Signal::Wire));
   L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));
@@ -329,7 +329,7 @@ const Signal::SignalListTy oclacc::getInSignals(const DynamicStreamIndex &P) {
   const std::string PName = getOpName(P);
 
   L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
-  L.push_back(Signal(PName+"_address_valid", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_address_valid", 1, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_unbuf", DataWidth, Signal::In, Signal::Wire));
   L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::In, Signal::Wire));
   L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));

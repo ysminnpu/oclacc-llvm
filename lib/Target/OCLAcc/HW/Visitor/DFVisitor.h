@@ -245,8 +245,8 @@ class DFVisitor : public BaseVisitor
       //for (base_p P : R.getIns())
       //  P->accept(*this);
 
-      //for (base_p P : R.getOuts())
-      //  P->accept(*this);
+      for (base_p P : R.getOuts())
+        P->accept(*this);
 
       return 0;
     }
@@ -256,11 +256,12 @@ class DFVisitor : public BaseVisitor
 
       //R.getIndex()->accept(*this);
       //R.getStream()->accept(*this);
+      return visit(static_cast<StreamIndex &>(R));
 
-      for (base_p P : R.getOuts())
-        P->accept(*this);
+//      for (base_p P : R.getOuts())
+//        P->accept(*this);
 
-      return 0;
+      //return 0;
     }
 
     virtual int visit(StaticStreamIndex &R) override {
@@ -271,10 +272,11 @@ class DFVisitor : public BaseVisitor
       //for (base_p P : R.getIns())
       //  P->accept(*this);
 
-      for (base_p P : R.getOuts())
-        P->accept(*this);
+//      for (base_p P : R.getOuts())
+//        P->accept(*this);
+      return visit(static_cast<StreamIndex &>(R));
 
-      return 0;
+      //return 0;
     }
 };
 

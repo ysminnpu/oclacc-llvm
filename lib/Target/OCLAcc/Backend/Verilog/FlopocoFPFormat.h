@@ -21,6 +21,8 @@ class FlopocoFPFormat : public DFVisitor {
     ~FlopocoFPFormat();
 
     int visit(ScalarPort &);
+    int visit(StreamPort &);
+    int visit(StreamIndex &);
 
     // Arith
     int visit(FPArith &);

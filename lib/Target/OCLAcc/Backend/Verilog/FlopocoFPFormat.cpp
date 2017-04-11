@@ -22,13 +22,30 @@ FlopocoFPFormat::~FlopocoFPFormat() {
 
 int FlopocoFPFormat::visit(ScalarPort &R) {
   VISIT_ONCE(R);
-  if (R.getParent()->isBlock() &&
-      ( R.getPortType() == Half ||
-        R.getPortType() == Float ||
-        R.getPortType() == Double ))
-  {
+  if (R.isFP()) {
     R.setBitWidth(R.getBitWidth()+2);
-    errs() << "set bitwidth for " << R.getUniqueName() << " of type " << Strings_Datatype[R.getPortType()] << "\n";
+    DEBUG(dbgs() << "set bitwidth for " << R.getUniqueName() << "\n";);
+  }
+  super::visit(R);
+  return 0;
+}
+int FlopocoFPFormat::visit(StreamPort &R) {
+  VISIT_ONCE(R);
+  if (R.isFP()) {
+    R.setBitWidth(R.getBitWidth()+2);
+    DEBUG(dbgs() << "set bitwidth for " << R.getUniqueName() << "\n";);
+  }
+  super::visit(R);
+  return 0;
+}
+
+int FlopocoFPFormat::visit(StreamIndex &R) {
+  VISIT_ONCE(R);
+  streamport_p S = R.getStream();
+
+  if (S->isFP()) {
+    R.setBitWidth(R.getBitWidth()+2);
+    DEBUG(dbgs() << "set bitwidth for " << R.getUniqueName() << "\n";);
   }
   super::visit(R);
   return 0;
@@ -37,7 +54,7 @@ int FlopocoFPFormat::visit(ScalarPort &R) {
 int FlopocoFPFormat::visit(FPArith &R) {
   VISIT_ONCE(R);
   R.setBitWidth(R.getBitWidth()+2);
-    errs() << "set bitwidth for " << R.getUniqueName() << "\n";
+  DEBUG(dbgs() << "set bitwidth for " << R.getUniqueName() << "\n";);
   super::visit(R);
   return 0;
 }
@@ -45,7 +62,7 @@ int FlopocoFPFormat::visit(FPArith &R) {
 int FlopocoFPFormat::visit(FPCompare &R) {
   VISIT_ONCE(R);
   R.setBitWidth(R.getBitWidth()+2);
-    errs() << "set bitwidth for " << R.getUniqueName() << "\n";
+  DEBUG(dbgs() << "set bitwidth for " << R.getUniqueName() << "\n";);
   super::visit(R);
 }
 

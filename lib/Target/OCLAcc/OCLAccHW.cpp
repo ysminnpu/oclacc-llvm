@@ -809,8 +809,7 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   // get the stream to read from
   streamport_p HWStream = HWStreamIndex->getStream();
   //TODO This is the case for local arrays!
-  if (! HWStream)
-    llvm_unreachable("Load base address is not a stream");
+  assert(HWStream && "Load base address is not a stream");
 
   // Check if the load has the same BitWidth as the port.
   unsigned StreamBitWidth = HWStream->getBitWidth();
@@ -824,6 +823,8 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   // block, but tell the stream that it is used to load data.
   HWParent->addInStreamIndex(HWStreamIndex);
   HWStream->addLoad(HWStreamIndex);
+
+  HWStreamIndex->setBitWidth(BitWidth);
 
   BlockValueMap[I.getParent()][&I] = HWStreamIndex;
 }
