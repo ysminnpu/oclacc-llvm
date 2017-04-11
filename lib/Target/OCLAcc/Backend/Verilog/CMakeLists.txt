@@ -7,5 +7,8 @@ add_llvm_library(LLVMOCLAccVerilogBackend
   Verilog.cpp
   Signal.cpp
   Naming.cpp
+  Flopoco.cpp
   FlopocoFPFormat.cpp
+  OperatorInstances.cpp
+  DesignFiles.cpp
 )

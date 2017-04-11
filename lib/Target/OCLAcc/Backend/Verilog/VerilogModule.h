@@ -63,7 +63,7 @@ class BlockModule : public VerilogModule {
 
     unsigned getReadyCycle(const std::string) const;
     inline unsigned getReadyCycle(base_p P) const {
-        return getReadyCycle(getOpName(P));
+      return getReadyCycle(getOpName(P));
     }
 
   private:
@@ -75,6 +75,11 @@ class BlockModule : public VerilogModule {
     std::stringstream ConstSignals;
     std::stringstream BlockAssignments;
     std::stringstream BlockComponents;
+
+    // Scheduling information
+    typedef std::map<std::string, unsigned> ReadyMapTy;
+    typedef ReadyMapTy::const_iterator ReadyMapConstItTy;
+    ReadyMapTy ReadyMap;
 
 };
 

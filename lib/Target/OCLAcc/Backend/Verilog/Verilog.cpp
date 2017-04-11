@@ -6,7 +6,6 @@
 #include <set>
 #include <unistd.h>
 #include <memory>
-#include <regex>
 #include <map>
 
 #include "Verilog.h"
@@ -17,6 +16,9 @@
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
 #include "VerilogModule.h"
+#include "OperatorInstances.h"
+#include "DesignFiles.h"
+#include "Flopoco.h"
 
 
 #define DEBUG_TYPE "verilog"
@@ -36,215 +38,6 @@ OperatorInstances TheOps;
 Signal Clk("clk", 1, Signal::In, Signal::Wire);
 Signal Rst("rst", 1, Signal::In, Signal::Wire);
 
-
-void DesignFiles::write(const std::string Filename) {
-  DEBUG(dbgs() << "Writing " + Filename + "...");
-
-  std::stringstream DoS;
-  FileTy DoFile = openFile(Filename);
-
-  DoS << "# top level simulation\n";
-  DoS << "# run with 'vsim -do " << Filename << "'\n";
-  DoS << "vlib work\n";
-
-  for (const std::string &S : Files) {
-    if (ends_with(S, ".vhd")) {
-      DoS << "vcom " << S << "\n";
-    } else if (ends_with(S, ".v")) {
-      DoS << "vlog " << S << "\n";
-    } else
-      llvm_unreachable("Invalid filetype");
-  }
-
-  (*DoFile) << DoS.str();
-  (*DoFile) << "quit\n";
-  DoFile->close();
-
-  DEBUG(dbgs() << "done\n");
-}
-
-void DesignFiles::addFile(const std::string S) {
-  Files.push_back(S);
-}
-
-bool OperatorInstances::existsOperator(const std::string OpName) {
-  return (Ops.find(OpName) != Ops.end());
-}
-
-void OperatorInstances::addOperator(const std::string HWName, const std::string OpName, unsigned Cycles) {
-  op_p O;
-
-  if (existsOperator(OpName)) {
-    O = getOperator(OpName);
-  } else {
-    O = std::make_shared<Operator>(OpName, Cycles);
-    NameMap[OpName] = O;
-    Ops.insert(OpName);
-  }
-
-  HWOp[HWName] = O;
-
-}
-
-op_p OperatorInstances::getOperator(const std::string OpName) {
-  if (!existsOperator(OpName))
-    llvm_unreachable("No Op");
-
-  OpMapConstItTy OI = NameMap.find(OpName);
-  if (OI == NameMap.end())
-    llvm_unreachable("No Namemapping");
-
-  return OI->second;
-}
-
-bool OperatorInstances::existsOperatorForHW(const std::string HWName) {
-  return HWOp.find(HWName) != HWOp.end();
-}
-
-op_p OperatorInstances::getOperatorForHW(const std::string HWName) {
-  assert(existsOperatorForHW(HWName));
-
-  OpMapConstItTy OI = HWOp.find(HWName);
-
-  return OI->second;
-}
-
-
-// Flopoco functions
-namespace flopoco {
-
-typedef std::map<std::string, std::string> ModMapTy;
-typedef ModMapTy::const_iterator ModMapConstItTy;
-typedef std::pair<std::string, std::string> ModMapElem;
-
-// Map Name to ModuleInstantiation
-ModMapTy ModuleMap;
-// Map HW.getUniqueName to Modulename
-ModMapTy NameHWMap;
-
-/// \brief Return latency of module \param M reported by Flopoco
-///
-///
-unsigned getLatency(const std::string M) {
-  FileTy Log = openFile(M+"log");
-
-  return 0;
-}
-
-/// \brief Generate modules
-unsigned generateModules() {
-  char *P = std::getenv("FLOPOCO");
-  if (!P)
-    llvm_unreachable("$FLOPOCO not set");
-
-  std::string Path(P);
- 
-  if (! sys::fs::can_execute(P))
-    llvm_unreachable("Cannot execute $FLOPOCO");
-
-  FileTy Log = openFile("flopoco.log");
-
-  for (const ModMapElem &M : ModuleMap) {
-
-    // Look up HWName to create Operator
-    const std::string Name = M.first;
-
-    ModMapConstItTy NM = NameHWMap.find(Name);
-    if (NM == NameHWMap.end())
-      llvm_unreachable("No HW Name mapping");
-
-    const std::string HWName = NM->second;
-    
-
-    std::stringstream CS;
-    CS << Path << " target=" << "Stratix5";
-    CS << " frequency=200";
-    CS << " plainVHDL=no";
-    CS << " " << M.second;
-    CS << " 2>&1";
-
-    DEBUG(dbgs() << "[exec] " << CS.str() << "\n");
-
-    (*Log) << "[exec] " << CS.str() << "\n";
-
-    std::array<char, 128> buffer;
-    std::string Result;
-    FILE* Pipe = popen(CS.str().c_str(), "r");
-
-    if (!Pipe)
-      llvm_unreachable("popen() $FLOPOCO failed");
-
-    while (!feof(Pipe)) {
-      if (fgets(buffer.data(), 128, Pipe) != NULL)
-        Result += buffer.data();
-    }
-
-    
-    if (int R = pclose(Pipe))
-      llvm_unreachable("Returned nonzero");
-
-    (*Log) << Result;
-    (*Log) << "\n";
-    Log->flush();
-
-
-    // Extract FileName from Command; Pattern: outputFile=<name>
-    std::regex RgxFileName("(?:outputFile=)\\S+(?= )");
-    std::smatch FileNameMatch;
-    if (!std::regex_search(M.second, FileNameMatch, RgxFileName))
-      llvm_unreachable("Getting outputFile failed");
-
-    std::string FileName = FileNameMatch[0];
-    FileName = FileName.substr(FileName.find("=")+1);
-
-    // Look for pipeline depth; Pattern: Entity: <name>
-    std::regex RgxNoPipe("(?:\\n\\s+Not pipelined)(?=\\n)");
-    std::regex RgxPipe("(?:\\n\\s+Pipeline depth = )\\d+(?=\\n)");
-
-    std::smatch Match;
-
-    unsigned Latency = 0;
-
-    if (std::regex_search(Result, Match, RgxNoPipe)) {
-      // pass
-    } else if (std::regex_search(Result, Match, RgxPipe)) {
-      std::smatch NumMatch;
-      std::string Res = Match[0];
-      std::regex_search(Res, NumMatch, std::regex("\\d+"));
-
-      Latency = stoul(NumMatch[0]);
-
-    } else
-      llvm_unreachable("Invalid flopoco output");
-
-    TheOps.addOperator(HWName, Name, Latency);
-
-    TheFiles.addFile(FileName);
-
-    DEBUG(dbgs() << "Latency of " << Name << ": " << Latency << " clock cycles\n");
-  }
-
-  Log->close();
-
-  return 0;
-}
-
-const std::string printModules() {
-  std::stringstream SS;
-  for (const ModMapElem &S : ModuleMap) {
-    SS << S.first << ":" << S.second << "\n";
-  }
-
-  return SS.str();
-}
-
-/// \brief Add module to global module list
-void addModule(const std::string HWName, const std::string Name, const std::string M) {
-  ModuleMap[Name] = M;
-  NameHWMap[Name] = HWName;
-}
-
-} // end ns flopoco
 
 
 Verilog::Verilog() {
@@ -322,7 +115,7 @@ int Verilog::visit(Kernel &R) {
   DEBUG(dbgs() << flopoco::printModules());
   DEBUG(dbgs() << Line << "\n");
 
-  flopoco::generateModules();
+  flopoco::generateModules(TheOps, TheFiles);
 
   return 0;
 }

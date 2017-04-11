@@ -10,12 +10,9 @@
 #include "VerilogModule.h"
 #include "Naming.h"
 #include "VerilogMacros.h"
-
-
+#include "DesignFiles.h"
 
 using namespace oclacc;
-
-extern DesignFiles TheFiles;
 
 VerilogModule::VerilogModule(Component &C) : Comp(C) {
 }
@@ -913,11 +910,23 @@ const std::string BlockModule::declPortControlSignals() const {
   return S.str();
 }
 
+/// \brief Assign each component a clock cycle when all inputs are ready.
+///
 void BlockModule::schedule(const OperatorInstances &I) {
   CriticalPath = 5;
+  std::list<base_p> Components;
+  for (base_p I : Comp.getInScalars()) {
+  }
+  const std::string Name = "hallo";
+  ReadyMap[Name] = 5;
 }
 
 unsigned BlockModule::getReadyCycle(const std::string OpName) const {
-  return 5;
+  assert(ReadyMap.size() != 0 && "No scheduling info");
+
+  ReadyMapConstItTy E = ReadyMap.find(OpName);
+  assert(E != ReadyMap.end());
+
+  return E->second;
 }
 
