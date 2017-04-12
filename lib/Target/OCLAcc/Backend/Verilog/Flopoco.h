@@ -12,34 +12,16 @@ class DesignFiles;
 // Flopoco functions
 namespace flopoco {
 
-typedef std::map<std::string, std::string> ModMapTy;
+typedef std::map<std::string, unsigned> ModMapTy;
 typedef ModMapTy::const_iterator ModMapConstItTy;
-typedef std::pair<std::string, std::string> ModMapElem;
+typedef std::pair<std::string, unsigned> ModMapElem;
 
-// Map Name to ModuleInstantiation
-extern ModMapTy ModuleMap;
-// Map HW.getUniqueName to Modulename
-extern ModMapTy NameHWMap;
-
-/// \brief Return latency of module \param M reported by Flopoco
+/// \brief Generate a module
 ///
-///
-unsigned getLatency(const std::string M);
-
-/// \brief Generate modules
-unsigned generateModules(oclacc::OperatorInstances &, oclacc::DesignFiles &);
-
-const std::string printModules();
-
-/// \brief Add module to global module list
-///
-/// \param HWName - UniqueName of the HW Object
-/// \param Name - Operator Name. Shared between multiple Instances
+/// \param Name - UniqueName of the HW Object
 /// \param M - Flopoco Module instantiation string
-inline void addModule(const std::string HWName, const std::string Name, const std::string M) {
-  ModuleMap[Name] = M;
-  NameHWMap[Name] = HWName;
-}
+/// \param F - File collection
+unsigned genModule(const std::string Name, const std::string M, oclacc::DesignFiles &F);
 
 } // end ns flopoco
 

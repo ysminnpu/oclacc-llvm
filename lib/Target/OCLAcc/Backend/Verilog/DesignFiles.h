@@ -6,7 +6,7 @@
 
 namespace oclacc {
 
-struct DesignFiles {
+class DesignFiles {
   public:
     typedef std::list<std::string> FileListTy;
     typedef std::list<std::string>::const_iterator FileListConstItTy;

@@ -42,13 +42,13 @@ class OperatorInstances {
     void addOperator(const std::string HWName, const std::string OpName, unsigned Cycles);
 
     /// \brief Get existing Operator by Operator's name
-    op_p getOperator(const std::string OpName);
+    op_p getOperator(const std::string OpName) const;
 
-    bool existsOperator(const std::string OpName);
+    bool existsOperator(const std::string OpName) const;
 
     // Lookup HWNames
-    bool existsOperatorForHW(const std::string HWName);
-    op_p getOperatorForHW(const std::string HWName);
+    bool existsOperatorForHW(const std::string HWName) const;
+    op_p getOperatorForHW(const std::string HWName) const;
 };
 
 } // end ns oclacc

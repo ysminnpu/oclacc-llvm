@@ -12,4 +12,6 @@
 
 #define OCL_ERR(x) DEBUG_WITH_TYPE("opencl", errs() << "[OCL_ERR] " << __FILE__ << ":" << __LINE__ << " " << x << "\n");
 
+#define NDEBUG(x) DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "] " << x << "\n")
+
 #endif /* MACROS_H */

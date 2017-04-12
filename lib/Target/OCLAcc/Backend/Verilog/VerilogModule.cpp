@@ -11,6 +11,9 @@
 #include "Naming.h"
 #include "VerilogMacros.h"
 #include "DesignFiles.h"
+#include "OperatorInstances.h"
+
+#define DEBUG_TYPE "verilog"
 
 using namespace oclacc;
 
@@ -27,7 +30,7 @@ const std::string VerilogModule::declFooter() const {
 }
 
 
-BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B) {
+BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B), CriticalPath(0) {
   // Clean up Components
   ConstSignals << "// Constant signals\n";
 
@@ -365,111 +368,6 @@ const std::string KernelModule::declBlockWires() const {
       END(Logic);
   }
 
-#if 0
-  for (block_p B : Comp.getBlocks()) {
-    // Create wires for each port used as input and output and assign them to
-    // their use in a component
-    for (scalarport_p P : B->getInScalars()) {
-      // Non-pipelined Inputs are the same as the Kernel's.
-      if (!P->isPipelined())
-        continue;
-
-      // Make sure that the Block's ScalarInput is connected with the Kernel's
-      if (
-
-      // Only a single input, directly connect it.
-      if (NumIns == 1) {
-        scalarport_p SI = std::static_pointer_cast<ScalarPort>(P->getIn(0));
-
-        if (SI->getOuts().size() > 1) {
-          MultipleOuts.push_back(SI);
-        } else {
-            }
-          }
-
-      } else {
-        // Input with multiple sources. This is a result of conditional jumps.
-        // To select the right input, generate a Muxer and use the Conditions to
-        // select it.
-
-        Block::SingleCondTy C = B->getCondForScalarPort(P);
-
-        const std::string ThisPortName = getOpName(P);
-        Signal PortMux(ThisPortName+"_mux", P->getBitWidth(), Signal::Local, Signal::Wire);
-        Wires << PortMux.getDefStr() << ";\n";
-
-
-        Signal::SignalListTy ThisPortSigs = getInSignals(P);
-
-        for (std::pair<scalarport_p, Block::TFTy> Conds : C) {
-          scalarport_p FromPort = Conds.first;
-          Signal::SignalListTy FromPortSigs = getInSignals(FromPort);
-
-          base_p CondVal;
-          bool NegCond = false;
-
-          if (CondVal = Conds.second.first) {
-
-          }
-          else if (CondVal = Conds.second.first) {
-          }
-        }
-      }
-    }
-    for (scalarport_p P : B->getOutScalars()) {
-      if (!P->isPipelined())
-        continue;
-
-      HW::PortsSizeTy NumOuts = P->getOuts().size();
-      assert(NumOuts);
-
-      Signal::SignalListTy OutSigs = getOutSignals(P);
-
-      for (const Signal &OS : OutSigs) {
-        Signal LocDef(OS.Name, OS.BitWidth, Signal::Local, Signal::Wire);
-        Wires << LocDef.getDefStr() << ";\n";
-      }
-
-      // Connect all inter-block scalarports.
-      // If an Output is connected to multiple Inputs, add a logical Or to all ack
-      // signals, otherwise directly connect source and sink.
-
-      for (base_p OP : P->getOuts()) {
-        scalarport_p SP = std::static_pointer_cast<ScalarPort>(OP);
-        Signal::SignalListTy InSigs = getInSignals(SP);
-
-        assert(OutSigs.size() == InSigs.size());
-
-        for (Signal::SignalListConstItTy
-            OI = OutSigs.begin(),
-            II = InSigs.begin(),
-            OE = OutSigs.end();
-            OI != OE;
-            ++OI, ++II) {
-
-            if (OI->Direction == Signal::Out) {
-              Assignments << "assign " << II->Name << " = " << OI->Name << ";\n"; 
-            } else {
-              MuxSigs[OI->Name].push_back(*II);
-            }
-        }
-      }
-
-      if (NumOuts > 1) {
-        std::string Prefix = "";
-        for (const std::pair<std::string, std::vector<Signal>> &Muxer : MuxSigs) {
-          Assignments << "assign " << Muxer.first << "_mux = ";
-
-          for (const Signal &MS : Muxer.second) {
-            Assignments << Prefix << MS.Name;
-            Prefix = " || ";
-          }
-
-          Assignments << ";\n";
-        }
-      }
-    }
-#endif
   S << Wires.str();
   S << Assignments.str();
   S << Logic.str();
@@ -584,6 +482,8 @@ const std::string BlockModule::declConstValues() const {
 
 const std::string BlockModule::declFSMSignals() const {
   std::stringstream S;
+
+  if (!CriticalPath) return "";
 
   S << "// FSM signals\n";
   S << "localparam state_free=0, state_busy=1, state_wait_output=2, state_wait_store=3, state_wait_load=4" << ";\n";
@@ -913,20 +813,81 @@ const std::string BlockModule::declPortControlSignals() const {
 /// \brief Assign each component a clock cycle when all inputs are ready.
 ///
 void BlockModule::schedule(const OperatorInstances &I) {
-  CriticalPath = 5;
-  std::list<base_p> Components;
-  for (base_p I : Comp.getInScalars()) {
+  // Fill all HW objects in worklist.
+  HW::HWListTy C;
+
+  for (const_p C : Comp.getConstVals()) {
+    ReadyMap[C->getUniqueName()] = 0;
   }
-  const std::string Name = "hallo";
-  ReadyMap[Name] = 5;
+
+  for (port_p P : Comp.getInScalars()) {
+    const HW::HWListTy Outs = P->getOuts();
+    C.insert(C.end(), Outs.begin(), Outs.end());
+
+    ReadyMap[P->getUniqueName()] = 0;
+  }
+
+  while (C.size() != 0) {
+    const base_p Curr = C.front();
+    C.erase(C.begin());
+
+    const std::string HWName = Curr->getUniqueName();
+
+    unsigned Max = 0;
+    bool allPredsAvailable=true;
+
+    for (const base_p P : Curr->getIns()) {
+      int InReady = 0;
+      const std::string InName = P->getUniqueName();
+
+      InReady = getReadyCycle(InName);
+      //NDEBUG(InName << " " << InReady);
+
+      if (InReady == -1) {
+        allPredsAvailable = false;
+        break;
+      }
+
+      unsigned InCycles = 0;
+
+      const std::string OpName = getOpName(P);
+
+      op_p Op = I.getOperatorForHW(OpName);
+
+      if (Op) {
+        InCycles = Op->Cycles;
+        //NDEBUG(InName << " takes " << InCycles);
+      } else 
+        InCycles = 0;
+
+      Max = std::max(InReady+InCycles, Max);
+    }
+
+
+    if (allPredsAvailable) {
+      ReadyMap[HWName] = Max;
+
+      CriticalPath = std::max(Max, CriticalPath);
+
+      //NDEBUG(HWName << " @ " << Max);
+    } else
+      C.push_back(Curr);
+
+    const HW::HWListTy Outs = Curr->getOuts();
+    C.insert(C.end(), Outs.begin(), Outs.end());
+
+  }
+
+  NDEBUG("critical path: " <<  CriticalPath);
 }
 
-unsigned BlockModule::getReadyCycle(const std::string OpName) const {
-  assert(ReadyMap.size() != 0 && "No scheduling info");
-
+int BlockModule::getReadyCycle(const std::string OpName) const {
   ReadyMapConstItTy E = ReadyMap.find(OpName);
-  assert(E != ReadyMap.end());
+  if (E == ReadyMap.end()) return -1;
 
   return E->second;
 }
 
+#ifdef DEBUG_TYPE
+#undef DEBUG_TYPE
+#endif

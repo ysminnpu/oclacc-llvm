@@ -61,9 +61,9 @@ class BlockModule : public VerilogModule {
 
     void schedule(const OperatorInstances &);
 
-    unsigned getReadyCycle(const std::string) const;
-    inline unsigned getReadyCycle(base_p P) const {
-      return getReadyCycle(getOpName(P));
+    int getReadyCycle(const std::string) const;
+    inline int getReadyCycle(base_p P) const {
+      return getReadyCycle(P->getUniqueName());
     }
 
   private:

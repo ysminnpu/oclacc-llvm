@@ -9,7 +9,6 @@ namespace oclacc {
 
 class HW;
 typedef std::shared_ptr<HW> base_p;
-typedef std::vector<base_p> HWList;
 
 class FPHW;
 typedef std::shared_ptr<FPHW> basefp_p;

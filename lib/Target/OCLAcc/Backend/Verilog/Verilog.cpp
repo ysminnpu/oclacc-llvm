@@ -108,15 +108,6 @@ int Verilog::visit(Kernel &R) {
 
   FS->close();
 
-
-  // Dump and Generate Flopoco instances
-  DEBUG(dbgs() << Line << "\n");
-  DEBUG(dbgs() << "[flopoco_instances]\n");
-  DEBUG(dbgs() << flopoco::printModules());
-  DEBUG(dbgs() << Line << "\n");
-
-  flopoco::generateModules(TheOps, TheFiles);
-
   return 0;
 }
 
@@ -263,7 +254,8 @@ int Verilog::visit(Mul &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(RName, Name, FInst.str());
+  unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+  TheOps.addOperator(RName, Name, Latency);
 
   // Add output signal
   Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
@@ -310,7 +302,8 @@ int Verilog::visit(FAdd &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  flopoco::addModule(RName, Name, FInst.str());
+  unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+  TheOps.addOperator(RName, Name, Latency);
 
   // Add output signal
   Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
@@ -381,7 +374,8 @@ int Verilog::visit(FMul &R) {
     FInst << "name=" << Name << " ";
     FInst << "outputFile=" << Name << ".vhd" << " ";
 
-    flopoco::addModule(RName, Name, FInst.str());
+    unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+    TheOps.addOperator(RName, Name, Latency);
 
     // Add output signal
     Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
@@ -411,7 +405,8 @@ int Verilog::visit(FMul &R) {
     FInst << "name=" << Name << " ";
     FInst << "outputFile=" << Name << ".vhd" << " ";
 
-    flopoco::addModule(RName, Name, FInst.str());
+    unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+    TheOps.addOperator(RName, Name, Latency);
 
     // Add output signal
     Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
@@ -564,4 +559,6 @@ int Verilog::visit(FPCompare &R) {
   super::visit(R);
 }
 
+#ifdef DEBUG_TYPE
 #undef DEBUG_TYPE
+#endif
