@@ -124,17 +124,18 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     /// \brief Create shared_ptr to HW object and add to ValueMap for \param BB
     ///
     /// Set Parent pointer for the created object.
-    template<class HW, class ...Args>
-    std::shared_ptr<HW> makeHWBB(const BasicBlock *BB, const Value *IR, Args&& ...args) {
+    template<class T, class ...Args>
+    std::shared_ptr<T> makeHWBB(const BasicBlock *BB, const Value *IR, Args&& ...args) {
 
-      std::shared_ptr<HW> HWP = makeHW<HW>(IR, args...);
-      oclacc::block_p HWB = getBlock(BB);
-      HWP->setParent(HWB);
+      std::shared_ptr<T> HWP = makeHW<T>(IR, args...);
+      oclacc::block_p HWBB = getBlock(BB);
+      HWP->setParent(HWBB);
 
       BlockValueMap[BB][IR] = HWP;
 
       // Only add operations (Instructions) to Blocks.
-      if (!std::is_base_of<oclacc::Port, HW>::value) HWB->addOp(HWP);
+      //if (!std::is_base_of<oclacc::Port, HW>::value) HWB->addOp(HWP);
+      HWBB->addOp(HWP);
 
       return HWP;
     }

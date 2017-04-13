@@ -83,7 +83,9 @@ StreamIndex::StreamIndex(const std::string &Name, streamport_p Stream, unsigned 
 }
 
 
-DynamicStreamIndex::DynamicStreamIndex(const std::string &Name, streamport_p Stream, base_p Index, unsigned BitWidth) : StreamIndex(Name, Stream, BitWidth), Index(Index) { }
+DynamicStreamIndex::DynamicStreamIndex(const std::string &Name, streamport_p Stream, base_p Index, unsigned BitWidth) : StreamIndex(Name, Stream, BitWidth) {
+  addIn(Index);
+}
 
 /// \brief Stream with compile-time constant Index 
 ///

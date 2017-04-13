@@ -3,6 +3,7 @@
 #include <cmath>
 #include <unordered_set>
 #include <map>
+#include <set>
 
 #include "../../HW/Kernel.h"
 
@@ -810,8 +811,18 @@ const std::string BlockModule::declPortControlSignals() const {
   return S.str();
 }
 
-/// \brief Assign each component a clock cycle when all inputs are ready.
-///
+void BlockModule::schedule(const OperatorInstances &I) {
+  const HW::HWListTy Ops = Comp.getOpsTopologicallySorted();
+
+  NDEBUG("Traversation sequence:");
+  for (base_p P : Ops) {
+    NDEBUG(P->getUniqueName());
+  }
+
+      
+}
+
+#if 0
 void BlockModule::schedule(const OperatorInstances &I) {
   // Fill all HW objects in worklist.
   HW::HWListTy C;
@@ -867,6 +878,13 @@ void BlockModule::schedule(const OperatorInstances &I) {
     if (allPredsAvailable) {
       ReadyMap[HWName] = Max;
 
+      op_p Op = I.getOperatorForHW(HWName);
+
+      if (Op) {
+        NDEBUG(Op->Name);
+        Max += Op->Cycles;
+      }
+
       CriticalPath = std::max(Max, CriticalPath);
 
       //NDEBUG(HWName << " @ " << Max);
@@ -878,8 +896,13 @@ void BlockModule::schedule(const OperatorInstances &I) {
 
   }
 
+  for (const ReadyMapElemTy &E : ReadyMap) {
+    NDEBUG(E.first << " @ " << E.second);
+  }
+
   NDEBUG("critical path: " <<  CriticalPath);
 }
+#endif
 
 int BlockModule::getReadyCycle(const std::string OpName) const {
   ReadyMapConstItTy E = ReadyMap.find(OpName);

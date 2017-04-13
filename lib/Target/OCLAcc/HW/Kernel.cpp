@@ -1,3 +1,8 @@
+#include <map>
+#include <set>
+#include <vector>
+
+#include "Constant.h"
 #include "Kernel.h"
 #include "Utils.h"
 
@@ -172,9 +177,50 @@ void Block::dump() {
 //
 Block::Block (const std::string &Name, bool EntryBlock) : Component(Name), EntryBlock(EntryBlock) { }
 
-void Block::addOp(base_p P) { Ops.push_back(P); }
-const std::vector<base_p> &Block::getOps() const { return Ops; }
+// Use Kahn's algorithm without back edge detection but a map of deleted edges
+const HW::HWListTy Block::getOpsTopologicallySorted() const {
+  const std::vector<scalarport_p> IS = getInScalars();
+  const std::vector<const_p> C = getConstVals();
 
+  std::vector<base_p> L;
+  std::vector<base_p> S;
+  S.insert(S.end(), IS.begin(), IS.end());
+  S.insert(S.end(), C.begin(), C.end());
+
+  std::map<base_p, std::set<base_p> > DelEdges;
+
+  while (S.size()) {
+    base_p F = S.front();
+    S.erase(S.begin());
+
+    L.push_back(F);
+    
+    for (base_p O : F->getOuts()) {
+      bool hasOtherEdges = false;
+      DelEdges[O].insert(F);
+
+      HW::HWListTy Ins = O->getIns();
+      DEBUG(dbgs() << O->getUniqueName() << " ins: ");
+      for (base_p P : Ins) {
+        DEBUG(dbgs() << P->getUniqueName() << ",");
+      }
+      DEBUG(dbgs() << "\n");
+
+
+      for (base_p I : Ins) {
+        if (I != F && DelEdges[O].find(I) == DelEdges[O].end()) {
+          hasOtherEdges = true;
+          break;
+        }
+      }
+
+      if (!hasOtherEdges) {
+        S.push_back(O);
+      }
+    }
+  }
+  return L;
+}
 
 // FIXME:
 // There must be a single condition to reach the Block from B. By iterating over

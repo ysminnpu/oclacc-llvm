@@ -27,7 +27,7 @@ class Port : public HW {
   public:
     virtual bool isScalar() const=0;
 
-    inline const Datatype getPortType() const {
+    inline Datatype getPortType() const {
       return PortType;
     }
 
@@ -183,10 +183,12 @@ class StreamIndex : public HW {
 };
 
 
+/// \brief DynamicStreamIndex results from a GEP instruction and can be used as
+/// address operand for Loads and Stores to Streams.
+///
+/// When Load, Ins[0] is the address
+/// When Store, Ins[0] is the address, Ins[1] is the value to store.
 class DynamicStreamIndex : public StreamIndex {
-
-  private:
-    base_p Index;
 
   public:
     DynamicStreamIndex(const std::string &Name, streamport_p, base_p, unsigned BitWidth);
@@ -194,15 +196,22 @@ class DynamicStreamIndex : public StreamIndex {
     DynamicStreamIndex(const DynamicStreamIndex&) = delete;
     DynamicStreamIndex& operator=(const DynamicStreamIndex&) = delete;
 
-    void setIndex(base_p I) {
-      Index = I;
+    inline void setIndex(base_p I) {
+      if (Ins.size() == 0)
+        Ins.push_back(I);
+      else
+        Ins[0] = I;
     }
 
-    base_p getIndex() const {
-      return Index;
+    inline base_p getIndex() const {
+      return Ins[0];
     }
 
-    bool isStatic() const {
+    inline base_p getValue() const {
+      return Ins[0];
+    }
+
+    inline bool isStatic() const override {
       return false;
     }
 
@@ -232,11 +241,11 @@ class StaticStreamIndex : public StreamIndex {
       return Index;
     }
 
-    inline bool isStatic() const {
+    inline bool isStatic() const override {
       return true;
     }
 
-    inline const std::string getUniqueName() const {
+    inline const std::string getUniqueName() const override {
       return getName();
     }
 

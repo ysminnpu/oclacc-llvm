@@ -112,13 +112,24 @@ class Block : public Component {
 
     bool EntryBlock;
 
+
   public:
     Block (const std::string &, bool);
 
-    NO_COPY_ASSIGN(Block)
+    NO_COPY_ASSIGN(Block);
 
-    void addOp(base_p);
-    const std::vector<base_p> &getOps() const;
+    inline void addOp(base_p P) {
+      Ops.push_back(P);
+    }
+
+
+    /// \brief Operation sequence dependencies with dependencies being listed before
+    /// their depending operators
+    const HW::HWListTy getOpsTopologicallySorted() const;
+
+    inline const HW::HWListTy &getOps() const {
+      return Ops;
+    }
 
     inline kernel_p getParent() const {
       return Parent;

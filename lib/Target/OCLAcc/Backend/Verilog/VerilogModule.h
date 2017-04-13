@@ -59,6 +59,8 @@ class BlockModule : public VerilogModule {
     inline std::stringstream &getBlockAssignments() { return BlockAssignments;}
     inline std::stringstream &getBlockComponents() { return BlockComponents;}
 
+    /// \brief Assign each component a clock cycle when all inputs are ready.
+    ///
     void schedule(const OperatorInstances &);
 
     int getReadyCycle(const std::string) const;
@@ -78,9 +80,9 @@ class BlockModule : public VerilogModule {
 
     // Scheduling information
     typedef std::map<std::string, unsigned> ReadyMapTy;
+    typedef std::pair<std::string, unsigned> ReadyMapElemTy;
     typedef ReadyMapTy::const_iterator ReadyMapConstItTy;
     ReadyMapTy ReadyMap;
-
 };
 
 /// \brief Instantiate multiple Kernel Functions in one Design

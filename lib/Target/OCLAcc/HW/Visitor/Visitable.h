@@ -7,7 +7,7 @@
 //DEBUG_WITH_TYPE("Visitor", llvm::dbgs() << __PRETTY_FUNCTION__ << "\n" );
 
 #define DECLARE_VISIT \
-  virtual ReturnType accept( BaseVisitor &V) { \
+  virtual ReturnType accept( BaseVisitor &V) override { \
     V.visit(*this); \
     return 0; \
   } \

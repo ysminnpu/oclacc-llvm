@@ -24,7 +24,7 @@ class ConstVal : public HW
     DECLARE_VISIT
 
   private:
-    virtual void addIn(base_p p) {};
+    using HW::addIn;
 
 };
 
