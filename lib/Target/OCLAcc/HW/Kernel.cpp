@@ -200,12 +200,6 @@ const HW::HWListTy Block::getOpsTopologicallySorted() const {
       DelEdges[O].insert(F);
 
       HW::HWListTy Ins = O->getIns();
-      DEBUG(dbgs() << O->getUniqueName() << " ins: ");
-      for (base_p P : Ins) {
-        DEBUG(dbgs() << P->getUniqueName() << ",");
-      }
-      DEBUG(dbgs() << "\n");
-
 
       for (base_p I : Ins) {
         if (I != F && DelEdges[O].find(I) == DelEdges[O].end()) {

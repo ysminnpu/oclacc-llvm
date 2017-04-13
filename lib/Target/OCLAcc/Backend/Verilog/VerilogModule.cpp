@@ -484,7 +484,6 @@ const std::string BlockModule::declConstValues() const {
 const std::string BlockModule::declFSMSignals() const {
   std::stringstream S;
 
-  if (!CriticalPath) return "";
 
   S << "// FSM signals\n";
   S << "localparam state_free=0, state_busy=1, state_wait_output=2, state_wait_store=3, state_wait_load=4" << ";\n";
@@ -495,9 +494,13 @@ const std::string BlockModule::declFSMSignals() const {
   S << State.getDefStr() << ";\n";
   S << NextState.getDefStr() << ";\n";
 
+  // If CriticalPath is 0, have at least one bit.
+  unsigned CounterWidth = 1;
+  if (CriticalPath != 0)
+    CounterWidth = static_cast<unsigned int>(std::ceil(std::log2(CriticalPath))-1);
 
   // CriticalPath counter
-  Signal Count("counter", std::ceil(std::log2(CriticalPath))-1, Signal::Local, Signal::Reg);
+  Signal Count("counter", CounterWidth, Signal::Local, Signal::Reg);
   S << Count.getDefStr() << ";\n";
   Signal CountEnabled("counter_enabled", 1, Signal::Local, Signal::Reg);
   S << CountEnabled.getDefStr() << ";\n";
@@ -814,12 +817,38 @@ const std::string BlockModule::declPortControlSignals() const {
 void BlockModule::schedule(const OperatorInstances &I) {
   const HW::HWListTy Ops = Comp.getOpsTopologicallySorted();
 
-  NDEBUG("Traversation sequence:");
   for (base_p P : Ops) {
-    NDEBUG(P->getUniqueName());
-  }
+    int MaxPreds = 0;
 
-      
+    for (base_p In : P->getIns()) {
+      const std::string InName = getOpName(In);
+      int InReady = getReadyCycle(InName);
+      assert (InReady != -1 && "Input has no Ready Information");
+
+      op_p Op = I.getOperatorForHW(InName);
+
+      if (Op) {
+        InReady += Op->Cycles;
+      }
+
+      MaxPreds = std::max(MaxPreds, InReady);
+    }
+
+    const std::string OpName = getOpName(P);
+
+    ReadyMap[OpName] = MaxPreds;
+
+    // Critical Path
+    op_p Op = I.getOperatorForHW(OpName);
+
+    if (Op)
+      MaxPreds + Op->Cycles;
+
+    assert(MaxPreds > 0 && "MaxPreds must not be zero");
+
+    CriticalPath = std::max((unsigned) MaxPreds, CriticalPath);
+  }
+  NDEBUG("Critical path of " << Comp.getUniqueName() << ": " << CriticalPath);
 }
 
 #if 0

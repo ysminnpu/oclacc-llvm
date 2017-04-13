@@ -24,7 +24,7 @@ void OperatorInstances::addOperator(const std::string HWName, const std::string 
 
   HWOp[HWName] = O;
 
-  NDEBUG("added new Operator " << OpName << " for HW " << HWName << " with " << Cycles << " cycles");
+  NDEBUG("added Operator " << OpName << " for HW " << HWName << " with " << Cycles << " cycles");
 }
 
 op_p OperatorInstances::getOperator(const std::string OpName) const {
