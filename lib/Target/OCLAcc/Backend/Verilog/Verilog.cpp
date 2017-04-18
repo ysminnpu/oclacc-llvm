@@ -145,6 +145,9 @@ int Verilog::visit(Block &R) {
   // Write constant assignments
   (*FS) << BM->declConstSignals();
 
+  // Write local operators
+  (*FS) << BM->declLocalOperators();
+
   // Write assignments
   (*FS) << BM->declBlockAssignments();
 
@@ -194,8 +197,9 @@ int Verilog::visit(DynamicStreamIndex &R) {
 /// \brief Generate Stream as BRAM with Addressgenerator
 
 void Verilog::handleInferableMath(const Arith &R, const std::string Op) {
-  std::stringstream &BlockSignals = BM->getBlockSignals();
-  std::stringstream &BlockAssignments = BM->getBlockAssignments();
+  std::stringstream &BS = BM->getBlockSignals();
+  std::stringstream &LO = BM->getLocalOperators();
+  std::stringstream &BA = BM->getBlockAssignments();
 
   const std::string Op0 = getOpName(R.getIn(0));
   const std::string Op1 = getOpName(R.getIn(1));
@@ -203,10 +207,22 @@ void Verilog::handleInferableMath(const Arith &R, const std::string Op) {
 
   const std::string RName = getOpName(R);
 
-  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
-  BlockSignals << S.getDefStr() << ";\n";
+  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Reg);
+  BS << S.getDefStr() << ";\n";
 
-  BlockAssignments << "assign " << Res << " = " << Op0 << " " << Op << " " << Op1 << ";\n";
+  unsigned II = 0;
+
+  LO << "always @(posedge clk)\n";
+  BEGIN(LO);
+  LO << Indent(II) << "if (rst)\n";
+    LO << Indent(II+1) << Res << " = '0;\n";
+
+  LO << Indent(II) << "else\n";
+    LO << Indent(II+1) << Res << " = " << Op0 << " " << Op << " " << Op1 << ";\n";
+
+  END(LO);
+
+  TheOps.addOperator(RName, RName, 1);
 }
 
 int Verilog::visit(Add &R) {
@@ -500,7 +516,7 @@ int Verilog::visit(IntCompare &R) {
   VISIT_ONCE(R);
 
   std::stringstream &BlockSignals = BM->getBlockSignals();
-  std::stringstream &BlockComponents = BM->getBlockComponents();
+  std::stringstream &BC = BM->getBlockComponents();
 
   const std::string Op0 = getOpName(R.getIn(0));
   const std::string Op1 = getOpName(R.getIn(1));
@@ -511,18 +527,20 @@ int Verilog::visit(IntCompare &R) {
   unsigned BitWidthOp1 = R.getIn(1)->getBitWidth();
 
   Signal Diff(Res+"_diff", std::max(BitWidthOp0, BitWidthOp1), Signal::Local, Signal::Reg);
-  BlockSignals << Diff.getDefStr() << ";\n";
 
   Signal RSig(Res, BitWidth, Signal::Local, Signal::Reg);
   BlockSignals << RSig.getDefStr() << ";\n";
 
-  BlockComponents << "always@(" << Op0 <<", " << Op1 << ")\n";
-  BEGIN(BlockComponents);
-    BlockComponents << Indent(II) << Res << "_diff <= " << Op0 << " - " << Op1 << ";\n";
+  BC << "always@(*)\n";
+  BEGIN(BC);
+    BC << Indent(II) << Diff.getDefStr() << ";\n";
+
+    BC << Indent(II) << Res << "_diff <= " << Op0 << " - " << Op1 << ";\n";
+    BC << Indent(II) << Res << " <= 0;\n";
 
   switch (R.getPred()) {
     case llvm::CmpInst::Predicate::ICMP_EQ:
-      BlockComponents << Indent(II) << "if (" << Res << "_diff == 0" << ") " << Res << " <= 1;\n";
+      BC << Indent(II) << "if (" << Res << "_diff == 0" << ") " << Res << " <= 1;\n";
       break;
     case llvm::CmpInst::Predicate::ICMP_NE:
       break;
@@ -535,20 +553,20 @@ int Verilog::visit(IntCompare &R) {
     case llvm::CmpInst::Predicate::ICMP_ULE:
       break;
     case llvm::CmpInst::Predicate::ICMP_SGT:
-      BlockComponents << Indent(II) << "if (" << Res << "_diff > 0" << ") " << Res << " <= 1;\n";
+      BC << Indent(II) << "if (" << Res << "_diff > 0" << ") " << Res << " <= 1;\n";
       break;
     case llvm::CmpInst::Predicate::ICMP_SGE:
-      BlockComponents << Indent(II) << "if (" << Res << "_diff >= 0" << ") " << Res << " <= 1;\n";
+      BC << Indent(II) << "if (" << Res << "_diff >= 0" << ") " << Res << " <= 1;\n";
       break;
     case llvm::CmpInst::Predicate::ICMP_SLT:
-      BlockComponents << Indent(II) << "if (" << Res << "_diff < 0" << ") " << Res << " <= 1;\n";
+      BC << Indent(II) << "if (" << Res << "_diff < 0" << ") " << Res << " <= 1;\n";
       break;
     case llvm::CmpInst::Predicate::ICMP_SLE:
       break;
     default:
       llvm_unreachable("Invalid predicate for icmp.");
   }
-    END(BlockComponents);
+    END(BC);
 
   super::visit(R);
   return 0;

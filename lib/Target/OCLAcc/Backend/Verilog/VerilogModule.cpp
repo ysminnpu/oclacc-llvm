@@ -37,6 +37,10 @@ BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B), CriticalPath(0) 
 
   BlockSignals << "// Component signals\n";
 
+  BlockAssignments << "// Block assignments\n";
+
+  LocalOperators << "// Local operators\n";
+
   BlockComponents << "// Component instances\n";
 }
 
@@ -496,7 +500,7 @@ const std::string BlockModule::declFSMSignals() const {
 
   // If CriticalPath is 0, have at least one bit.
   unsigned CounterWidth = 1;
-  if (CriticalPath != 0)
+  if (CriticalPath > 1)
     CounterWidth = static_cast<unsigned int>(std::ceil(std::log2(CriticalPath))-1);
 
   // CriticalPath counter

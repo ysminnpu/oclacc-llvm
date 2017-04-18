@@ -51,12 +51,14 @@ class BlockModule : public VerilogModule {
 
     inline const std::string declBlockSignals() const { return BlockSignals.str(); }
     inline const std::string declConstSignals() const { return ConstSignals.str(); }
-    inline const std::string declBlockAssignments() const { return ConstSignals.str(); }
+    inline const std::string declBlockAssignments() const { return BlockAssignments.str(); }
+    inline const std::string declLocalOperators() const { return LocalOperators.str(); }
     inline const std::string declBlockComponents() const { return BlockComponents.str(); }
 
     inline std::stringstream &getBlockSignals() { return BlockSignals; }
     inline std::stringstream &getConstSignals() { return ConstSignals; }
     inline std::stringstream &getBlockAssignments() { return BlockAssignments;}
+    inline std::stringstream &getLocalOperators() { return LocalOperators;}
     inline std::stringstream &getBlockComponents() { return BlockComponents;}
 
     /// \brief Assign each component a clock cycle when all inputs are ready.
@@ -76,6 +78,7 @@ class BlockModule : public VerilogModule {
     std::stringstream BlockSignals;
     std::stringstream ConstSignals;
     std::stringstream BlockAssignments;
+    std::stringstream LocalOperators;
     std::stringstream BlockComponents;
 
     // Scheduling information
