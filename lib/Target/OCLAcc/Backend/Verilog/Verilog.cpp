@@ -515,8 +515,8 @@ int Verilog::visit(Xor &R) {
 int Verilog::visit(IntCompare &R) {
   VISIT_ONCE(R);
 
-  std::stringstream &BlockSignals = BM->getBlockSignals();
-  std::stringstream &BC = BM->getBlockComponents();
+  std::stringstream &BS = BM->getBlockSignals();
+  std::stringstream &LO = BM->getLocalOperators();
 
   const std::string Op0 = getOpName(R.getIn(0));
   const std::string Op1 = getOpName(R.getIn(1));
@@ -529,44 +529,54 @@ int Verilog::visit(IntCompare &R) {
   Signal Diff(Res+"_diff", std::max(BitWidthOp0, BitWidthOp1), Signal::Local, Signal::Reg);
 
   Signal RSig(Res, BitWidth, Signal::Local, Signal::Reg);
-  BlockSignals << RSig.getDefStr() << ";\n";
+  BS << RSig.getDefStr() << ";\n";
 
-  BC << "always@(*)\n";
-  BEGIN(BC);
-    BC << Indent(II) << Diff.getDefStr() << ";\n";
+  LO << "always@(clk)\n";
+  BEGIN(LO);
+    LO << Indent(II) << Diff.getDefStr() << ";\n";
 
-    BC << Indent(II) << Res << "_diff <= " << Op0 << " - " << Op1 << ";\n";
-    BC << Indent(II) << Res << " <= 0;\n";
+    LO << Indent(II) << "if (rst)\n";
+    BEGIN(LO);
+    LO << Indent(II) << Res << "_diff <= " << Op0 << " - " << Op1 << ";\n";
+    LO << Indent(II) << Res << " <= 0;\n";
+    END(LO);
 
-  switch (R.getPred()) {
-    case llvm::CmpInst::Predicate::ICMP_EQ:
-      BC << Indent(II) << "if (" << Res << "_diff == 0" << ") " << Res << " <= 1;\n";
-      break;
-    case llvm::CmpInst::Predicate::ICMP_NE:
-      break;
-    case llvm::CmpInst::Predicate::ICMP_UGT:
-      break;
-    case llvm::CmpInst::Predicate::ICMP_UGE:
-      break;
-    case llvm::CmpInst::Predicate::ICMP_ULT:
-      break;
-    case llvm::CmpInst::Predicate::ICMP_ULE:
-      break;
-    case llvm::CmpInst::Predicate::ICMP_SGT:
-      BC << Indent(II) << "if (" << Res << "_diff > 0" << ") " << Res << " <= 1;\n";
-      break;
-    case llvm::CmpInst::Predicate::ICMP_SGE:
-      BC << Indent(II) << "if (" << Res << "_diff >= 0" << ") " << Res << " <= 1;\n";
-      break;
-    case llvm::CmpInst::Predicate::ICMP_SLT:
-      BC << Indent(II) << "if (" << Res << "_diff < 0" << ") " << Res << " <= 1;\n";
-      break;
-    case llvm::CmpInst::Predicate::ICMP_SLE:
-      break;
-    default:
-      llvm_unreachable("Invalid predicate for icmp.");
-  }
-    END(BC);
+    LO << Indent(II) << "else\n";
+    BEGIN(LO);
+
+    LO << Indent(II) << Res << "_diff <= " << Op0 << " - " << Op1 << ";\n";
+    LO << Indent(II) << Res << " <= 0;\n";
+
+    switch (R.getPred()) {
+      case llvm::CmpInst::Predicate::ICMP_EQ:
+        LO << Indent(II) << "if (" << Res << "_diff == 0" << ") " << Res << " <= 1;\n";
+        break;
+      case llvm::CmpInst::Predicate::ICMP_NE:
+        break;
+      case llvm::CmpInst::Predicate::ICMP_UGT:
+        break;
+      case llvm::CmpInst::Predicate::ICMP_UGE:
+        break;
+      case llvm::CmpInst::Predicate::ICMP_ULT:
+        break;
+      case llvm::CmpInst::Predicate::ICMP_ULE:
+        break;
+      case llvm::CmpInst::Predicate::ICMP_SGT:
+        LO << Indent(II) << "if (" << Res << "_diff > 0" << ") " << Res << " <= 1;\n";
+        break;
+      case llvm::CmpInst::Predicate::ICMP_SGE:
+        LO << Indent(II) << "if (" << Res << "_diff >= 0" << ") " << Res << " <= 1;\n";
+        break;
+      case llvm::CmpInst::Predicate::ICMP_SLT:
+        LO << Indent(II) << "if (" << Res << "_diff < 0" << ") " << Res << " <= 1;\n";
+        break;
+      case llvm::CmpInst::Predicate::ICMP_SLE:
+        break;
+      default:
+        llvm_unreachable("Invalid predicate for icmp.");
+    }
+    END(LO);
+  END(LO);
 
   super::visit(R);
   return 0;
