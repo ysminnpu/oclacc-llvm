@@ -20,7 +20,7 @@ void DesignFiles::write(const std::string Filename) {
     if (ends_with(S, ".vhd")) {
       DoS << "vcom " << S << "\n";
     } else if (ends_with(S, ".v")) {
-      DoS << "vlog " << S << "\n";
+      DoS << "vlog -sv " << S << "\n";
     } else
       llvm_unreachable("Invalid filetype");
   }
