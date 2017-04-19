@@ -60,7 +60,7 @@ Verilog::~Verilog() {
 /// for their instantiation, e.g. visit(Kernel) calls K->inst() on the
 /// KernelModule. Each visit(Block) calls B->inst() on the BlockModules and adds
 /// them to the KernelInstance.
-/// 
+///
 int Verilog::visit(DesignUnit &R) {
   VISIT_ONCE(R);
   std::string TopFilename = "top.v";
@@ -173,6 +173,18 @@ int Verilog::visit(Block &R) {
 // Ports
 int Verilog::visit(ScalarPort &R) {
   VISIT_ONCE(R);
+
+  std::stringstream &BA = BM->getBlockAssignments();
+
+  const std::string RName = getOpName(R);
+
+  if (R.getParent()->isInScalar(R)) {
+
+  } else if (R.getParent()->isOutScalar(R)) {
+
+  } else
+    llvm_unreachable("ScalarPort must be InScalar or OutScalar.");
+
   return 0;
 }
 
@@ -214,7 +226,7 @@ void Verilog::handleInferableMath(const Arith &R, const std::string Op) {
 
   LO << "always @(posedge clk)\n";
   BEGIN(LO);
-  LO << Indent(II) << "if (rst)\n";
+  LO << Indent(II) << "if (rst==1)\n";
     LO << Indent(II+1) << Res << " = '0;\n";
 
   LO << Indent(II) << "else\n";
@@ -380,7 +392,7 @@ int Verilog::visit(FMul &R) {
     std::replace(ConstOpName.begin(), ConstOpName.end(), '.', '_');
 
     const std::string Name = "FPConstMult_" + WEout + "_" + WFout + "_" + ConstOpName;
-    
+
     std::stringstream FInst;
 
     FInst << "FPConstMult" << " wE_in=" << WEin << " wF_in=" << WFin << " ";
@@ -531,11 +543,11 @@ int Verilog::visit(IntCompare &R) {
   Signal RSig(Res, BitWidth, Signal::Local, Signal::Reg);
   BS << RSig.getDefStr() << ";\n";
 
-  LO << "always@(clk)\n";
+  LO << "always @(clk)\n";
   BEGIN(LO);
     LO << Indent(II) << Diff.getDefStr() << ";\n";
 
-    LO << Indent(II) << "if (rst)\n";
+    LO << Indent(II) << "if (rst == 1)\n";
     BEGIN(LO);
     LO << Indent(II) << Res << "_diff <= " << Op0 << " - " << Op1 << ";\n";
     LO << Indent(II) << Res << " <= 0;\n";
@@ -585,6 +597,33 @@ int Verilog::visit(IntCompare &R) {
 int Verilog::visit(FPCompare &R) {
   VISIT_ONCE(R);
   super::visit(R);
+  return 0;
+}
+
+int Verilog::visit(Mux &R) {
+  VISIT_ONCE(R);
+
+  std::stringstream &BS = BM->getBlockSignals();
+  std::stringstream &LO = BM->getLocalOperators();
+
+  const std::string RName = getOpName(R);
+  Signal MSig(RName, R.getBitWidth(), Signal::Local, Signal::Reg);
+  BS << MSig.getDefStr() << ";\n";
+
+  unsigned II = 0;
+  LO << "always @(*)\n";
+    BEGIN(LO);
+    LO << Indent(II) << RName << " <= '0;\n";
+    for (const Mux::MuxInputTy &M : R.getIns()) {
+      const std::string IName = M.first->getUniqueName();
+      const std::string CName = M.second->getUniqueName();
+
+      LO << Indent(II) << " if (" << CName << "_valid == 1 && " << CName << " == 1) " << RName << " <= " << IName << ";\n";
+    }
+    END(LO);
+
+  super::visit(R);
+  return 0;
 }
 
 #ifdef DEBUG_TYPE
