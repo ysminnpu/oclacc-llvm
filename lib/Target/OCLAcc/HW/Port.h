@@ -111,11 +111,11 @@ class StoreAccess : public StreamAccess {
     }
 
     inline virtual bool isLoad() const override {
-      return true;
+      return false;
     }
 
     inline virtual bool isStore() const override {
-      return false;
+      return true;
     }
 
     inline base_p getValue() const {
