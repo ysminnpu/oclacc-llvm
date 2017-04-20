@@ -38,9 +38,10 @@ const std::string oclacc::getOpName(const ConstVal &R) {
 const std::string oclacc::getOpName(const StreamAccess &R) {
   std::stringstream Name;
 
-  const streamport_p S = R.getIndex()->getStream();
+  const streamindex_p I = R.getIndex();
+  const streamport_p S = I->getStream();
   
-  Name << S->getUniqueName() << R.getUniqueName();
+  Name << S->getName() << "_" << I->getUniqueName() << "_" << R.getUniqueName();
 
   return Name.str();
 }
@@ -373,6 +374,8 @@ const Signal::SignalListTy oclacc::getSignals(const StoreAccess &R) {
   L.push_back(Signal(PName+"_buf", DataWidth, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
+
+  return L;
 }
 
 const std::string oclacc::createPortList(const Signal::SignalListTy &Ports) {
