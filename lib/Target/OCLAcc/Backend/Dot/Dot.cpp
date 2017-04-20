@@ -5,6 +5,7 @@
 #include "HW/typedefs.h"
 
 #include "Utils.h"
+#include "Macros.h"
 
 #define DEBUG_TYPE "dot"
 
@@ -275,7 +276,6 @@ int Dot::visit(ConstVal &R) {
 
 /// \brief Create Node for StreamPort.
 ///
-/// Each StreamIndex points to that Node. 
 /// We do not dispatch to the Index objects but handle loads and stores
 /// here.
 ///
@@ -287,8 +287,8 @@ int Dot::visit(StreamPort &R) {
   // they are hierarchically ordered in the graph. 
 
   // No range-based loop to call std::next()
-  const StreamPort::IndexListTy &IndexList = R.getIndexList();
-  for (StreamPort::IndexListConstIt I=IndexList.begin(), E=IndexList.end(); I != E; I++) {
+  const StreamPort::AccessListTy &AL = R.getAccessList();
+  for (StreamPort::AccessListTy::const_iterator I=AL.begin(), E=AL.end(); I != E; I++) {
     if (std::next(I) != E) {
       Conn() << "n" << (*I)->getUID() << " -> " << "n" << (*(std::next(I)))->getUID() << " [style=invis];\n";
     }
@@ -299,22 +299,81 @@ int Dot::visit(StreamPort &R) {
 
   // Draw connection from Index to base Stream only for Stores. Loads make the
   // graph look polluted.
-  for ( streamindex_p I : R.getStores() ) {
+#if 0
+  for ( storeaccess_p I : R.getStores() ) {
     Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
   }
 
   // Draw connection from Index to uses
   // Stores do not have Outs().
-  for ( streamindex_p I : R.getLoads() ) {
+  for ( loadaccess_p I : R.getLoads() ) {
     for ( base_p O : I->getOuts() ) {
       Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
     }
 
   }
+#endif
 
   return 0;
 }
 
+int Dot::visit(LoadAccess &R) {
+  VISIT_ONCE(R);
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+  F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\"];\n";
+
+  super::visit(R);
+
+  for ( base_p O : R.getOuts() ) {
+    Conn() << "n" << R.getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
+  }
+
+  return 0;
+}
+int Dot::visit(StoreAccess &R) {
+  VISIT_ONCE(R);
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+  
+  F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\"];\n";
+
+  super::visit(R);
+
+  for ( base_p O : R.getOuts() ) {
+    Conn() << "n" << R.getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
+  }
+
+  return 0;
+}
+
+int Dot::visit(StaticStreamIndex &R) {
+  VISIT_ONCE(R);
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+  F() << "n" << R.getUID() << " [shape=box,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\n" << R.getStream()->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
+
+  super::visit(R);
+
+  for ( base_p O : R.getOuts() ) {
+    Conn() << "n" << R.getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
+  }
+
+  return 0;
+}
+
+int Dot::visit(DynamicStreamIndex &R) {
+  VISIT_ONCE(R);
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+  F() << "n" << R.getUID() << " [shape=box,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\n" << R.getStream()->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
+
+  super::visit(R);
+
+  for ( base_p O : R.getOuts() ) {
+    Conn() << "n" << R.getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
+  }
+
+  return 0;
+}
+#if 0
 /// \brief Create arrow for Load/Store
 ///
 int Dot::visit(StaticStreamIndex &R) {
@@ -347,6 +406,7 @@ int Dot::visit(DynamicStreamIndex &R) {
 
   return 0;
 }
+#endif
 
 int Dot::visit(ScalarPort &R) {
   VISIT_ONCE(R)

@@ -56,12 +56,14 @@ class Reg;
 class Ram;
 class Fifo;
 class ConstVal;
-//class InStreamIndex;
+
 class Port;
 class ScalarPort;
-//class OutStreamIndex;
 class StreamPort;
-//class InOutStream;
+class StreamAccess;
+class LoadAccess;
+class StoreAccess;
+
 class StreamIndex;
 class DynamicStreamIndex;
 class StaticStreamIndex;
@@ -82,48 +84,51 @@ class BaseVisitor
     virtual ~BaseVisitor() {
     };
 
-    virtual int visit( Visitable &) = 0;
-    virtual int visit( DesignUnit &) = 0;
+    virtual int visit(Visitable &) = 0;
+    virtual int visit(DesignUnit &) = 0;
 
-    virtual int visit( Arith &) = 0;
-    virtual int visit( FPArith &) = 0;
-    virtual int visit( Add &) = 0;
-    virtual int visit( FAdd &) = 0;
-    virtual int visit( Sub & ) = 0;
-    virtual int visit( FSub & ) = 0;
-    virtual int visit( Mul & ) = 0;
-    virtual int visit( FMul & ) = 0;
-    virtual int visit( UDiv & ) = 0;
-    virtual int visit( SDiv & ) = 0;
-    virtual int visit( FDiv & ) = 0;
-    virtual int visit( URem & ) = 0;
-    virtual int visit( SRem & ) = 0;
-    virtual int visit( FRem & ) = 0;
+    virtual int visit(Arith &) = 0;
+    virtual int visit(FPArith &) = 0;
+    virtual int visit(Add &) = 0;
+    virtual int visit(FAdd &) = 0;
+    virtual int visit(Sub & ) = 0;
+    virtual int visit(FSub & ) = 0;
+    virtual int visit(Mul & ) = 0;
+    virtual int visit(FMul & ) = 0;
+    virtual int visit(UDiv & ) = 0;
+    virtual int visit(SDiv & ) = 0;
+    virtual int visit(FDiv & ) = 0;
+    virtual int visit(URem & ) = 0;
+    virtual int visit(SRem & ) = 0;
+    virtual int visit(FRem & ) = 0;
 
-    virtual int visit( Shl & ) = 0;
-    virtual int visit( LShr & )  = 0;
-    virtual int visit( AShr & ) = 0;
-    virtual int visit( And & )  = 0;
-    virtual int visit( Or & ) = 0;
-    virtual int visit( Xor & )  = 0;
+    virtual int visit(Shl & ) = 0;
+    virtual int visit(LShr & )  = 0;
+    virtual int visit(AShr & ) = 0;
+    virtual int visit(And & )  = 0;
+    virtual int visit(Or & ) = 0;
+    virtual int visit(Xor & )  = 0;
 
-    virtual int visit( Compare & ) = 0;
-    virtual int visit( IntCompare & ) = 0;
-    virtual int visit( FPCompare & ) = 0;
-    virtual int visit( Mux & ) = 0;
-    virtual int visit( Reg & ) = 0;
-    virtual int visit( Ram & ) = 0;
-    virtual int visit( Fifo & ) = 0;
-    virtual int visit( ConstVal & ) = 0;
-    virtual int visit( Kernel & ) = 0;
-    virtual int visit( Block & ) = 0;
-    //virtual int visit( InStreamIndex & ) = 0;
-    virtual int visit( ScalarPort & )  = 0;
-   // virtual int visit( OutStreamIndex & ) = 0;
-    virtual int visit( StreamPort & ) = 0;
-    virtual int visit( StreamIndex & ) = 0;
-    virtual int visit( DynamicStreamIndex & ) = 0;
-    virtual int visit( StaticStreamIndex & ) = 0;
+    virtual int visit(Compare & ) = 0;
+    virtual int visit(IntCompare & ) = 0;
+    virtual int visit(FPCompare & ) = 0;
+    virtual int visit(Mux & ) = 0;
+    virtual int visit(Reg & ) = 0;
+    virtual int visit(Ram & ) = 0;
+    virtual int visit(Fifo & ) = 0;
+    virtual int visit(ConstVal & ) = 0;
+    virtual int visit(Kernel & ) = 0;
+    virtual int visit(Block & ) = 0;
+
+    virtual int visit(ScalarPort & )  = 0;
+    virtual int visit(StreamPort & ) = 0;
+    virtual int visit(StreamAccess &) = 0;
+    virtual int visit(LoadAccess &) = 0;
+    virtual int visit(StoreAccess &) = 0;
+
+    virtual int visit(StreamIndex & ) = 0;
+    virtual int visit(DynamicStreamIndex & ) = 0;
+    virtual int visit(StaticStreamIndex & ) = 0;
 };
 
 } //ns oclacc

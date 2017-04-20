@@ -29,14 +29,6 @@ const std::string ConstVal::dump(const std::string &Indent) const {
   return ss.str();
 }
 
-const std::string ConstVal::getUniqueName() const {
-  return getName();
-}
-
-const std::string &ConstVal::getBits() const {
-  return Bits;
-}
-
 #undef TYPENAME
 
 } //end namespace oclacc

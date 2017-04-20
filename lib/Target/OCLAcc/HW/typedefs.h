@@ -22,6 +22,15 @@ typedef std::shared_ptr<ScalarPort> scalarport_p;
 class StreamPort;
 typedef std::shared_ptr<StreamPort> streamport_p;
 
+class StreamAccess;
+typedef std::shared_ptr<StreamAccess> streamaccess_p;
+
+class LoadAccess;
+typedef std::shared_ptr<LoadAccess> loadaccess_p;
+
+class StoreAccess;
+typedef std::shared_ptr<StoreAccess> storeaccess_p;
+
 class Kernel;
 typedef std::shared_ptr<Kernel> kernel_p;
 

@@ -501,7 +501,7 @@ const std::string BlockModule::declFSMSignals() const {
   // If CriticalPath is 0, have at least one bit.
   unsigned CounterWidth = 1;
   if (CriticalPath > 1)
-    CounterWidth = static_cast<unsigned int>(std::ceil(std::log2(CriticalPath))-1);
+    CounterWidth = static_cast<unsigned int>(std::ceil(std::log2(CriticalPath)));
 
   // CriticalPath counter
   Signal Count("counter", CounterWidth, Signal::Local, Signal::Reg);
@@ -571,6 +571,7 @@ const std::string BlockModule::declFSM() const {
     S << Indent(++II) << "begin" << "\n";
     S << Indent(II) << "counter_enabled <= 1;\n";
 
+#if 0
     // Enable outputs starting at correct cycle
     for (streamindex_p SI : Comp.getStaticOutStreamIndices()) {
       assert(SI->getIns().size() == 1);
@@ -583,6 +584,7 @@ const std::string BlockModule::declFSM() const {
       S << Indent(II++) << "if (counter >= " << C << " && " << Name << "_fin == 0)\n";
       S << Indent(II--) << "next_state <= state_wait_store;\n";
     }
+#endif
 
     // state_wait_output
     S << Indent(II) << "if (counter == " << CriticalPath <<") next_state <= state_wait_output;\n";
@@ -614,6 +616,7 @@ const std::string BlockModule::declFSM() const {
   S << Indent(II) << "state_wait_store:" << "\n";
     BEGIN(S);
 
+#if 0
       for (dynamicstreamindex_p SI : Comp.getDynamicOutStreamIndices()) {
         streamport_p SP = SI->getStream();
         base_p Val = SI->getIn(0);
@@ -629,6 +632,7 @@ const std::string BlockModule::declFSM() const {
           S << Indent(II) << Name << "_buf <= " << ValName << ";\n";
           END(S);
       }
+#endif
     END(S);
 
   S << Indent(II) << "state_wait_load:" << "\n";
@@ -750,6 +754,7 @@ const std::string BlockModule::declFSM() const {
             END(S);
         }
 
+#if 0
         for (streamindex_p SI : Comp.getStaticOutStreamIndices()) {
           assert(SI->getIns().size() == 1);
 
@@ -757,6 +762,7 @@ const std::string BlockModule::declFSM() const {
           const std::string Name = getOpName(Val);
           unsigned C = getReadyCycle(Name);
         }
+#endif
 
       END(S);
     
@@ -795,7 +801,7 @@ const std::string BlockModule::declPortControlSignals() const {
   }
 
   S << "// InStream buffer\n";
-  for (const streamindex_p P : Comp.getInStreamIndices()) {
+  for (const loadaccess_p P : Comp.getLoads()) {
     Signal SP(getOpName(P), P->getBitWidth(), Signal::Local, Signal::Reg);
     S << SP.getDefStr() << ";\n";
 
@@ -810,7 +816,7 @@ const std::string BlockModule::declPortControlSignals() const {
   }
 
   S << "// OutStream internal\n";
-  for (const streamindex_p P : Comp.getOutStreamIndices()) {
+  for (const storeaccess_p P : Comp.getStores()) {
     Signal SF(getOpName(P)+"_fin", 1, Signal::Local, Signal::Reg);
     S << SF.getDefStr() << ";\n";
   }

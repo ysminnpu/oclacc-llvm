@@ -4,6 +4,7 @@
 #include "llvm/Support/Debug.h"
 
 #include "BaseVisitor.h"
+#include "Macros.h"
 #include "HW/typedefs.h"
 #include "HW/HW.h"
 #include "HW/Arith.h"
@@ -19,7 +20,6 @@
 //#define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
 #define TYPENAME(x) x.getName()
 #define DEBUG_TYPE "dfvisitor"
-#define DEBUG_FUNC do {DEBUG(dbgs() << __PRETTY_FUNCTION__ << ": " << R.getUniqueName() << "\n");} while (0);
 
 namespace oclacc {
 
@@ -220,20 +220,30 @@ class DFVisitor : public BaseVisitor
     virtual int visit(ScalarPort &R) override { 
       DEBUG_FUNC;
 
-      //  P->accept(*this);
-
-      //for (base_p P : R.getOuts())
-      //  P->accept(*this);
-
       return 0;
     }
 
     virtual int visit(StreamPort &R) override {
       DEBUG_FUNC;
 
-      //for ( streamindex_p P : R.getIndexList() ) {
-      //  P->accept(*this);
-      //}
+      return 0;
+    }
+
+    virtual int visit(StreamAccess &R) override {
+      DEBUG_FUNC;
+
+      return 0;
+    }
+
+    virtual int visit(LoadAccess &R) override {
+      DEBUG_FUNC;
+
+      return 0;
+    }
+
+    virtual int visit(StoreAccess &R) override {
+      DEBUG_FUNC;
+      
       return 0;
     }
 
@@ -241,9 +251,6 @@ class DFVisitor : public BaseVisitor
       DEBUG_FUNC;
 
       R.getStream()->accept(*this);
-
-      //for (base_p P : R.getIns())
-      //  P->accept(*this);
 
       for (base_p P : R.getOuts())
         P->accept(*this);
@@ -254,29 +261,13 @@ class DFVisitor : public BaseVisitor
     virtual int visit(DynamicStreamIndex &R) override {
       DEBUG_FUNC;
 
-      //R.getIndex()->accept(*this);
-      //R.getStream()->accept(*this);
       return visit(static_cast<StreamIndex &>(R));
-
-//      for (base_p P : R.getOuts())
-//        P->accept(*this);
-
-      //return 0;
     }
 
     virtual int visit(StaticStreamIndex &R) override {
       DEBUG_FUNC;
 
-      //R.getStream()->accept(*this);
-
-      //for (base_p P : R.getIns())
-      //  P->accept(*this);
-
-//      for (base_p P : R.getOuts())
-//        P->accept(*this);
       return visit(static_cast<StreamIndex &>(R));
-
-      //return 0;
     }
 };
 

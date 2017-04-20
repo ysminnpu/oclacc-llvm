@@ -16,19 +16,17 @@ extern Signal Rst;
 const std::string oclacc::getOpName(const base_p P) {
   if (const_p SI = std::dynamic_pointer_cast<ConstVal>(P)) {
     return getOpName(*SI);
-  } else if (staticstreamindex_p SI = std::dynamic_pointer_cast<StaticStreamIndex>(P)) {
-    return getOpName(*SI);
-  } else if (dynamicstreamindex_p SC = std::dynamic_pointer_cast<DynamicStreamIndex>(P)) {
-    return getOpName(*SC);
+  } else if (streamaccess_p SA = std::dynamic_pointer_cast<StreamAccess>(P)) {
+    return getOpName(*SA);
   } else {
     return getOpName(*P);
   }
 }
 
-const std::string oclacc::getOpName(const ConstVal &P) {
+const std::string oclacc::getOpName(const ConstVal &R) {
   std::stringstream Name;
 
-  std::string PName = P.getUniqueName();
+  std::string PName = R.getUniqueName();
   if (PName[0] == '-')
     PName[0] = '_';
 
@@ -37,15 +35,25 @@ const std::string oclacc::getOpName(const ConstVal &P) {
   return Name.str();
 }
 
-
-const std::string oclacc::getOpName(const StaticStreamIndex &P) {
+const std::string oclacc::getOpName(const StreamAccess &R) {
   std::stringstream Name;
 
-  const std::string PName = P.getUniqueName();
-  const std::string StreamName = P.getStream()->getName();
+  const streamport_p S = R.getIndex()->getStream();
+  
+  Name << S->getUniqueName() << R.getUniqueName();
+
+  return Name.str();
+}
+
+#if 0
+const std::string oclacc::getOpName(const StaticStreamIndex &R) {
+  std::stringstream Name;
+
+  const std::string PName = R.getUniqueName();
+  const std::string StreamName = R.getStream()->getName();
 
   // Get numerical index
-  StaticStreamIndex::IndexTy Index = P.getIndex();
+  StaticStreamIndex::IndexTy Index = R.getIndex();
   std::string Sign = "";
   if (Index < 0) {
     Index = -Index;
@@ -57,57 +65,24 @@ const std::string oclacc::getOpName(const StaticStreamIndex &P) {
   return Name.str();
 }
 
-const std::string oclacc::getOpName(const DynamicStreamIndex &P) {
+const std::string oclacc::getOpName(const DynamicStreamIndex &R) {
   std::stringstream Name;
 
-  const std::string IndexName = P.getUniqueName();
-  const std::string StreamName = P.getStream()->getName();
+  const std::string IndexName = R.getUniqueName();
+  const std::string StreamName = R.getStream()->getName();
 
-  const base_p Index = P.getIndex();
+  const base_p Index = R.getIndex();
   const std::string ID = std::to_string(Index->getUID());
 
   Name << StreamName+"_"+IndexName+"_"+ID;
 
   return Name.str();
 }
+#endif
 
 const std::string oclacc::getOpName(const HW &R) {
   return R.getUniqueName();
 }
-
-#if 0
-const std::string oclacc:getOpName(const ScalarPort &P) {
-  unsigned BitWidth = P.getBitWidth();
-
-  const HW::PortsTy Ins = P.getIns();
-
-  if (Ins.empty()) {
-    // ScalarPorts without input are kernel inputs. As they are always added to
-    // the EntryBlock, their name must be the same as in this Block, and thus we
-    // have to get the id of the output instead of the input.
-    const HW::PortsTy Outs = P.getOuts();
-    assert(Outs.size() == 1);
-
-    Identifiable::UIDTy OutsID = std::begin(Outs)->get()->getUID();
-
-    const std::string PName = P.getName() + "_" + std::to_string(P.getUID()) + "_" + std::to_string(OutsID);
-  } else {
-    for (base_p In : Ins) {
-      const std::string PName = P.getName() + "_" + std::to_string(In->getUID()) + "_" + std::to_string(P.getUID());
-
-      L.push_back(Signal(PName,BitWidth,Signal::In, Signal::Wire));
-
-      // Only pipelined ports have synchronization signals
-      if (P.isPipelined()) {
-        L.push_back(Signal(PName+"_valid", 1, Signal::In, Signal::Wire));
-        L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));
-      }
-    }
-
-  }
-  return PName;
-}
-#endif
 
 /// \brief Return all signals for a specific port depending on its dynamic type
 const Signal::SignalListTy oclacc::getSignals(const block_p P) {
@@ -124,8 +99,8 @@ const Signal::SignalListTy oclacc::getSignals(const Block &R) {
     const Signal::SignalListTy SISC = getInSignals(P);
     L.insert(std::end(L),std::begin(SISC), std::end(SISC)); 
   }
-  for (const streamindex_p P : R.getInStreamIndices()) {
-    const Signal::SignalListTy SIST = getInSignals(P);
+  for (const loadaccess_p P : R.getLoads()) {
+    const Signal::SignalListTy SIST = getSignals(P);
     L.insert(std::end(L),std::begin(SIST), std::end(SIST)); 
   }
 
@@ -135,8 +110,8 @@ const Signal::SignalListTy oclacc::getSignals(const Block &R) {
     L.insert(std::end(L),std::begin(SOSC), std::end(SOSC)); 
   }
 
-  for (const streamindex_p P : R.getOutStreamIndices()) {
-    const Signal::SignalListTy SOST = getOutSignals(P);
+  for (const storeaccess_p P : R.getStores()) {
+    const Signal::SignalListTy SOST = getSignals(P);
     L.insert(std::end(L),std::begin(SOST), std::end(SOST)); 
   }
 
@@ -172,6 +147,7 @@ const Signal::SignalListTy oclacc::getSignals(const Kernel &R) {
   return L;
 }
 
+#if 0
 const Signal::SignalListTy oclacc::getInSignals(const streamindex_p P) {
   if (P->isStatic()) {
     const staticstreamindex_p S = std::static_pointer_cast<StaticStreamIndex>(P);
@@ -191,12 +167,8 @@ const Signal::SignalListTy oclacc::getOutSignals(const streamindex_p P) {
     return getOutSignals(*S);
   }
 }
+#endif
 
-
-// Used for delegation
-const Signal::SignalListTy oclacc::getInSignals(const scalarport_p P) {
-  return getInSignals(*P);
-}
 
 /// \brief Return a list of all ScalarPorts
 const Signal::SignalListTy oclacc::getInSignals(const ScalarPort &P) {
@@ -216,6 +188,7 @@ const Signal::SignalListTy oclacc::getInSignals(const ScalarPort &P) {
 
   return L;
 }
+
 
 const Signal::SignalListTy oclacc::getInMuxSignals(const ScalarPort &Sink, const ScalarPort &Src) {
   Signal::SignalListTy L;
@@ -244,33 +217,14 @@ const Signal::SignalListTy oclacc::getSignals(const StreamPort &P) {
 
   const std::string PName = getOpName(P);
 
-  // Loads
-  for(staticstreamindex_p PI : P.getStaticLoads()) {
-    const Signal::SignalListTy Ports = getInSignals(PI);
-    L.insert(std::end(L), std::begin(Ports), std::end(Ports));
-  }
-  for(dynamicstreamindex_p PI : P.getDynamicLoads()) {
-    const Signal::SignalListTy Ports = getInSignals(PI);
-    L.insert(std::end(L), std::begin(Ports), std::end(Ports));
-  }
-
-  // Stores
-  for(staticstreamindex_p PI : P.getStaticStores()) {
-    const Signal::SignalListTy Ports = getOutSignals(PI);
-    L.insert(std::end(L), std::begin(Ports), std::end(Ports));
-  }
-  for(dynamicstreamindex_p PI : P.getDynamicStores()) {
-    const Signal::SignalListTy Ports = getOutSignals(PI);
+  for (streamaccess_p S : P.getAccessList()) {
+    const Signal::SignalListTy Ports = getSignals(S);
     L.insert(std::end(L), std::begin(Ports), std::end(Ports));
   }
 
   return L;
 }
 
-
-const Signal::SignalListTy oclacc::getOutSignals(const scalarport_p P) {
-  return getOutSignals(*P);
-}
 
 const Signal::SignalListTy oclacc::getOutSignals(const ScalarPort &P) {
   Signal::SignalListTy L;
@@ -293,6 +247,8 @@ const Signal::SignalListTy oclacc::getOutSignals(const ScalarPort &P) {
 
   return L;
 }
+
+#if 0
 
 const Signal::SignalListTy oclacc::getInSignals(const staticstreamindex_p P) {
   return getInSignals(*P);
@@ -384,6 +340,39 @@ const Signal::SignalListTy oclacc::getOutSignals(const DynamicStreamIndex &P) {
   L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
 
   return L;
+}
+#endif
+const Signal::SignalListTy oclacc::getSignals(const LoadAccess &R) {
+  Signal::SignalListTy L;
+
+  unsigned AddressWidth = 64;
+  unsigned DataWidth = R.getStream()->getBitWidth();
+
+  const std::string PName = getOpName(R);
+
+  L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_address_valid", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_unbuf", DataWidth, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_unbuf_valid", 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_ack", 1, Signal::Out, Signal::Reg));
+
+  return L;
+}
+
+const Signal::SignalListTy oclacc::getSignals(const StoreAccess &R) {
+  Signal::SignalListTy L;
+
+  const std::string PName = getOpName(R);
+
+  const base_p Index = R.getIndex();
+
+  unsigned AddressWidth = Index->getBitWidth();
+  unsigned DataWidth = R.getStream()->getBitWidth();
+
+  L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_buf", DataWidth, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
 }
 
 const std::string oclacc::createPortList(const Signal::SignalListTy &Ports) {

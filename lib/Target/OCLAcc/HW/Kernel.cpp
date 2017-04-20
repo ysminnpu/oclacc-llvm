@@ -67,7 +67,7 @@ scalarport_p Component::getOutScalarForValue(const Value *V) {
 
 
 // Unified access
-const Component::PortsTy Kernel::getOuts(void) const {
+const Kernel::PortsTy Kernel::getOuts(void) const {
   PortsTy Outs;
   Outs.insert(Outs.end(), OutScalars.begin(), OutScalars.end());
   for (streamport_p S : Streams) {
@@ -77,7 +77,7 @@ const Component::PortsTy Kernel::getOuts(void) const {
   return Outs;
 }
 
-const Component::PortsTy Kernel::getIns(void) const {
+const Kernel::PortsTy Kernel::getIns(void) const {
   PortsTy Ins;
   Ins.insert(Ins.end(), InScalars.begin(), InScalars.end());
   for (streamport_p S : Streams) {
@@ -87,7 +87,7 @@ const Component::PortsTy Kernel::getIns(void) const {
   return Ins;
 }
 
-const Component::PortsTy Kernel::getPorts(void) const {
+const Kernel::PortsTy Kernel::getPorts(void) const {
   PortsTy P;
   P.insert(P.end(), InScalars.begin(), InScalars.end());
   P.insert(P.end(), OutScalars.begin(), OutScalars.end());
@@ -115,11 +115,11 @@ void Kernel::dump() {
   outs() << "Streams:\n";
   for (const streamport_p HWP : getStreams()) {
     outs() << " "<< HWP->getUniqueName() << "\n";
-    for (const streamindex_p HWI : HWP->getLoads()) {
-      outs() << "  ld @"<< HWI->getUniqueName() << "\n";
+    for (const loadaccess_p HWL : HWP->getLoads()) {
+      outs() << "  ld " << HWL->getUniqueName() << "@" << HWL->getIndex()->getUniqueName() << "\n";
     }
-    for (const streamindex_p HWI : HWP->getStores()) {
-      outs() << "  st @"<< HWI->getUniqueName() << "\n";
+    for (const storeaccess_p HWS : HWP->getStores()) {
+      outs() << "  st " << HWS->getUniqueName() << "@" << HWS->getIndex()->getUniqueName() << "\n";
     }
   }
   outs() << "OutScalars:\n";
@@ -151,22 +151,20 @@ void Block::dump() {
   for (const scalarport_p HWP : getInScalars()) {
     outs() << " "<< HWP->getUniqueName() << ": " << (HWP->isPipelined()? "pipelined" : "not pipelined") << "\n";
   }
-
-  outs() << "InStreamIndices:\n";
-  const StreamIndicesTy I = InStreamIndices;
-  for (const streamindex_p HWP : InStreamIndices) {
-    const streamport_p S = HWP->getStream();
-    outs() << " "<< S->getUniqueName() << "@" << HWP->getUniqueName() << "\n";
-  }
-
   outs() << "OutScalars:\n";
   for (const scalarport_p HWP : OutScalars) {
     outs() << " "<< HWP->getUniqueName() << "\n";
   }
-  outs() << "OutStreamIndices:\n";
-  for (const streamindex_p HWP : OutStreamIndices) {
-    const streamport_p S = HWP->getStream();
-    outs() << " "<< S->getUniqueName() << "@" << HWP->getUniqueName() << "\n";
+
+  outs() << "Loads:\n";
+  for (const loadaccess_p HWL : getLoads()) {
+    const streamport_p S = HWL->getStream();
+    outs() << HWL->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWL->getIndex()->getUniqueName() << "\n";
+  }
+  outs() << "Stores:\n";
+  for (const storeaccess_p HWS : getStores()) {
+    const streamport_p S = HWS->getStream();
+    outs() << HWS->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWS->getIndex()->getUniqueName() << " = " << HWS->getValue()->getUniqueName() << "\n";
   }
 
   outs() << Line << "\n";
@@ -274,69 +272,44 @@ const Block::SingleCondTy Block::getCondForScalarPort(scalarport_p P) const {
 }
 
 // InStreams
-void Block::addInStreamIndex(streamindex_p P) { 
-  assert(P->getIR() != nullptr);
-  InStreamIndicesMap[P->getIR()] = P;
-  InStreamIndices.push_back(P);
+const loadaccess_p Block::getLoadForValue(const Value *V) {
+  for (const streamaccess_p A : AccessList) {
+    if (A->isLoad())
+      if (A->getIR() == V)
+        return std::static_pointer_cast<LoadAccess>(A);
+  }
+  return nullptr;
 }
 
-bool Block::containsInStreamIndexForValue(const Value *V) {
-  StreamIndexMapTy::const_iterator IT = InStreamIndicesMap.find(V);
-  return IT != InStreamIndicesMap.end();
-}
+const StreamPort::LoadListTy Block::getLoads() const {
+  StreamPort::LoadListTy L;
+  for (const streamaccess_p A : AccessList) {
+    if (A->isLoad())
+        L.push_back(std::static_pointer_cast<LoadAccess>(A));
+  }
 
-const Block::StreamIndicesTy &Block::getInStreamIndices() const {
-  return InStreamIndices; 
-}
-const Block::StaticStreamIndicesTy &Block::getStaticInStreamIndices() const {
-  StaticStreamIndicesTy S;
-  for (const streamindex_p SI : getInStreamIndices()) {
-    if (staticstreamindex_p SSI = std::dynamic_pointer_cast<StaticStreamIndex>(SI))
-      S.push_back(SSI);
-  }
-   
-  return S;
-}
-const Block::DynamicStreamIndicesTy &Block::getDynamicInStreamIndices() const {
-  DynamicStreamIndicesTy S;
-  for (const streamindex_p SI : getInStreamIndices()) {
-    if (dynamicstreamindex_p DSI = std::dynamic_pointer_cast<DynamicStreamIndex>(SI))
-      S.push_back(DSI);
-  }
-  return S;
+  return L;
 }
 
 // OutStreams
-void Block::addOutStreamIndex(streamindex_p P) { 
-  assert(P->getIR() != nullptr);
-  OutStreamIndicesMap[P->getIR()] = P;
-  OutStreamIndices.push_back(P);
+
+const storeaccess_p Block::getStoreForValue(const Value *V) {
+  for (const streamaccess_p A : AccessList) {
+    if (A->isStore())
+      if (A->getIR() == V)
+        return std::static_pointer_cast<StoreAccess>(A);
+  }
+    return nullptr;
 }
 
-bool Block::containsOutStreamIndexForValue(const Value *V) {
-  StreamIndexMapTy::const_iterator IT = OutStreamIndicesMap.find(V);
-  return IT != OutStreamIndicesMap.end();
-}
+const StreamPort::StoreListTy Block::getStores() const {
+  StreamPort::StoreListTy L;
+  for (const streamaccess_p A : AccessList) {
+    if (A->isStore())
+        L.push_back(std::static_pointer_cast<StoreAccess>(A));
+  }
 
-const Block::StreamIndicesTy &Block::getOutStreamIndices() const {
-  return OutStreamIndices;
-}
-const Block::StaticStreamIndicesTy &Block::getStaticOutStreamIndices() const {
-  StaticStreamIndicesTy S;
-  for (const streamindex_p SI : getOutStreamIndices()) {
-    if (staticstreamindex_p SSI = std::dynamic_pointer_cast<StaticStreamIndex>(SI))
-      S.push_back(SSI);
-  }
-   
-  return S;
-}
-const Block::DynamicStreamIndicesTy &Block::getDynamicOutStreamIndices() const {
-  DynamicStreamIndicesTy S;
-  for (const streamindex_p SI : getOutStreamIndices()) {
-    if (dynamicstreamindex_p DSI = std::dynamic_pointer_cast<DynamicStreamIndex>(SI))
-      S.push_back(DSI);
-  }
-  return S;
+  return L;
 }
 
 // 
@@ -353,13 +326,13 @@ bool Kernel::isWorkItem() const { return WorkItem; }
 // Streams
 void Kernel::addStream(streamport_p P) { 
   assert(P->getIR() != nullptr);
-  StreamsMap[P->getIR()] = P;
   Streams.push_back(P);
 }
 
 const Kernel::StreamsTy Kernel::getStreams() const { 
   return Streams; 
 }
+
 
 #if 0
 // InStreams

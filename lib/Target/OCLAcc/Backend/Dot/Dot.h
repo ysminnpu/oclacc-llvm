@@ -61,6 +61,8 @@ class Dot: public DFVisitor {
     virtual int visit(ConstVal &);
     virtual int visit(ScalarPort &);
     virtual int visit(StreamPort &);
+    virtual int visit(LoadAccess &);
+    virtual int visit(StoreAccess &);
     virtual int visit(StaticStreamIndex &);
     virtual int visit(DynamicStreamIndex &);
     virtual int visit(Mux &);

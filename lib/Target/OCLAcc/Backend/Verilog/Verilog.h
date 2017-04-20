@@ -84,6 +84,8 @@ class Verilog : public DFVisitor {
     int visit(IntCompare &);
     int visit(FPCompare &);
 
+    int visit(Mux &);
+
 };
 
 } // end ns oclacc

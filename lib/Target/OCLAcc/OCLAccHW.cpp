@@ -475,6 +475,11 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     }
   }
 
+#if 0
+
+  // We try to eliminate the StreamAccess List in Block to keep only a single
+  // one in the STream itself
+
   // Is the Argument used to read from or write at? The list of read and write
   // StreamPorts was collected by handleArguments(), when we had to find out, if
   // we have to create a read or write port for the kernel.
@@ -498,6 +503,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       }
     }
   }
+#endif
 }
 
 /// \brief Create ScalarInput/InputStream for Kernel
@@ -689,7 +695,6 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
       llvm_unreachable("Invalid FP Type");
     }
 
-
     switch (I.getOpcode()) {
       case Instruction::FAdd:
         HWOp = makeHWBB<FAdd>(BB, IVal, IName, M, E);
@@ -706,6 +711,8 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
       case Instruction::FDiv:
         HWOp = makeHWBB<FDiv>(BB, IVal,IName, M, E);
         break;
+      default:
+        llvm_unreachable("Invalid FP Binary Op");
     }
   } else {
 
@@ -805,6 +812,9 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   // TODO: Maybe we should support Non-primitive types
   assert(BitWidth);
 
+  loadaccess_p HWLoad = makeHWBB<LoadAccess>(Parent, &I, Name, BitWidth, HWStreamIndex);
+
+  connect(HWStreamIndex, HWLoad);
 
   // get the stream to read from
   streamport_p HWStream = HWStreamIndex->getStream();
@@ -815,18 +825,11 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   unsigned StreamBitWidth = HWStream->getBitWidth();
   assert(StreamBitWidth >= BitWidth);
 
-  // TODO: If it is smaller, add a BitSelector.
-  if (StreamBitWidth > BitWidth)
-    TODO("Add BitSelector");
+  // Streams are global. Tell the Block that it has a load. The load
+  // itself keeps a reference to the BasicBlock and the Stream.
+  HWStream->addAccess(HWLoad);
 
-  // Streams are global, so we have to add the access to the corresponding
-  // block, but tell the stream that it is used to load data.
-  HWParent->addInStreamIndex(HWStreamIndex);
-  HWStream->addLoad(HWStreamIndex);
-
-  HWStreamIndex->setBitWidth(BitWidth);
-
-  BlockValueMap[I.getParent()][&I] = HWStreamIndex;
+  HWParent->addStreamAccess(HWLoad);
 }
 
 ///
@@ -843,7 +846,8 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   // TODO atomic, volatile
   assert(I.isSimple());
 
-  const std::string Name = I.getName();
+  // Stores do not have any name
+  const std::string Name = "store";
 
   const Value *DataVal = I.getValueOperand();
   const Value *AddrVal = I.getPointerOperand();
@@ -908,15 +912,15 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   unsigned StreamBitWidth = HWStream->getBitWidth();
   assert(StreamBitWidth >= BitWidth);
 
-  // TODO: If it is smaller, add a BitSelector.
-  if (StreamBitWidth > BitWidth)
-    TODO("Add BitSelector");
+  storeaccess_p HWStore = makeHWBB<StoreAccess>(Parent, &I, Name, BitWidth, HWStreamIndex, HWData);
 
-  HWStream->addStore(HWStreamIndex);
+  connect(HWStreamIndex, HWStore);
 
-  HWParent->addOutStreamIndex(HWStreamIndex);
+  HWStream->addAccess(HWStore);
 
-  connect(HWData, HWStreamIndex);
+  HWParent->addStreamAccess(HWStore);
+
+  connect(HWData, HWStore);
 }
 
 /// \brief Create StaticStreamIndex or DynamicStreamIndex used by Load or

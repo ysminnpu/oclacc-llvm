@@ -19,6 +19,7 @@ class Mux : public HW
     MuxInputsTy Ins;
 
     using HW::addIn;
+    using HW::getIns;
 
   public:
     Mux(const std::string &Name, unsigned BitWidth) : HW(Name,BitWidth) {

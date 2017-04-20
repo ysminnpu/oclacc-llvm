@@ -14,4 +14,6 @@
 
 #define NDEBUG(x) DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "] " << x << "\n")
 
+#define DEBUG_FUNC do {DEBUG(dbgs() << __PRETTY_FUNCTION__ << ": " << R.getUniqueName() << "\n");} while (0);
+
 #endif /* MACROS_H */

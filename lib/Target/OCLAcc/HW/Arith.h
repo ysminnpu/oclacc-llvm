@@ -58,7 +58,7 @@ class Add : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "Add";
     }
     DECLARE_VISIT;
@@ -70,7 +70,7 @@ class FAdd : public FPArith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "FAdd";
     }
     DECLARE_VISIT;
@@ -83,7 +83,7 @@ class Sub : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "Sub";
     }
     DECLARE_VISIT;
@@ -95,7 +95,7 @@ class FSub : public FPArith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "FSub";
     }
     DECLARE_VISIT;
@@ -107,7 +107,7 @@ class Mul : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "Mul";
     }
     DECLARE_VISIT;
@@ -120,7 +120,7 @@ class FMul : public FPArith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "FMul";
     }
     DECLARE_VISIT;
@@ -133,7 +133,7 @@ class UDiv : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "UDiv";
     }
     DECLARE_VISIT;
@@ -145,7 +145,7 @@ class SDiv : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "SDiv";
     }
     DECLARE_VISIT;
@@ -158,7 +158,7 @@ class FDiv : public FPArith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "FDiv";
     }
     DECLARE_VISIT;
@@ -171,7 +171,7 @@ class URem : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "URem";
     }
     DECLARE_VISIT;
@@ -184,7 +184,7 @@ class SRem : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "SRam";
     }
     DECLARE_VISIT;
@@ -197,7 +197,7 @@ class FRem : public FPArith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "FRem";
     }
     DECLARE_VISIT;
@@ -210,7 +210,7 @@ class Shl : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "Shl";
     }
     DECLARE_VISIT;
@@ -222,7 +222,7 @@ class LShr : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "LShr";
     }
     DECLARE_VISIT;
@@ -234,7 +234,7 @@ class AShr : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "AShr";
     }
     DECLARE_VISIT;
@@ -246,7 +246,7 @@ class And : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "And";
     }
     DECLARE_VISIT;
@@ -258,7 +258,7 @@ class Or : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "Or";
     }
     DECLARE_VISIT;
@@ -270,7 +270,7 @@ class Xor : public Arith
     {
       //pass
     }
-    virtual const std::string getOp() {
+    virtual const std::string getOp() override {
       return "Xor";
     }
     DECLARE_VISIT;

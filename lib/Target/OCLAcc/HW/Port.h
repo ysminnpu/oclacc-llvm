@@ -22,10 +22,10 @@ class Port : public HW {
 
 
   protected:
-    Port(const std::string &, size_t, const Datatype &, bool);
+    Port(const std::string &, unsigned, const Datatype &, bool);
 
   public:
-    virtual bool isScalar() const=0;
+    virtual bool isScalar() const = 0;
 
     inline Datatype getPortType() const {
       return PortType;
@@ -52,9 +52,75 @@ class Port : public HW {
 ///
 class ScalarPort : public Port {
   public:
-    ScalarPort(const std::string &Name, size_t W, const Datatype &T, bool Pipelined);
+    ScalarPort(const std::string &Name, unsigned W, const Datatype &T, bool Pipelined);
 
-    bool isScalar() const;
+    inline bool isScalar() const override {
+      return true;
+    }
+
+    DECLARE_VISIT;
+};
+
+class StreamAccess : public HW {
+  private:
+    streamindex_p Index;
+
+    using HW::addIn;
+
+  public:
+    virtual bool isLoad() const = 0;
+    virtual bool isStore() const = 0;
+
+    streamport_p getStream() const;
+
+    inline streamindex_p getIndex() const {
+      return Index;
+    }
+
+  protected:
+    StreamAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index) : HW(Name, BitWidth), Index(Index) {
+    }
+};
+
+class LoadAccess : public StreamAccess {
+  private:
+    using HW::addIn;
+  public:
+    LoadAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index) : StreamAccess(Name, BitWidth, Index) {
+    }
+
+    inline virtual bool isLoad() const override {
+      return true;
+    }
+
+    inline virtual bool isStore() const override {
+      return false;
+    }
+
+    DECLARE_VISIT;
+};
+
+class StoreAccess : public StreamAccess {
+  private:
+    base_p Value;
+
+    using HW::addOut;
+
+  public:
+    StoreAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index, base_p Value) : StreamAccess(Name, BitWidth, Index), Value(Value) {
+    }
+
+    inline virtual bool isLoad() const override {
+      return true;
+    }
+
+    inline virtual bool isStore() const override {
+      return false;
+    }
+
+    inline base_p getValue() const {
+      return Value;
+    }
 
     DECLARE_VISIT;
 };
@@ -70,87 +136,56 @@ class ScalarPort : public Port {
 ///
 class StreamPort : public Port {
   public:
-    enum AccessTy {
-      Invalid,
-      Load,
-      Store
-    };
+    typedef std::vector<streamaccess_p> AccessListTy;
+    typedef std::vector<loadaccess_p> LoadListTy;
+    typedef std::vector<storeaccess_p> StoreListTy;
 
-    typedef std::vector<streamindex_p> IndexListTy;
-    typedef IndexListTy::iterator IndexListIt;
-    typedef IndexListTy::const_iterator IndexListConstIt;
-    typedef std::vector<AccessTy> AccessListTy;
-
-    typedef std::vector<staticstreamindex_p> StaticIndexListTy;
-    typedef StaticIndexListTy::iterator StaticIndexListIt;
-    typedef StaticIndexListTy::const_iterator StaticIndexListConstIt;
-
-    typedef std::vector<dynamicstreamindex_p> DynamicIndexListTy;
-    typedef DynamicIndexListTy::iterator DynamicIndexListIt;
-    typedef DynamicIndexListTy::const_iterator DynamicIndexListConstIt;
   private:
-    // must be a ordered list of indices to preserve correct store order.
-    // Instead of a single list we use separate lists for the Index and the
-    // access type.
-    IndexListTy IndexList;
-
-    // We store the type of access in a separate list. IndexList[i] has an
-    // access ty of AccessList[i].
     AccessListTy AccessList;
 
   public:
-    StreamPort(const std::string &Name, size_t W, ocl::AddressSpace, const Datatype &T);
+    StreamPort(const std::string &Name, unsigned BitWidth, ocl::AddressSpace, const Datatype &T);
 
     DECLARE_VISIT;
 
-    inline bool isScalar() const {
+    inline bool isScalar() const override {
       return false;
-    }
-
-    // Combined
-    const IndexListTy get(AccessTy) const;
-    const StaticIndexListTy getStaticIndizes() const;
-    const DynamicIndexListTy getDynamicIndizes() const;
-
-    inline const IndexListTy &getIndexList() const {
-      return IndexList;
     }
 
     inline const AccessListTy &getAccessList() const {
       return AccessList;
     }
 
+    const AccessListTy getAccessList(block_p HWB) const;
 
     bool hasLoads() const;
     bool hasStores() const;
 
-    // Load methods
-    //
-    bool isLoad(StreamIndex *) const;
-    bool isLoad(streamindex_p P) const { return isLoad(P.get()); } 
-
-    inline const IndexListTy getLoads() const {
-      return get(Load);
+    inline const LoadListTy getLoads() const {
+      LoadListTy L;
+      for (const streamaccess_p S : AccessList) {
+        if (S->isLoad()) L.push_back(std::static_pointer_cast<LoadAccess>(S));
+      }
+      return L;
     }
 
-    const StaticIndexListTy getStaticLoads() const;
-    const DynamicIndexListTy getDynamicLoads() const;
-
-    void addLoad(streamindex_p I);
-
-    // Store methods
-    //
-    bool isStore(StreamIndex *) const;
-    bool isStore(streamindex_p P) const { return isStore(P.get()); }
-
-    inline const IndexListTy getStores() const {
-      return get(Store);
+    inline void addAccess(streamaccess_p I) {
+      AccessList.push_back(I);
     }
 
-    const StaticIndexListTy getStaticStores() const;
-    const DynamicIndexListTy getDynamicStores() const;
+    inline const StoreListTy getStores() const {
+      StoreListTy L;
+      for (const streamaccess_p S : AccessList) {
+        if (S->isStore()) L.push_back(std::static_pointer_cast<StoreAccess>(S));
+      }
+      return L;
+    }
 
-    void addStore(streamindex_p);
+    const LoadListTy getStaticLoads() const;
+    const LoadListTy getDynamicLoads() const;
+
+    const StoreListTy getStaticStores() const;
+    const StoreListTy getDynamicStores() const;
 
 };
 
@@ -185,9 +220,6 @@ class StreamIndex : public HW {
 
 /// \brief DynamicStreamIndex results from a GEP instruction and can be used as
 /// address operand for Loads and Stores to Streams.
-///
-/// When Load, Ins[0] is the address
-/// When Store, Ins[0] is the address, Ins[1] is the value to store.
 class DynamicStreamIndex : public StreamIndex {
 
   public:
@@ -204,10 +236,7 @@ class DynamicStreamIndex : public StreamIndex {
     }
 
     inline base_p getIndex() const {
-      return Ins[0];
-    }
-
-    inline base_p getValue() const {
+      assert(Ins.size() == 1 && "Invalid Ins for DynamicStreamIndex");
       return Ins[0];
     }
 
@@ -228,7 +257,7 @@ class StaticStreamIndex : public StreamIndex {
   private:
     IndexTy Index;
   public:
-    StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, size_t BitWidth);
+    StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, unsigned BitWidth);
 
     StaticStreamIndex(const StaticStreamIndex&) = delete;
     StaticStreamIndex& operator=(const StaticStreamIndex&) = delete;

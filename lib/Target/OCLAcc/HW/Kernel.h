@@ -3,6 +3,7 @@
 
 #include <map>
 #include <vector>
+#include <algorithm>
 
 #include "typedefs.h"
 #include "Identifiable.h"
@@ -21,10 +22,6 @@ const std::string ConditionFlagNames[] = {
 /// inputs/outputs.
 class Component : public Identifiable, public Visitable {
   public:
-    typedef std::vector<port_p> PortsTy;
-    typedef std::vector<port_p>::iterator PortsItTy;
-    typedef std::vector<port_p>::const_iterator PortsConstItTy;
-
     typedef std::vector<scalarport_p> ScalarsTy;
 
   protected:
@@ -55,6 +52,14 @@ class Component : public Identifiable, public Visitable {
     // InScalars
     void addInScalar(scalarport_p);
 
+    inline bool isInScalar(const ScalarPort &R) const {
+      ScalarsTy::const_iterator FI = std::find_if(InScalars.begin(), InScalars.end(), [&R](const scalarport_p V){
+          return (&R == V.get());
+      });
+
+      return (FI != InScalars.end());
+    }
+
     const ScalarsTy &getInScalars() const;
     
     bool containsInScalarForValue(const Value *);
@@ -65,6 +70,14 @@ class Component : public Identifiable, public Visitable {
     void addOutScalar(scalarport_p);
 
     const ScalarsTy &getOutScalars() const;
+
+    inline bool isOutScalar(const ScalarPort &R) const {
+      ScalarsTy::const_iterator FI = std::find_if(OutScalars.begin(), OutScalars.end(), [&R](const scalarport_p V){
+          return (&R == V.get());
+      });
+
+      return (FI != OutScalars.end());
+    }
 
     bool containsOutScalarForValue(const Value *V);
 
@@ -88,11 +101,6 @@ class Block : public Component {
     typedef CondListTy::iterator CondItTy;
     typedef CondListTy::const_iterator CondConstItTy;
 
-    typedef std::vector<streamindex_p> StreamIndicesTy;
-    typedef std::vector<staticstreamindex_p> StaticStreamIndicesTy;
-    typedef std::vector<dynamicstreamindex_p> DynamicStreamIndicesTy;
-    typedef std::map<const llvm::Value *, streamindex_p> StreamIndexMapTy;
-
     // TrueFalse Type
     typedef std::pair<base_p, base_p> TFTy;
     typedef std::map<scalarport_p, TFTy> SingleCondTy;
@@ -104,14 +112,9 @@ class Block : public Component {
     CondListTy Conds;
     CondListTy NegConds;
 
-    StreamIndicesTy InStreamIndices;
-    StreamIndexMapTy InStreamIndicesMap;
-
-    StreamIndicesTy OutStreamIndices;
-    StreamIndexMapTy OutStreamIndicesMap;
-
     bool EntryBlock;
 
+    StreamPort::AccessListTy AccessList;
 
   public:
     Block (const std::string &, bool);
@@ -179,24 +182,20 @@ class Block : public Component {
     }
 
     // InStreams
-    void addInStreamIndex(streamindex_p);
+    const loadaccess_p getLoadForValue(const Value *);
 
-    bool containsInStreamIndexForValue(const Value *);
+    inline void addStreamAccess(streamaccess_p A) {
+      AccessList.push_back(A);
+    }
 
-    const StreamIndicesTy &getInStreamIndices() const;
-    const StaticStreamIndicesTy &getStaticInStreamIndices() const;
-    const DynamicStreamIndicesTy &getDynamicInStreamIndices() const;
+    const StreamPort::LoadListTy getLoads() const;
 
     // OutStreams
-    void addOutStreamIndex(streamindex_p);
+    const storeaccess_p getStoreForValue(const Value *);
 
-    bool containsOutStreamIndexForValue(const Value *);
-
-    const StreamIndicesTy &getOutStreamIndices() const;
-    const StaticStreamIndicesTy &getStaticOutStreamIndices() const;
-    const DynamicStreamIndicesTy &getDynamicOutStreamIndices() const;
+    const StreamPort::StoreListTy getStores() const;
     
-    virtual void dump();
+    virtual void dump() override;
 
     DECLARE_VISIT;
 };
@@ -206,8 +205,8 @@ class Block : public Component {
 class Kernel : public Component {
   public:
     typedef std::vector<streamport_p> StreamsTy;
-    typedef std::map<const llvm::Value *, streamport_p> StreamMapTy;
     typedef std::vector<block_p> BlocksTy;
+    typedef std::vector<port_p> PortsTy;
 
   private:
 
@@ -217,7 +216,6 @@ class Kernel : public Component {
     BlocksTy Blocks;
 
     StreamsTy Streams;
-    StreamMapTy StreamsMap;
 #if 0
     StreamsTy InStreams;
     StreamMapTy InStreamsMap;
@@ -282,7 +280,7 @@ class Kernel : public Component {
 
     const PortsTy getPorts(void) const;
 
-    virtual void dump();
+    virtual void dump() override;
 
     DECLARE_VISIT;
 };
