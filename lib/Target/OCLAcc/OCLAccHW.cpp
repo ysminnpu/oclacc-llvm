@@ -205,7 +205,7 @@ bool OCLAccHW::runOnModule(Module &M) {
     FindFunctionBackedges(*KF, Result);
     if (! Result.empty()) {
       TODO("Handle Loops");
-      llvm_unreachable("Stop.");
+      assert(0);
     }
 
     // Print bitwidth of functions
@@ -338,7 +338,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
           if (!AType->isIntegerTy()) {
             A->dump();
             AType->dump();
-            llvm_unreachable("stop");
+            assert(0);
           }
 
           VS.push_back(A);
@@ -350,7 +350,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       }
       else {
         V->dump();
-        llvm_unreachable("unknown value");
+        assert(0 && "unknown value");
       }
     }
   }
@@ -387,7 +387,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     else if (const Argument *A = dyn_cast<Argument>(I))
       DefBB = &(A->getParent()->getEntryBlock());
     else
-      llvm_unreachable("stop");
+      assert(0);
 
     block_p HWDefBB = getBlock(DefBB);
     base_p HWI = getHW<HW>(DefBB, I);
@@ -450,7 +450,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     }
     else if (IT->isPointerTy()) {
       IT->dump();
-      llvm_unreachable("pointer operand in code. fixme.");
+      assert(0 && "pointer operand in code. fixme.");
     }
   }
 
@@ -589,7 +589,7 @@ void OCLAccHW::handleArgument(const Argument &A) {
       case ocl::AS_CONSTANT:
         break;
       default:
-        llvm_unreachable("Invalid AddressSpace");
+        assert(0 && "Invalid AddressSpace");
     }
 
     // Walk through use list and collect Load/Store/GEP Instructions using it
@@ -692,7 +692,7 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
       E=15;
     } else {
       I.dump();
-      llvm_unreachable("Invalid FP Type");
+      assert(0 && "Invalid FP Type");
     }
 
     switch (I.getOpcode()) {
@@ -712,7 +712,7 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
         HWOp = makeHWBB<FDiv>(BB, IVal,IName, M, E);
         break;
       default:
-        llvm_unreachable("Invalid FP Binary Op");
+        assert(0 && "Invalid FP Binary Op");
     }
   } else {
 
@@ -766,7 +766,7 @@ void OCLAccHW::visitBinaryOperator(BinaryOperator &I) {
 
       default:
         I.dump();
-        llvm_unreachable("Unknown Binary Operator");
+        assert(0 && "Unknown Binary Operator");
     }
   }
 
@@ -794,16 +794,16 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   unsigned AddrSpace = I.getPointerAddressSpace();
 
   if ( AddrSpace != ocl::AS_GLOBAL && AddrSpace != ocl::AS_LOCAL )
-    llvm_unreachable("NOT_IMPLEMENTED: Only global and local address space supported.");
+    assert(0 && "NOT_IMPLEMENTED: Only global and local address space supported.");
 
   //Get Address to load from
   const GetElementPtrInst * P = dyn_cast<GetElementPtrInst>(AddrVal);
   if (!P)
-    llvm_unreachable("stop");
+    assert(0);
 
   streamindex_p HWStreamIndex = getHW<StreamIndex>(I.getParent(), P);
   if (!HWStreamIndex) {
-    llvm_unreachable("Index base address only streams.");
+    assert(0 && "Index base address only streams.");
   }
 
   // We may have loads with different types using the same StreamIndex.
@@ -864,7 +864,7 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
     case ocl::AS_LOCAL:
       break;
     default:
-      llvm_unreachable("Invalid AddressSpace");
+      assert(0 && "Invalid AddressSpace");
   }
 
   base_p HWData;
@@ -893,7 +893,7 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
     HWStreamIndex->addOut(HWStream);
   }
   else {
-    llvm_unreachable("Index base address only streams.");
+    assert(0 && "Index base address only streams.");
   }
 
 
@@ -906,7 +906,7 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
 
   //TODO This is the case for local arrays!
   if (! HWStream)
-    llvm_unreachable("Load base address is not a stream");
+    assert(0 && "Load base address is not a stream");
 
   // Check if the data to store has the same BitWidth as the port.
   unsigned StreamBitWidth = HWStream->getBitWidth();
@@ -937,20 +937,20 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
   Value *BaseValue = I.getPointerOperand();
 
   if (! I.isInBounds() )
-    llvm_unreachable("Not in Bounds.");
+    assert(0 && "Not in Bounds.");
 
   const std::string Name = I.getName();
 
   // The pointer base can either be a local Array or a input stream
   unsigned BaseAddressSpace = I.getPointerAddressSpace();
   if ( BaseAddressSpace != ocl::AS_GLOBAL && BaseAddressSpace != ocl::AS_LOCAL )
-    llvm_unreachable( "Only global and local address space supported." );
+    assert(0 &&  "Only global and local address space supported." );
 
   streamport_p HWBase = getHW<StreamPort>(I.getParent(), BaseValue);
 
   // Handle index on the base address
   if ( I.getNumIndices() != 1 )
-    llvm_unreachable("Only 1D arrays supported");
+    assert(0 && "Only 1D arrays supported");
 
   Value *IndexValue = *(I.idx_begin());
 
@@ -966,7 +966,7 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
 
     const ConstantInt *IntConst = dyn_cast<ConstantInt>(ConstValue);
     if (!IntConst)
-      llvm_unreachable("Unknown Constant Type");
+      assert(0 && "Unknown Constant Type");
 
     int64_t C = IntConst->getSExtValue();
     HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), InstValue, Name, HWBase, C, IntConst->getValue().getActiveBits());
@@ -1051,7 +1051,7 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
     const APFloat &Float = FConst->getValueAPF();
 
     if (CType->isHalfTy())
-      llvm_unreachable("Half floating point type not supported");
+      assert(0 &&"Half floating point type not supported");
     else if (CType->isFloatTy()) {
       const APInt Bits = Float.bitcastToAPInt();
 
@@ -1068,10 +1068,10 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
 
       HWConst = std::make_shared<ConstVal>(CName, V, Bits.getBitWidth());
     } else
-      llvm_unreachable("Unknown floating point type");
+      assert(0 && "Unknown floating point type");
   } else
   {
-    llvm_unreachable("Unsupported Constant Type");
+    assert(0 &&"Unsupported Constant Type");
   }
 
   HWConst->setParent(HWBlock);
@@ -1089,11 +1089,11 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   if (ocl::isArithmeticBuiltIn(CN)) {
 
   } else if (ocl::isWorkItemBuiltIn(CN)) {
-    llvm_unreachable("Run pass to inline WorkItem builtins");
+    assert(0 && "Run pass to inline WorkItem builtins");
 
   } else {
     errs() << "Function Name: " << CN << "\n";
-    llvm_unreachable("Invalid Builtin.");
+    assert(0 && "Invalid Builtin.");
   }
 }
 
