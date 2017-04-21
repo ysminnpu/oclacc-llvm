@@ -157,12 +157,15 @@ int Verilog::visit(Block &R) {
   // Determine critical path
   BM->schedule(TheOps);
 
-  // Store Signals
-  (*FS) << BM->declStores();
-
   // State Machine
   (*FS) << BM->declFSMSignals();
   (*FS) << BM->declFSM();
+
+  // Store Signals
+  (*FS) << BM->declStores();
+
+  (*FS) << BM->declLoads();
+
 
   // Write component instantiations
   (*FS) << BM->declBlockComponents();
@@ -199,8 +202,23 @@ int Verilog::visit(StreamPort &R) {
   return 0;
 }
 
+int Verilog::visit(LoadAccess &R) {
+  VISIT_ONCE(R);
+
+  const std::string RName = getOpName(R);
+
+  TheOps.addOperator(RName, RName, 1);
+
+  return 0;
+}
+
 int Verilog::visit(StoreAccess &R) {
   VISIT_ONCE(R);
+
+  const std::string RName = getOpName(R);
+
+  TheOps.addOperator(RName, RName, 1);
+
   return 0;
 }
 

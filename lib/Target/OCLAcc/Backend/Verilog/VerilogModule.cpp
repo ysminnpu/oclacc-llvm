@@ -565,28 +565,32 @@ const std::string BlockModule::declFSM() const {
     S << "\n" << Indent(--II) << ")" << "\n";
 
     // state_free
-    S << Indent(++II) << "begin" << "\n";
-    S << Indent(II) << "next_state <= state_busy" << ";\n";
-    S << Indent(II--) << "end" << "\n";
+      BEGIN(S);
+      S << Indent(II) << "next_state <= state_busy" << ";\n";
+      END(S);
 
 
-    S << Indent(II--) << "end" << "\n";
+    END(S);
 
   S << Indent(II) << "state_busy:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
+    BEGIN(S);
     S << Indent(II) << "counter_enabled <= 1;\n";
 
     // Enable outputs starting at correct cycle
     for (storeaccess_p SI : Comp.getStores()) {
-      assert(SI->getIns().size() == 1);
-
       const std::string Name = getOpName(SI);
 
       unsigned C = getReadyCycle(Name);
 
       S << Indent(II) << "// " << Name << "\n";
-      S << Indent(II++) << "if (counter >= " << C << " && " << Name << "_fin == 0)\n";
-      S << Indent(II--) << "next_state <= state_wait_store;\n";
+      S << Indent(II) << "if (counter == " << C << " && " << Name << "_fin == 0)\n";
+      S << Indent(II+1) << "next_state <= state_wait_store;\n";
+    }
+
+    for (loadaccess_p LI : Comp.getLoads()) {
+      const std::string Name = getOpName(LI);
+
+      S << Indent(II) << "if (counter == " << getReadyCycle(Name) <<" && " << Name << "_valid == 0) next_state <= state_wait_load;\n";
     }
 
     // state_wait_output
@@ -594,23 +598,23 @@ const std::string BlockModule::declFSM() const {
 
     // state_
 
-    S << Indent(II--) << "end" << "\n";
+    END(S);
 
   S << Indent(II) << "state_wait_output:" << "\n";
     if (Comp.getOutScalars().size()) {
-      S << Indent(++II) << "begin" << "\n";
+      BEGIN(S);
       
       // When all outputs and stores are acknoledged, return to state_free
       Prefix = "";
-      S << Indent(II++) << "if (\n";
+      S << Indent(II++) << "if (";
       for (const std::string N : ScalarOutputNames) {
-        S << Prefix << Indent(II) << N << "_fin == 1";
-        Prefix = " &&\n";
+        S << Prefix << N << "_fin == 1";
+        Prefix = "\n" + Indent(II) + "&& ";
       }
-      S << "\n" << Indent(II) << ")\n";
+      S << ")\n";
       S << Indent((II--)+1) << "next_state <= state_free;\n";
 
-      S << Indent(II--) << "end" << "\n";
+      END(S)
     } else {
       S << Indent(II+1) << "next_state <= state_free;\n";
     }
@@ -618,28 +622,36 @@ const std::string BlockModule::declFSM() const {
 
   S << Indent(II) << "state_wait_store:" << "\n";
     BEGIN(S);
-
-#if 0
-      for (dynamicstreamindex_p SI : Comp.getDynamicOutStreamIndices()) {
-        streamport_p SP = SI->getStream();
-        base_p Val = SI->getIn(0);
-
-        const std::string Name = getOpName(SI);
-        const std::string StreamName = getOpName(SP);
-        const std::string ValName = getOpName(Val);
-
-        unsigned C = getReadyCycle(Name);
-
-        S << Indent(II) << "if (counter >= " << C << " && " << Name << "_fin == 0)\n";
-          BEGIN(S);
-          S << Indent(II) << Name << "_buf <= " << ValName << ";\n";
-          END(S);
+    if (Comp.hasStores()) {
+      BEGIN(S);
+      S << Indent(II) << "if ((";
+      Prefix = "";
+      for (storeaccess_p SA : Comp.getStores()) {
+        const std::string SName = getOpName(SA);
+        S << Prefix << SName << "_fin";
+        Prefix = " & ";
       }
-#endif
+      S << ") == 0)\n";
+      S << Indent(II+1) << "next_state <= state_busy;\n";
+      END(S);
+    }
     END(S);
-
   S << Indent(II) << "state_wait_load:" << "\n";
     BEGIN(S);
+    if (Comp.hasLoads()) {
+      BEGIN(S);
+      S << Indent(II) << "if ((";
+      Prefix = "";
+      for (loadaccess_p LA : Comp.getLoads()) {
+        const std::string LName = getOpName(LA);
+        S << Prefix << LName << "_address_valid && " << LName << "_unbuf_valid";
+        Prefix = "\n" + Indent(II) + " & ";
+      }
+      S << ") == 0)\n";
+      S << Indent(II+1) << "next_state <= state_busy;\n";
+
+      END(S);
+    }
     END(S);
 
 
@@ -791,56 +803,121 @@ const std::string BlockModule::declFSM() const {
 
 const std::string BlockModule::declStores() const {
   std::stringstream S;
+  S << "// Store processes\n";
 
   for (storeaccess_p SA : Comp.getStores()) {
     assert(R.getIns().size() == 1 && "Stores may only have a single input");
 
     const std::string Name = getOpName(SA);
-    const std::string IndexName = getOpName(SA->getIndex());
-    const std::string ValueName = getOpName(SA->getIn(0));
+    const streamindex_p Index = SA->getIndex();
 
+    std::string IndexName;
 
-    unsigned IndexClk = getReadyCycle(IndexName);
-    unsigned ValueClk = getReadyCycle(ValueName);
-    unsigned Clk = std::max(IndexClk, ValueClk);
+    if (staticstreamindex_p SI = std::dynamic_pointer_cast<StaticStreamIndex>(Index)) {
+      IndexName = std::to_string(SI->getIndex());
+    }
+    else {
+      dynamicstreamindex_p DI = std::static_pointer_cast<DynamicStreamIndex>(Index);
+      IndexName = getOpName(DI->getIndex());
+
+    }
+
+    const std::string ValueName = getOpName(SA->getValue());
+
+    unsigned Clk = getReadyCycle(Name);
 
     unsigned II = 0;
-    S << "// StoreAccess " << Name << "\n;";
+    S << "// StoreAccess " << Name << "\n";
     S << "always @(posedge clk)\n";
-    BEGIN(S);
-    S << Indent(II) << "if (rst==1)\n";
-    BEGIN(S);
-    S << Indent(II) << Name << "_address = '0;\n";
-    S << Indent(II) << Name << "_buf = '0;\n";
-    S << Indent(II) << Name << "_valid = 0;\n";
-    S << Indent(II) << Name << "_running = 0;\n";
-    S << Indent(II) << Name << "_fin = 0;\n";
-    END(S);
+      BEGIN(S);
+      S << Indent(II) << "if (rst==1)\n";
+        BEGIN(S);
+        S << Indent(II) << Name << "_address = '0;\n";
+        S << Indent(II) << Name << "_buf = '0;\n";
+        S << Indent(II) << Name << "_valid = 0;\n";
+        S << Indent(II) << Name << "_running = 0;\n";
+        S << Indent(II) << Name << "_fin = 0;\n";
+        END(S);
 
-    S << Indent(II) << "else\n";
-    BEGIN(S);
-    S << Indent(II) << "if (Counter == " << Clk << ")\n";
-    BEGIN(S);
-    S << Indent(II) << Name << "_address = " << IndexName << ";\n";
-    S << Indent(II) << Name << "_buf = " << ValueName << ";\n";
-    S << Indent(II) << Name << "_valid = 1;\n";
-    S << Indent(II) << Name << "_running = 1;\n";
-    END(S);
-    END(S);
+      S << Indent(II) << "else\n";
+        BEGIN(S);
+        S << Indent(II) << "if (counter == " << Clk << ")\n";
+          BEGIN(S);
+          S << Indent(II) << Name << "_address = " << IndexName << ";\n";
+          S << Indent(II) << Name << "_buf = " << ValueName << ";\n";
+          S << Indent(II) << Name << "_valid = 1;\n";
+          S << Indent(II) << Name << "_running = 1;\n";
+          END(S);
 
-    S << Indent(II) << "if (" << Name << "_running == 1 && " << Name << "_ack == 1)\n;";
-    BEGIN(S);
-    S << Indent(II) << Name << "_address = '0;\n";
-    S << Indent(II) << Name << "_buf = '0;\n";
-    S << Indent(II) << Name << "_valid = 0;\n";
-    S << Indent(II) << Name << "_running = 0;\n";
-    S << Indent(II) << Name << "_fin = 1;\n";
-    END(S);
-    END(S);
-
+        S << Indent(II) << "if (" << Name << "_running == 1 && " << Name << "_ack == 1)\n";
+          BEGIN(S);
+          S << Indent(II) << Name << "_address = '0;\n";
+          S << Indent(II) << Name << "_buf = '0;\n";
+          S << Indent(II) << Name << "_valid = 0;\n";
+          S << Indent(II) << Name << "_running = 0;\n";
+          S << Indent(II) << Name << "_fin = 1;\n";
+          END(S);
+        END(S);
     END(S);
   }
 
+  return S.str();
+}
+
+const std::string BlockModule::declLoads() const {
+  std::stringstream S;
+  S << "// Load processes\n";
+
+  for (loadaccess_p LA : Comp.getLoads()) {
+    const std::string Name = getOpName(LA);
+    const streamindex_p Index = LA->getIndex();
+
+    std::string IndexName;
+
+    if (staticstreamindex_p SI = std::dynamic_pointer_cast<StaticStreamIndex>(Index)) {
+      IndexName = std::to_string(SI->getIndex());
+    }
+    else {
+      dynamicstreamindex_p DI = std::static_pointer_cast<DynamicStreamIndex>(Index);
+      IndexName = getOpName(DI->getIndex());
+    }
+
+    unsigned Clk = getReadyCycle(Name);
+
+    unsigned II = 0;
+    S << "// LoadAccess " << Name << "\n";
+    S << "always @(posedge clk)\n";
+      BEGIN(S);
+      S << Indent(II) << "if (rst==1)\n";
+        BEGIN(S);
+        // local buffer
+        S << Indent(II) << Name << " = '0;\n";
+        S << Indent(II) << Name << "_valid = 0;\n";
+        // ports
+        S << Indent(II) << Name << "_address = '0;\n";
+        S << Indent(II) << Name << "_address_valid = 0;\n";
+        S << Indent(II) << Name << "_ack = 0;\n";
+        END(S);
+
+      S << Indent(II) << "else\n";
+        BEGIN(S);
+        S << Indent(II) << "if (counter == " << Clk << " && " << Name << "_address_valid == 0)\n";
+          BEGIN(S);
+          S << Indent(II) << Name << "_address = " << IndexName << ";\n";
+          S << Indent(II) << Name << "_address_valid = 1;\n";
+          END(S);
+
+        S << Indent(II) << "if (" << Name << "_address_valid == 1 && " << Name << "_unbuf_valid == 1)\n";
+          BEGIN(S);
+          S << Indent(II) << Name << " = " << Name << "_unbuf;\n";
+          S << Indent(II) << Name << "_valid = 1;\n";
+          S << Indent(II) << Name << "_address = '0;\n";
+          S << Indent(II) << Name << "_address_valid = 0;\n";
+          END(S);
+      END(S);
+
+    END(S);
+  }
   return S.str();
 }
 
@@ -858,7 +935,7 @@ const std::string BlockModule::declPortControlSignals() const {
     S << SV.getDefStr() << ";\n";
   }
 
-  S << "// InStream buffer\n";
+  S << "// Load buffer\n";
   for (const loadaccess_p P : Comp.getLoads()) {
     Signal SP(getOpName(P), P->getBitWidth(), Signal::Local, Signal::Reg);
     S << SP.getDefStr() << ";\n";
@@ -873,7 +950,7 @@ const std::string BlockModule::declPortControlSignals() const {
     S << SF.getDefStr() << ";\n";
   }
 
-  S << "// OutStream internal\n";
+  S << "// Store internal\n";
   for (const storeaccess_p P : Comp.getStores()) {
     Signal SF(getOpName(P)+"_fin", 1, Signal::Local, Signal::Reg);
     S << SF.getDefStr() << ";\n";
@@ -938,7 +1015,7 @@ void BlockModule::schedule(const OperatorInstances &I) {
     op_p Op = I.getOperatorForHW(OpName);
 
     if (Op)
-      MaxPreds + Op->Cycles;
+      MaxPreds += Op->Cycles;
 
     assert(MaxPreds > 0 && "MaxPreds must not be zero");
 

@@ -57,6 +57,7 @@ class Verilog : public DFVisitor {
     // Ports
     int visit(ScalarPort &);
     int visit(StreamPort &);
+    int visit(LoadAccess &);
     int visit(StoreAccess &);
     int visit(StaticStreamIndex &);
     int visit(DynamicStreamIndex &);

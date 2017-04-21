@@ -43,6 +43,7 @@ int FlopocoFPFormat::visit(StreamPort &R) {
 
 int FlopocoFPFormat::visit(StreamAccess &R) {
   VISIT_ONCE(R);
+
   streamport_p S = R.getStream();
 
   if (S->isFP()) {

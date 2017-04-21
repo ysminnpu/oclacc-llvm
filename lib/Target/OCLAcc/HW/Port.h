@@ -70,6 +70,8 @@ class StreamAccess : public HW {
 
     streamindex_p getIndex() const;
 
+    DECLARE_VISIT;
+
   protected:
     StreamAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index);
 };

@@ -50,6 +50,7 @@ class BlockModule : public VerilogModule {
     const std::string declFSM() const;
 
     const std::string declStores() const;
+    const std::string declLoads() const;
 
     inline const std::string declBlockSignals() const { return BlockSignals.str(); }
     inline const std::string declConstSignals() const { return ConstSignals.str(); }

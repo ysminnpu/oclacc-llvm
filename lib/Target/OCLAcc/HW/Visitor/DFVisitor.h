@@ -237,14 +237,12 @@ class DFVisitor : public BaseVisitor
 
     virtual int visit(LoadAccess &R) override {
       DEBUG_FUNC;
-
-      return 0;
+      return visit(static_cast<StreamAccess &>(R));
     }
 
     virtual int visit(StoreAccess &R) override {
       DEBUG_FUNC;
-      
-      return 0;
+      return visit(static_cast<StreamAccess &>(R));
     }
 
     virtual int visit(StreamIndex &R) override {

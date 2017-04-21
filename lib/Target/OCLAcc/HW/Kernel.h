@@ -181,7 +181,7 @@ class Block : public Component {
       return EntryBlock;
     }
 
-    // InStreams
+    // Loads
     const loadaccess_p getLoadForValue(const Value *);
 
     inline void addStreamAccess(streamaccess_p A) {
@@ -190,10 +190,24 @@ class Block : public Component {
 
     const StreamPort::LoadListTy getLoads() const;
 
-    // OutStreams
+    inline bool hasLoads() const {
+      for (streamaccess_p P : AccessList)
+        if (P->isLoad()) return true;
+
+      return false;
+    }
+
+    // Stores
     const storeaccess_p getStoreForValue(const Value *);
 
     const StreamPort::StoreListTy getStores() const;
+
+    inline bool hasStores() const {
+      for (streamaccess_p P : AccessList)
+        if (P->isStore()) return true;
+
+      return false;
+    }
     
     virtual void dump() override;
 
