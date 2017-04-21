@@ -62,29 +62,19 @@ class ScalarPort : public Port {
 };
 
 class StreamAccess : public HW {
-  private:
-    streamindex_p Index;
-
-    using HW::addIn;
-
   public:
     virtual bool isLoad() const = 0;
     virtual bool isStore() const = 0;
 
     streamport_p getStream() const;
 
-    inline streamindex_p getIndex() const {
-      return Index;
-    }
+    streamindex_p getIndex() const;
 
   protected:
-    StreamAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index) : HW(Name, BitWidth), Index(Index) {
-    }
+    StreamAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index);
 };
 
 class LoadAccess : public StreamAccess {
-  private:
-    using HW::addIn;
   public:
     LoadAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index) : StreamAccess(Name, BitWidth, Index) {
     }
@@ -101,13 +91,9 @@ class LoadAccess : public StreamAccess {
 };
 
 class StoreAccess : public StreamAccess {
-  private:
-    base_p Value;
-
-    using HW::addOut;
-
   public:
-    StoreAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index, base_p Value) : StreamAccess(Name, BitWidth, Index), Value(Value) {
+    StoreAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index, base_p Value) : StreamAccess(Name, BitWidth, Index) {
+      Ins.push_back(Value);
     }
 
     inline virtual bool isLoad() const override {
@@ -119,7 +105,7 @@ class StoreAccess : public StreamAccess {
     }
 
     inline base_p getValue() const {
-      return Value;
+      return Ins[1];
     }
 
     DECLARE_VISIT;

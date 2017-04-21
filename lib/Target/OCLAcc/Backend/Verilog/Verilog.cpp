@@ -1,6 +1,8 @@
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Support/ErrorHandling.h"
 
 #include <cstdio>
+#include <cmath>
 #include <sstream>
 #include <cstdlib>
 #include <set>
@@ -22,6 +24,7 @@
 
 
 #define DEBUG_TYPE "verilog"
+
 
 using namespace oclacc;
 
@@ -154,6 +157,9 @@ int Verilog::visit(Block &R) {
   // Determine critical path
   BM->schedule(TheOps);
 
+  // Store Signals
+  (*FS) << BM->declStores();
+
   // State Machine
   (*FS) << BM->declFSMSignals();
   (*FS) << BM->declFSM();
@@ -193,6 +199,11 @@ int Verilog::visit(StreamPort &R) {
   return 0;
 }
 
+int Verilog::visit(StoreAccess &R) {
+  VISIT_ONCE(R);
+  return 0;
+}
+
 int Verilog::visit(StaticStreamIndex &R) {
   VISIT_ONCE(R);
   return 0;
@@ -200,6 +211,7 @@ int Verilog::visit(StaticStreamIndex &R) {
 
 int Verilog::visit(DynamicStreamIndex &R) {
   VISIT_ONCE(R);
+
   return 0;
 }
 
@@ -211,7 +223,6 @@ int Verilog::visit(DynamicStreamIndex &R) {
 void Verilog::handleInferableMath(const Arith &R, const std::string Op) {
   std::stringstream &BS = BM->getBlockSignals();
   std::stringstream &LO = BM->getLocalOperators();
-  std::stringstream &BA = BM->getBlockAssignments();
 
   const std::string Op0 = getOpName(R.getIn(0));
   const std::string Op1 = getOpName(R.getIn(1));
@@ -223,7 +234,6 @@ void Verilog::handleInferableMath(const Arith &R, const std::string Op) {
   BS << S.getDefStr() << ";\n";
 
   unsigned II = 0;
-
   LO << "always @(posedge clk)\n";
   BEGIN(LO);
   LO << Indent(II) << "if (rst==1)\n";

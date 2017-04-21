@@ -38,24 +38,40 @@ class HW : public Identifiable, public Visitable
 
     NO_COPY_ASSIGN(HW)
 
-    void setParent(component_p P) {
+    inline void setParent(component_p P) {
       Parent = P;
     }
 
-    component_p getParent(void) const {
+    inline component_p getParent(void) const {
       return Parent;
     }
 
-    virtual void addIn(base_p P) {
+    inline virtual void addIn(base_p P) {
       if (P)
         if (std::find(Ins.begin(), Ins.end(), P) == Ins.end())
           Ins.push_back(P);
     }
 
-    virtual void addOut(base_p P) {
+    inline virtual void addOut(base_p P) {
       if (P)
         if (std::find(Outs.begin(), Outs.end(), P) == Outs.end())
           Outs.push_back(P);
+    }
+
+    inline virtual void delIn(base_p P) {
+      if (P) {
+        HWListItTy I = std::find(Ins.begin(), Ins.end(), P);
+        if (I != Ins.end())
+          Ins.erase(I);
+      }
+    }
+
+    inline virtual void delOut(base_p P) {
+      if (P) {
+        HWListItTy I = std::find(Outs.begin(), Outs.end(), P);
+        if (I != Outs.end())
+          Outs.erase(I);
+      }
     }
 
     virtual base_p getIn(unsigned I) const { return I < Ins.size() ? Ins[I] : NULL;  }
@@ -87,10 +103,10 @@ class FPHW : public HW {
     
     NO_COPY_ASSIGN(FPHW);
 
-    unsigned getMantissaBitWidth() const {
+    inline unsigned getMantissaBitWidth() const {
       return MantissaBitWidth;
     }
-    unsigned getExponentBitWidth() const {
+    inline unsigned getExponentBitWidth() const {
       return ExponentBitWidth;
     }
 };

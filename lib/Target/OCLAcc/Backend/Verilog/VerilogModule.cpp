@@ -1,3 +1,6 @@
+#include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/CommandLine.h"
+
 #include <memory>
 #include <sstream>
 #include <cmath>
@@ -15,6 +18,8 @@
 #include "OperatorInstances.h"
 
 #define DEBUG_TYPE "verilog"
+
+static cl::opt<bool> PreserveLoadOrder("preserve-load-order", cl::init(false), cl::desc("Keep the order of memory loads.") );
 
 using namespace oclacc;
 
@@ -571,20 +576,18 @@ const std::string BlockModule::declFSM() const {
     S << Indent(++II) << "begin" << "\n";
     S << Indent(II) << "counter_enabled <= 1;\n";
 
-#if 0
     // Enable outputs starting at correct cycle
-    for (streamindex_p SI : Comp.getStaticOutStreamIndices()) {
+    for (storeaccess_p SI : Comp.getStores()) {
       assert(SI->getIns().size() == 1);
 
-      base_p Val = SI->getIn(0);
-      const std::string Name = getOpName(Val);
+      const std::string Name = getOpName(SI);
+
       unsigned C = getReadyCycle(Name);
 
       S << Indent(II) << "// " << Name << "\n";
       S << Indent(II++) << "if (counter >= " << C << " && " << Name << "_fin == 0)\n";
       S << Indent(II--) << "next_state <= state_wait_store;\n";
     }
-#endif
 
     // state_wait_output
     S << Indent(II) << "if (counter == " << CriticalPath <<") next_state <= state_wait_output;\n";
@@ -786,6 +789,61 @@ const std::string BlockModule::declFSM() const {
   return S.str();
 }
 
+const std::string BlockModule::declStores() const {
+  std::stringstream S;
+
+  for (storeaccess_p SA : Comp.getStores()) {
+    assert(R.getIns().size() == 1 && "Stores may only have a single input");
+
+    const std::string Name = getOpName(SA);
+    const std::string IndexName = getOpName(SA->getIndex());
+    const std::string ValueName = getOpName(SA->getIn(0));
+
+
+    unsigned IndexClk = getReadyCycle(IndexName);
+    unsigned ValueClk = getReadyCycle(ValueName);
+    unsigned Clk = std::max(IndexClk, ValueClk);
+
+    unsigned II = 0;
+    S << "// StoreAccess " << Name << "\n;";
+    S << "always @(posedge clk)\n";
+    BEGIN(S);
+    S << Indent(II) << "if (rst==1)\n";
+    BEGIN(S);
+    S << Indent(II) << Name << "_address = '0;\n";
+    S << Indent(II) << Name << "_buf = '0;\n";
+    S << Indent(II) << Name << "_valid = 0;\n";
+    S << Indent(II) << Name << "_running = 0;\n";
+    S << Indent(II) << Name << "_fin = 0;\n";
+    END(S);
+
+    S << Indent(II) << "else\n";
+    BEGIN(S);
+    S << Indent(II) << "if (Counter == " << Clk << ")\n";
+    BEGIN(S);
+    S << Indent(II) << Name << "_address = " << IndexName << ";\n";
+    S << Indent(II) << Name << "_buf = " << ValueName << ";\n";
+    S << Indent(II) << Name << "_valid = 1;\n";
+    S << Indent(II) << Name << "_running = 1;\n";
+    END(S);
+    END(S);
+
+    S << Indent(II) << "if (" << Name << "_running == 1 && " << Name << "_ack == 1)\n;";
+    BEGIN(S);
+    S << Indent(II) << Name << "_address = '0;\n";
+    S << Indent(II) << Name << "_buf = '0;\n";
+    S << Indent(II) << Name << "_valid = 0;\n";
+    S << Indent(II) << Name << "_running = 0;\n";
+    S << Indent(II) << Name << "_fin = 1;\n";
+    END(S);
+    END(S);
+
+    END(S);
+  }
+
+  return S.str();
+}
+
 const std::string BlockModule::declPortControlSignals() const {
   std::stringstream S;
 
@@ -819,22 +877,50 @@ const std::string BlockModule::declPortControlSignals() const {
   for (const storeaccess_p P : Comp.getStores()) {
     Signal SF(getOpName(P)+"_fin", 1, Signal::Local, Signal::Reg);
     S << SF.getDefStr() << ";\n";
+    Signal SR(getOpName(P)+"_running", 1, Signal::Local, Signal::Reg);
+    S << SR.getDefStr() << ";\n";
   }
 
   return S.str();
 }
 
 void BlockModule::schedule(const OperatorInstances &I) {
-  const HW::HWListTy Ops = Comp.getOpsTopologicallySorted();
+  typedef Identifiable::UIDTy UIDTy;
+  typedef std::set<std::pair<UIDTy, UIDTy> > AddedConsTy;
+  AddedConsTy AddedCons;
+
+  // Add additional dependencies between Loads to keep their order and remove
+  // them afterwards.
+  if (PreserveLoadOrder) {
+    StreamPort::LoadListTy LL = Comp.getLoads();
+
+    for (StreamPort::LoadListTy::iterator LI = LL.begin(), LE = LL.end(); LI != LE; ++LI) {
+      if (std::next(LI) == LE) break;
+
+      loadaccess_p This = *LI;
+      loadaccess_p Next = *(std::next(LI));
+
+      if (This->getStream() == Next->getStream()) {
+        AddedCons.insert(std::make_pair(This->getUID(), Next->getUID()));
+        This->addOut(Next);
+        Next->addIn(This);
+      }
+    }
+  }
+
+  HW::HWListTy Ops = Comp.getOpsTopologicallySorted();
 
   for (base_p P : Ops) {
     int MaxPreds = 0;
 
     for (base_p In : P->getIns()) {
+      // Skip all InScalars
+      if (In->getParent().get() != &Comp) continue;
+
       const std::string InName = getOpName(In);
       int InReady = getReadyCycle(InName);
-      assert (InReady != -1 && "Input has no Ready Information");
 
+      // Latency of input operation
       op_p Op = I.getOperatorForHW(InName);
 
       if (Op) {
@@ -858,94 +944,34 @@ void BlockModule::schedule(const OperatorInstances &I) {
 
     CriticalPath = std::max((unsigned) MaxPreds, CriticalPath);
   }
+
+  if (PreserveLoadOrder) {
+    StreamPort::LoadListTy LL = Comp.getLoads();
+
+    for (StreamPort::LoadListTy::iterator LI = LL.begin(), LE = LL.end(); LI != LE; ++LI) {
+      if (std::next(LI) == LE) break;
+
+      loadaccess_p This = *LI;
+      loadaccess_p Next = *(std::next(LI));
+
+      AddedConsTy::iterator I = AddedCons.find(std::make_pair(This->getUID(), Next->getUID()));
+      if (I != AddedCons.end()) {
+        AddedCons.erase(I);
+        This->delOut(Next);
+        Next->delIn(This);
+      }
+    }
+  } 
+
   NDEBUG("Critical path of " << Comp.getUniqueName() << ": " << CriticalPath);
 }
 
-#if 0
-void BlockModule::schedule(const OperatorInstances &I) {
-  // Fill all HW objects in worklist.
-  HW::HWListTy C;
-
-  for (const_p C : Comp.getConstVals()) {
-    ReadyMap[C->getUniqueName()] = 0;
-  }
-
-  for (port_p P : Comp.getInScalars()) {
-    const HW::HWListTy Outs = P->getOuts();
-    C.insert(C.end(), Outs.begin(), Outs.end());
-
-    ReadyMap[P->getUniqueName()] = 0;
-  }
-
-  while (C.size() != 0) {
-    const base_p Curr = C.front();
-    C.erase(C.begin());
-
-    const std::string HWName = Curr->getUniqueName();
-
-    unsigned Max = 0;
-    bool allPredsAvailable=true;
-
-    for (const base_p P : Curr->getIns()) {
-      int InReady = 0;
-      const std::string InName = P->getUniqueName();
-
-      InReady = getReadyCycle(InName);
-      //NDEBUG(InName << " " << InReady);
-
-      if (InReady == -1) {
-        allPredsAvailable = false;
-        break;
-      }
-
-      unsigned InCycles = 0;
-
-      const std::string OpName = getOpName(P);
-
-      op_p Op = I.getOperatorForHW(OpName);
-
-      if (Op) {
-        InCycles = Op->Cycles;
-        //NDEBUG(InName << " takes " << InCycles);
-      } else 
-        InCycles = 0;
-
-      Max = std::max(InReady+InCycles, Max);
-    }
-
-
-    if (allPredsAvailable) {
-      ReadyMap[HWName] = Max;
-
-      op_p Op = I.getOperatorForHW(HWName);
-
-      if (Op) {
-        NDEBUG(Op->Name);
-        Max += Op->Cycles;
-      }
-
-      CriticalPath = std::max(Max, CriticalPath);
-
-      //NDEBUG(HWName << " @ " << Max);
-    } else
-      C.push_back(Curr);
-
-    const HW::HWListTy Outs = Curr->getOuts();
-    C.insert(C.end(), Outs.begin(), Outs.end());
-
-  }
-
-  for (const ReadyMapElemTy &E : ReadyMap) {
-    NDEBUG(E.first << " @ " << E.second);
-  }
-
-  NDEBUG("critical path: " <<  CriticalPath);
-}
-#endif
-
 int BlockModule::getReadyCycle(const std::string OpName) const {
   ReadyMapConstItTy E = ReadyMap.find(OpName);
-  if (E == ReadyMap.end()) return -1;
+
+  assert(E != ReadyMap.end() && "No scheduling information");
+
+  //errs() << OpName << ": " << E->second << "\n";
 
   return E->second;
 }

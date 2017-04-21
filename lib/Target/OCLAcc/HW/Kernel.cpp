@@ -211,6 +211,12 @@ const HW::HWListTy Block::getOpsTopologicallySorted() const {
       }
     }
   }
+
+  NDEBUG("Order of block " << getUniqueName() << ":");
+  for (base_p P : L) {
+    NDEBUG("  " << P->getUniqueName());
+  }
+
   return L;
 }
 
@@ -332,58 +338,6 @@ void Kernel::addStream(streamport_p P) {
 const Kernel::StreamsTy Kernel::getStreams() const { 
   return Streams; 
 }
-
-
-#if 0
-// InStreams
-void Kernel::addInStream(streamport_p P) { 
-  assert(P->getIR() != nullptr);
-  InStreamsMap[P->getIR()] = P;
-  InStreams.push_back(P);
-}
-
-bool Kernel::containsInStreamForValue(const Value *V) {
-  StreamMapTy::const_iterator IT = InStreamsMap.find(V);
-  return IT != InStreamsMap.end();
-}
-
-const Kernel::StreamsTy Kernel::getInStreams() const { 
-  return InStreams; 
-}
-
-// OutStreams
-void Kernel::addOutStream(streamport_p P) { 
-  assert(P->getIR() != nullptr);
-  OutStreamsMap[P->getIR()] = P;
-  OutStreams.push_back(P);
-}
-
-bool Kernel::containsOutStreamForValue(const Value *V) {
-  StreamMapTy::const_iterator IT = OutStreamsMap.find(V);
-  return IT != OutStreamsMap.end();
-}
-
-const Kernel::StreamsTy &Kernel::getOutStreams() const { 
-  return OutStreams;
-}
-
-// InOutStreams
-void Kernel::addInOutStream(streamport_p P) { 
-  assert(P->getIR() != nullptr);
-  InOutStreamsMap[P->getIR()] = P;
-  InOutStreams.push_back(P);
-}
-
-bool Kernel::containsInOutStreamForValue(const Value *V) {
-  StreamMapTy::const_iterator IT = InOutStreamsMap.find(V);
-  return IT != InOutStreamsMap.end();
-}
-
-const Kernel::StreamsTy &Kernel::getInOutStreams() const { 
-  return InOutStreams;
-}
-#endif
-
 
 #ifdef DEBUG_TYPE
 #undef DEBUG_TYPE

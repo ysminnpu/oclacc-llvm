@@ -18,8 +18,16 @@ ScalarPort::ScalarPort(const std::string &Name, unsigned W, const Datatype &T, b
 StreamPort::StreamPort(const std::string &Name, unsigned W, ocl::AddressSpace, const Datatype &T) : Port(Name, W, T) { }
 
 // No inline to break dependency between Stream and StreamAccess
+StreamAccess::StreamAccess(const std::string &Name, unsigned BitWidth, streamindex_p Index) : HW(Name, BitWidth) {
+  Ins.push_back(Index);
+}
+
 streamport_p StreamAccess::getStream() const {
-  return Index->getStream();
+  return getIndex()->getStream();
+}
+
+streamindex_p StreamAccess::getIndex() const {
+  return std::static_pointer_cast<StreamIndex>(Ins[0]);
 }
 
 const StreamPort::AccessListTy StreamPort::getAccessList(block_p HWB) const {
