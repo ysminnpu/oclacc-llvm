@@ -22,6 +22,7 @@ class Arith;
 class FPArith;
 class Mux;
 class BlockModule;
+class KernelModule;
 
 // Quick and dirty set various options for flopoco instances
 namespace conf {
@@ -39,6 +40,7 @@ class Verilog : public DFVisitor {
   private:
     typedef DFVisitor super;
 
+    std::unique_ptr<KernelModule> KM;
     std::unique_ptr<BlockModule> BM;
 
     unsigned II=0;

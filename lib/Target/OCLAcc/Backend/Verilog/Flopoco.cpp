@@ -11,6 +11,7 @@
 #include "Utils.h"
 #include "OperatorInstances.h"
 #include "DesignFiles.h"
+#include "VerilogModule.h"
 
 #define DEBUG_TYPE "flopoco"
 
@@ -24,7 +25,7 @@ ModMapTy ModuleMap;
 } // end ns flopoco
 
 /// \brief Generate modules
-unsigned flopoco::genModule(const std::string Name, const std::string M, DesignFiles &Files) {
+unsigned flopoco::genModule(const std::string Name, const std::string M, BlockModule &BM) {
 
   // check if module already exists and return latency
   ModMapConstItTy MI = ModuleMap.find(Name);
@@ -104,7 +105,7 @@ unsigned flopoco::genModule(const std::string Name, const std::string M, DesignF
   } else
     llvm_unreachable("Invalid flopoco output");
 
-  Files.addFile(FileName);
+  BM.addFile(FileName);
 
   Log->close();
 

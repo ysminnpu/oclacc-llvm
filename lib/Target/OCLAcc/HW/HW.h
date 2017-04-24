@@ -87,6 +87,10 @@ class HW : public Identifiable, public Visitable
     void setIR(const llvm::Value *P) { IR=P; }
 
     virtual const std::string dump(const std::string &Indent="") const;
+    
+    inline virtual bool isFP() const {
+      return false;
+    }
 };
 
 class FPHW : public HW {
@@ -108,6 +112,10 @@ class FPHW : public HW {
     }
     inline unsigned getExponentBitWidth() const {
       return ExponentBitWidth;
+    }
+
+    inline virtual bool isFP() const {
+      return true;
     }
 };
 

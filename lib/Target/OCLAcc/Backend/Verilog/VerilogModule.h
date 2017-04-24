@@ -19,6 +19,12 @@ class OperatorInstances;
 /// \brief Base class to implement Components
 class VerilogModule {
   public:
+    typedef std::list<std::string> FileListTy;
+
+  private:
+    Component &Comp;
+
+    FileListTy Files;
 
   public:
     VerilogModule(Component &);
@@ -28,8 +34,19 @@ class VerilogModule {
 
     const std::string declFooter() const;
 
-  private:
-    Component &Comp;
+    virtual void genTestBench() const;
+
+    inline void addFile(const std::string F) {
+      Files.push_back(F);
+    }
+
+    inline FileListTy &getFiles() {
+      return Files;
+    }
+
+    inline const FileListTy &getFiles() const {
+      return Files;
+    }
 };
 
 /// \brief Implementation of Block
@@ -72,6 +89,8 @@ class BlockModule : public VerilogModule {
     inline int getReadyCycle(base_p P) const {
       return getReadyCycle(P->getUniqueName());
     }
+
+    virtual void genTestBench() const;
 
   private:
     Block &Comp;

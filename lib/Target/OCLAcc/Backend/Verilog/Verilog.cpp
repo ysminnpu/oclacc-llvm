@@ -32,8 +32,6 @@ const std::string conf::to_string(bool B) {
   return B? "true" : "false";
 }
 
-DesignFiles TheFiles;
-
 OperatorInstances TheOps;
 
 // Local Port functions
@@ -66,20 +64,12 @@ Verilog::~Verilog() {
 ///
 int Verilog::visit(DesignUnit &R) {
   VISIT_ONCE(R);
-  std::string TopFilename = "top.v";
-  FileTy FS = openFile(TopFilename);
-
-  TheFiles.addFile(TopFilename);
 
   for (kernel_p K : R.Kernels) {
     K->accept(*this);
   }
 
   // no need to call super::visit, all is done here.
-
-  FS->close();
-
-  TheFiles.write(R.getName()+".do");
 
   return 0;
 }
@@ -93,19 +83,19 @@ int Verilog::visit(Kernel &R) {
   std::string KernelFilename = R.getName()+".v";
   FileTy FS = openFile(KernelFilename);
 
-  TheFiles.addFile(KernelFilename);
+  // Instantiate the Kernel
+  KM = std::make_unique<KernelModule>(R);
+  KM->addFile(KernelFilename);
 
   (*FS) << header();
 
-  // Instantiate the Kernel
-  KernelModule KM(R);
-  (*FS) << KM.declHeader();
+  (*FS) << KM->declHeader();
 
-  (*FS) << KM.declBlockWires();
+  (*FS) << KM->declBlockWires();
 
-  (*FS) << KM.instBlocks();
+  (*FS) << KM->instBlocks();
 
-  (*FS) << KM.declFooter();
+  (*FS) << KM->declFooter();
 
   super::visit(R);
 
@@ -123,9 +113,9 @@ int Verilog::visit(Block &R) {
   // contents. This avoids passing the FS between functions.
   FileTy FS = openFile(Filename);
 
-  TheFiles.addFile(Filename);
-
   BM = std::make_unique<BlockModule>(R);
+
+  BM->addFile(Filename);
 
   (*FS) << header();
 
@@ -171,6 +161,8 @@ int Verilog::visit(Block &R) {
   (*FS) << BM->declBlockComponents();
 
   (*FS) << BM->declFooter();
+
+  BM->genTestBench();
 
   BM = nullptr;
 
@@ -276,7 +268,6 @@ int Verilog::visit(Add &R) {
 
 /// \brief Generate Subtractor.
 ///
-/// TODO: Use adder with negated 2nd operand.
 int Verilog::visit(Sub &R) {
   VISIT_ONCE(R);
 
@@ -286,12 +277,31 @@ int Verilog::visit(Sub &R) {
   return 0;
 }
 
+std::string addRegister(const std::string &RName, unsigned BitWidth, std::stringstream &BS, std::stringstream &BC) {
+  std::string OutName = RName + "_buf";
+
+  Signal SB(OutName, BitWidth, Signal::Local, Signal::Wire);
+  BS << SB.getDefStr() << ";\n";
+
+  unsigned II = 0;
+  BC << "always @(posedge clk)\n";
+  BEGIN(BC);
+  BC << Indent(II) << "if (rst==1)\n";
+  BC << Indent(II+1) << RName << " = '0;\n";
+
+  BC << Indent(II) << "else\n";
+  BC << Indent(II+1) << RName << " = " << RName << "_buf;\n";
+  END(BC);
+
+  return OutName;
+}
+
 int Verilog::visit(Mul &R) {
   VISIT_ONCE(R);
   assert(R.getIns().size() == 2);
 
-  std::stringstream &BlockSignals = BM->getBlockSignals();
-  std::stringstream &BlockComponents = BM->getBlockComponents();
+  std::stringstream &BS = BM->getBlockSignals();
+  std::stringstream &BC = BM->getBlockComponents();
 
   const std::string WX = std::to_string(R.getIn(0)->getBitWidth());
   const std::string WY = std::to_string(R.getIn(1)->getBitWidth());
@@ -310,22 +320,39 @@ int Verilog::visit(Mul &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+  unsigned Latency = flopoco::genModule(Name, FInst.str(), *BM);
+
+  // Latency is typically 0, so add a register to the output.
+
+  std::string OutName = RName;
+
+  BC << "// " << RName << "\n";
+
+  Signal::SignalType OutType = Signal::Wire;
+  if (Latency == 0) {
+    OutType = Signal::Reg;
+    OutName = addRegister(RName, R.getBitWidth(), BS, BC);
+
+    // Latency+1 for the register
+    Latency++;
+  }
+
   TheOps.addOperator(RName, Name, Latency);
 
   // Add output signal
-  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
-  BlockSignals << S.getDefStr() << ";\n";
+  Signal S(RName, R.getBitWidth(), Signal::Local, OutType);
+  BS << S.getDefStr() << ";\n";
 
   // Instantiate component
-  BlockComponents << "// " << RName << "\n";
-  BlockComponents << Name << " " << Name << "_" << RName << "(\n";
-  BlockComponents << Indent(1) << ".clk(clk)," << "\n";
-  BlockComponents << Indent(1) << ".rst(rst)," << "\n";
-  BlockComponents << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
-  BlockComponents << Indent(1) << ".Y(" << getOpName(R.getIn(1)) << ")," << "\n";
-  BlockComponents << Indent(1) << ".R(" << RName << ")" << "\n";
-  BlockComponents << ");\n";
+  BC << Name << " " << Name << "_" << RName << "(\n";
+  BC << Indent(1) << ".clk(clk)," << "\n";
+  BC << Indent(1) << ".rst(rst)," << "\n";
+  BC << Indent(1) << ".X(" << getOpName(R.getIn(0)) << ")," << "\n";
+  BC << Indent(1) << ".Y(" << getOpName(R.getIn(1)) << ")," << "\n";
+  BC << Indent(1) << ".R(" << OutName << ")" << "\n";
+  BC << ");\n";
+
+
 
   super::visit(R);
   return 0;
@@ -358,7 +385,7 @@ int Verilog::visit(FAdd &R) {
   FInst << "name=" << Name << " ";
   FInst << "outputFile=" << Name << ".vhd" << " ";
 
-  unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+  unsigned Latency = flopoco::genModule(Name, FInst.str(), *BM);
   TheOps.addOperator(RName, Name, Latency);
 
   // Add output signal
@@ -430,7 +457,7 @@ int Verilog::visit(FMul &R) {
     FInst << "name=" << Name << " ";
     FInst << "outputFile=" << Name << ".vhd" << " ";
 
-    unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+    unsigned Latency = flopoco::genModule(Name, FInst.str(), *BM);
     TheOps.addOperator(RName, Name, Latency);
 
     // Add output signal
@@ -461,7 +488,7 @@ int Verilog::visit(FMul &R) {
     FInst << "name=" << Name << " ";
     FInst << "outputFile=" << Name << ".vhd" << " ";
 
-    unsigned Latency = flopoco::genModule(Name, FInst.str(), TheFiles);
+    unsigned Latency = flopoco::genModule(Name, FInst.str(), *BM);
     TheOps.addOperator(RName, Name, Latency);
 
     // Add output signal

@@ -3,6 +3,7 @@
 
 
 #include "Signal.h"
+#include "HW/Port.h"
 #include "../../HW/typedefs.h"
 
 

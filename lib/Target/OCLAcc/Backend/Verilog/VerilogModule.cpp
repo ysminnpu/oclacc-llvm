@@ -29,26 +29,14 @@ VerilogModule::VerilogModule(Component &C) : Comp(C) {
 VerilogModule::~VerilogModule() {
 }
 
+void VerilogModule::genTestBench() const {
+}
+
 const std::string VerilogModule::declFooter() const {
   std::stringstream S;
   S << "endmodule " << " // " << Comp.getUniqueName() << "\n";
   return S.str();
 }
-
-
-BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B), CriticalPath(0) {
-  // Clean up Components
-  ConstSignals << "// Constant signals\n";
-
-  BlockSignals << "// Component signals\n";
-
-  BlockAssignments << "// Block assignments\n";
-
-  LocalOperators << "// Local operators\n";
-
-  BlockComponents << "// Component instances\n";
-}
-
 
 KernelModule::KernelModule(Kernel &K) : VerilogModule(K), Comp(K) {
 }
@@ -425,6 +413,20 @@ const std::string KernelModule::instBlocks() const {
 
 // Block
 
+BlockModule::BlockModule(Block &B) : VerilogModule(B), Comp(B), CriticalPath(0) {
+  // Clean up Components
+  ConstSignals << "// Constant signals\n";
+
+  BlockSignals << "// Component signals\n";
+
+  BlockAssignments << "// Block assignments\n";
+
+  LocalOperators << "// Local operators\n";
+
+  BlockComponents << "// Component instances\n";
+}
+
+
 /// \brief Separate functions because StreamPorts have to be instantiated
 /// differently
 const std::string BlockModule::declHeader() const {
@@ -495,7 +497,7 @@ const std::string BlockModule::declFSMSignals() const {
 
 
   S << "// FSM signals\n";
-  S << "localparam state_free=0, state_busy=1, state_wait_output=2, state_wait_store=3, state_wait_load=4" << ";\n";
+  S << "localparam state_free=0, state_busy=1, state_wait_load=2, state_wait_store=3, state_wait_output=4" << ";\n";
 
   // States
   Signal State("state", 3, Signal::Local, Signal::Reg);
@@ -664,6 +666,7 @@ const std::string BlockModule::declFSM() const {
 
 
   // Synchronous next_state
+  S << "//FSM next_state" << "\n";
   S << "always @(posedge clk)" << "\n";
   S << "begin\n";
   // Reset state
@@ -675,6 +678,7 @@ const std::string BlockModule::declFSM() const {
     for (const std::string &N : ScalarInputNames) {
       S << Indent(II) << N << " <= '0;\n";
       S << Indent(II) << N << "_valid <= 0" << ";\n";
+      S << Indent(II) << N << "_ack <= 0" << ";\n";
     }
 
     // Outout buffers and valids
@@ -699,20 +703,6 @@ const std::string BlockModule::declFSM() const {
       S << Indent(II) << N << "_ack <= 0;\n";
     }
 
-    // Reset status signals in state_free
-    S << Indent(II) << "if (state == state_free)\n";
-    BEGIN(S);
-    for (const std::string &N : ScalarInputNames) {
-      S << Indent(II) << N << " <= '0;\n";
-      S << Indent(II) << N << "_valid <= 0;\n";
-    }
-    for (const std::string &N : ScalarOutputNames) {
-      S << Indent(II) << N << " <= '0;\n";
-      S << Indent(II) << N << "_valid <= 0;\n";
-      S << Indent(II) << N << "_fin <= 0;\n";
-    }
-    END(S);
-
     // Allow others to acknowledge an output port in every state except state_free
     S << Indent(II) << "if (state != state_free)\n";
     BEGIN(S);
@@ -726,14 +716,30 @@ const std::string BlockModule::declFSM() const {
     }
     END(S);
 
+    // Reset state after completion
+    S << Indent(II) << "if (next_state == state_free)\n";
+      BEGIN(S);
+      for (const std::string &N : ScalarInputNames) {
+        S << Indent(II) << N << " <= '0;\n";
+        S << Indent(II) << N << "_valid <= 0;\n";
+      }
+      // Reset status signals in state_free
+      for (const std::string &N : ScalarOutputNames) {
+        S << Indent(II) << N << " <= '0;\n";
+        S << Indent(II) << N << "_valid <= 0;\n";
+        S << Indent(II) << N << "_fin <= 0;\n";
+      }
+      END(S);
+
     S << Indent(II) << "case (state)" << "\n";
     S << Indent(II) << "state_free:" << "\n";
       BEGIN(S);
 
       // Buffer Inputs
 
+      // Only set ack for a single cycle and do not wait for state to change
       for (const std::string &N : ScalarInputNames) {
-        S << Indent(II) << "if (" << N << "_unbuf_valid" << ")\n";
+        S << Indent(II) << "if (" << N << "_unbuf_valid == 1 && " << N << "_valid == 0)\n";
         BEGIN(S);
         S << Indent(II) << N << "_ack" << " <= 1;\n";
         S << Indent(II) << N << " <= " << N << "_unbuf;\n";
@@ -901,6 +907,9 @@ const std::string BlockModule::declLoads() const {
 
       S << Indent(II) << "else\n";
         BEGIN(S);
+        // Set signal for a single cycle
+        S << Indent(II) << Name << "_ack = 0;\n";
+
         S << Indent(II) << "if (counter == " << Clk << " && " << Name << "_address_valid == 0)\n";
           BEGIN(S);
           S << Indent(II) << Name << "_address = " << IndexName << ";\n";
@@ -910,6 +919,7 @@ const std::string BlockModule::declLoads() const {
         S << Indent(II) << "if (" << Name << "_address_valid == 1 && " << Name << "_unbuf_valid == 1)\n";
           BEGIN(S);
           S << Indent(II) << Name << " = " << Name << "_unbuf;\n";
+          S << Indent(II) << Name << "_ack = 1;\n";
           S << Indent(II) << Name << "_valid = 1;\n";
           S << Indent(II) << Name << "_address = '0;\n";
           S << Indent(II) << Name << "_address_valid = 0;\n";
@@ -1052,6 +1062,84 @@ int BlockModule::getReadyCycle(const std::string OpName) const {
 
   return E->second;
 }
+
+void BlockModule::genTestBench() const {
+  std::stringstream DoS;
+
+  const std::string BName = Comp.getName();
+  const std::string FileName = BName+"_tb.do";
+
+  FileTy DoFile = openFile(FileName);
+
+  DoS << "# " << BName << " testbench\n";
+  DoS << "# run with 'vsim -do " << FileName << "'\n";
+  DoS << "vlib work\n";
+
+  for (const std::string &S : getFiles()) {
+    if (ends_with(S, ".vhd")) {
+      DoS << "vcom " << S << "\n";
+    } else if (ends_with(S, ".v")) {
+      DoS << "vlog -sv " << S << "\n";
+    } else
+      llvm_unreachable("Invalid filetype");
+  }
+
+  DoS << "vsim -novopt work." << BName << " -t {1 ns}\n";
+
+  // clk and reset
+  DoS << "force /" << BName << "/clk 0 0ns, 1 5ns -r 10ns\n";
+  DoS << "force /" << BName << "/rst 1 0ns, 0 50ns\n";
+
+  unsigned II = 0;
+  // scalar inputs
+  for (const scalarport_p P : Comp.getInScalars()) {
+    if (P->isPipelined()) {
+      // _unbuf, _unbuf_valid
+      if (P->isFP()) {
+        DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf 16#1 60ns\n";
+      }
+      else
+        DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf 16#1234 60ns\n";
+
+      DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf_valid 16#1 60ns\n";
+    } else {
+      DoS << "force /" << BName << "/" << getOpName(P) << " 16#10101 60ns\n";
+    }
+
+    DoS << "when { /" << BName << "/" << getOpName(P) << "_ack==1} {\n";
+    DoS << Indent(++II) << "noforce /" << BName << "/" << getOpName(P) << "_unbuf\n";
+    DoS << Indent(II--) << "force /" << BName << "/" << getOpName(P) << "_unbuf_valid 0\n";
+    DoS << "}\n";
+  }
+  // Load signals
+  for (const loadaccess_p L : Comp.getLoads()) {
+    DoS << "when { /" << BName << "/" << getOpName(L) << "_address_valid==1} {\n";
+    DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(L) << "_unbuf 16#4 30ns\n";
+    DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(L) << "_unbuf_valid 1 30 ns\n";
+    DoS << "}\n";
+
+    DoS << "when { /" << BName << "/" << getOpName(L) << "_ack==1} {\n";
+    DoS << Indent(++II) << "noforce /" << BName << "/" << getOpName(L) << "_unbuf\n";
+    DoS << Indent(II--) << "force /" << BName << "/" << getOpName(L) << "_unbuf_valid 0\n";
+    DoS << "}\n";
+  }
+
+  for (const scalarport_p P : Comp.getOutScalars()) {
+    DoS << "when { /" << BName << "/" << getOpName(P) << "_valid==1} {\n";
+    DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(P) << "_ack 1 20 ns\n";
+    DoS << "}\n";
+  }
+
+  DoS << "add wave -r /" << BName << "/*\n";
+  DoS << "property wave -radix hexadecimal /" << BName << "/*\n";
+
+  DoS << "run 1 us\n";
+  DoS << "seetime work 0\n";
+
+  (*DoFile) << DoS.str();
+  DoFile->close();
+}
+
 
 #ifdef DEBUG_TYPE
 #undef DEBUG_TYPE

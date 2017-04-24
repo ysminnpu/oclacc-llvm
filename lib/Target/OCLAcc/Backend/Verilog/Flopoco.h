@@ -5,8 +5,7 @@
 #include <string>
 
 namespace oclacc {
-class OperatorInstances;
-class DesignFiles;
+class BlockModule;
 } // end ns oclacc
 
 // Flopoco functions
@@ -21,7 +20,7 @@ typedef std::pair<std::string, unsigned> ModMapElem;
 /// \param Name - UniqueName of the HW Object
 /// \param M - Flopoco Module instantiation string
 /// \param F - File collection
-unsigned genModule(const std::string Name, const std::string M, oclacc::DesignFiles &F);
+unsigned genModule(const std::string Name, const std::string M, oclacc::BlockModule &BM);
 
 } // end ns flopoco
 
