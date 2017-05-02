@@ -334,6 +334,12 @@ static int compileModule(char **argv, LLVMContext &Context) {
   if (MN.endswith(".bc") || MN.endswith(".ll"))
     MN = MN.drop_back(3);
 
+  // remove all path parts
+  size_t LastSlash = MN.find_last_of('/');
+  if (LastSlash != MN.npos) {
+    MN = MN.drop_front(LastSlash+1);
+  }
+
   if (!OutputDir.compare("")) 
     OutputDir = MN;
 
@@ -357,7 +363,7 @@ static int compileModule(char **argv, LLVMContext &Context) {
   SmallVector<char, 1024> CD;
   EC = sys::fs::current_path(CD);
   if (EC) {
-    errs() << "Failed to change dir: " << EC.message() << '\n';
+    errs() << "Failed to get current dir: " << EC.message() << '\n';
     return -1;
   }
 
