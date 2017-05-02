@@ -10,6 +10,7 @@
 
 #include "../../HW/Kernel.h"
 
+#include "Flopoco.h"
 #include "Verilog.h"
 #include "VerilogModule.h"
 #include "Naming.h"
@@ -19,7 +20,7 @@
 
 #define DEBUG_TYPE "verilog"
 
-static cl::opt<bool> PreserveLoadOrder("preserve-load-order", cl::init(false), cl::desc("Keep the order of memory loads.") );
+static cl::opt<bool> NoPreserveLoadOrder("no-preserve-load-order", cl::init(false), cl::desc("Keep the order of memory loads.") );
 
 using namespace oclacc;
 
@@ -775,16 +776,6 @@ const std::string BlockModule::declFSM() const {
             END(S);
         }
 
-#if 0
-        for (streamindex_p SI : Comp.getStaticOutStreamIndices()) {
-          assert(SI->getIns().size() == 1);
-
-          base_p Val = SI->getIn(0);
-          const std::string Name = getOpName(Val);
-          unsigned C = getReadyCycle(Name);
-        }
-#endif
-
       END(S);
     
     S << Indent(II) << "state_wait_output:" << "\n";
@@ -801,6 +792,9 @@ const std::string BlockModule::declFSM() const {
 
 
     S << Indent(II) << "endcase" << "\n";
+
+    S << Indent(II) << "// Reset counter\n";
+    S << Indent(II) << "if (next_state == state_free) counter <= '0;\n";
     END(S);
   END(S);
 
@@ -978,7 +972,7 @@ void BlockModule::schedule(const OperatorInstances &I) {
 
   // Add additional dependencies between Loads to keep their order and remove
   // them afterwards.
-  if (PreserveLoadOrder) {
+  if (!NoPreserveLoadOrder) {
     StreamPort::LoadListTy LL = Comp.getLoads();
 
     for (StreamPort::LoadListTy::iterator LI = LL.begin(), LE = LL.end(); LI != LE; ++LI) {
@@ -1032,7 +1026,7 @@ void BlockModule::schedule(const OperatorInstances &I) {
     CriticalPath = std::max((unsigned) MaxPreds, CriticalPath);
   }
 
-  if (PreserveLoadOrder) {
+  if (!NoPreserveLoadOrder) {
     StreamPort::LoadListTy LL = Comp.getLoads();
 
     for (StreamPort::LoadListTy::iterator LI = LL.begin(), LE = LL.end(); LI != LE; ++LI) {
@@ -1095,32 +1089,38 @@ void BlockModule::genTestBench() const {
   for (const scalarport_p P : Comp.getInScalars()) {
     if (P->isPipelined()) {
       // _unbuf, _unbuf_valid
-      if (P->isFP()) {
-        DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf 16#1 60ns\n";
-      }
+      if (P->isFP())
+        DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf 2#" << flopoco::convert(0.5, 8, 23) << " 60ns\n";
       else
-        DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf 16#1234 60ns\n";
+        DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf 6#1 60ns\n";
 
       DoS << "force /" << BName << "/" << getOpName(P) << "_unbuf_valid 16#1 60ns\n";
-    } else {
-      DoS << "force /" << BName << "/" << getOpName(P) << " 16#10101 60ns\n";
-    }
 
-    DoS << "when { /" << BName << "/" << getOpName(P) << "_ack==1} {\n";
-    DoS << Indent(++II) << "noforce /" << BName << "/" << getOpName(P) << "_unbuf\n";
-    DoS << Indent(II--) << "force /" << BName << "/" << getOpName(P) << "_unbuf_valid 0\n";
-    DoS << "}\n";
+      DoS << "when { /" << BName << "/" << getOpName(P) << "_ack==1} {\n";
+      DoS << Indent(++II) << "noforce /" << BName << "/" << getOpName(P) << "_unbuf\n";
+      DoS << Indent(II--) << "force /" << BName << "/" << getOpName(P) << "_unbuf_valid 0\n";
+      DoS << "}\n";
+    } else {
+      if (P->isFP())
+        DoS << "force /" << BName << "/" << getOpName(P) << " 2#" << flopoco::convert(0.5, 8, 23) << "\n";
+      else
+        DoS << "force /" << BName << "/" << getOpName(P) << " 16#1\n";
+    }
   }
   // Load signals
   for (const loadaccess_p L : Comp.getLoads()) {
     DoS << "when { /" << BName << "/" << getOpName(L) << "_address_valid==1} {\n";
-    DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(L) << "_unbuf 16#4 30ns\n";
-    DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(L) << "_unbuf_valid 1 30 ns\n";
+    if (L->getStream()->isFP())
+      DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(L) << "_unbuf 2#" << flopoco::convert(0.5, 8, 23) << " 30ns\n";
+    else
+      DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(L) << "_unbuf 16#4 30ns\n";
+
+    DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(L) << "_unbuf_valid 1 30ns\n";
     DoS << "}\n";
 
     DoS << "when { /" << BName << "/" << getOpName(L) << "_ack==1} {\n";
-    DoS << Indent(++II) << "noforce /" << BName << "/" << getOpName(L) << "_unbuf\n";
-    DoS << Indent(II--) << "force /" << BName << "/" << getOpName(L) << "_unbuf_valid 0\n";
+    DoS << Indent(++II) << "force /" << BName << "/" << getOpName(L) << "_unbuf 0 15ns\n";
+    DoS << Indent(II--) << "force /" << BName << "/" << getOpName(L) << "_unbuf_valid 0 15ns\n";
     DoS << "}\n";
   }
 

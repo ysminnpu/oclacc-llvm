@@ -1,7 +1,3 @@
-#include "llvm/Support/ErrorHandling.h"
-#include "llvm/Support/Debug.h"
-#include "llvm/Support/FileSystem.h"
-
 #include <string>
 #include <sstream>
 #include <regex>
@@ -31,18 +27,7 @@ unsigned flopoco::genModule(const std::string Name, const std::string M, BlockMo
   ModMapConstItTy MI = ModuleMap.find(Name);
   if (MI != ModuleMap.end()) return MI->second;
 
-
-  char *P = std::getenv("FLOPOCO");
-  if (!P)
-    llvm_unreachable("$FLOPOCO not set");
-
-  std::string Path(P);
- 
-  if (! sys::fs::can_execute(P))
-    llvm_unreachable("Cannot execute $FLOPOCO");
-
-  FileTy Log = openFile("flopoco.log");
-
+  std::string Path = getFPExPath("flopoco"); 
 
   std::stringstream CS;
   CS << Path << " target=" << "Stratix5";
@@ -53,28 +38,7 @@ unsigned flopoco::genModule(const std::string Name, const std::string M, BlockMo
 
   NDEBUG(CS.str());
 
-  (*Log) << "[exec] " << CS.str() << "\n";
-
-  std::array<char, 128> buffer;
-  std::string Result;
-  FILE* Pipe = popen(CS.str().c_str(), "r");
-
-  if (!Pipe)
-    llvm_unreachable("popen() $FLOPOCO failed");
-
-  while (!feof(Pipe)) {
-    if (fgets(buffer.data(), 128, Pipe) != NULL)
-      Result += buffer.data();
-  }
-
-
-  if (int R = pclose(Pipe))
-    llvm_unreachable("Returned nonzero");
-
-  (*Log) << Result;
-  (*Log) << "\n";
-  Log->flush();
-
+  const std::string Result = execute(CS.str());
 
   // Extract FileName from Command; Pattern: outputFile=<name>
   std::regex RgxFileName("(?:outputFile=)\\S+(?= )");
@@ -107,13 +71,28 @@ unsigned flopoco::genModule(const std::string Name, const std::string M, BlockMo
 
   BM.addFile(FileName);
 
-  Log->close();
-
   ModuleMap[Name] = Latency;
 
   NDEBUG("Latency of " << Name << ": " << Latency << " clock cycles");
 
   return Latency;
+}
+
+std::string flopoco::convert(float V, unsigned MantissaBitWidth, unsigned ExponentBitwidth) {
+
+  std::string Path = getFPExPath("fp2bin"); 
+
+  std::stringstream CS;
+  CS << Path << " " << MantissaBitWidth << " " << ExponentBitwidth << " " << V;
+
+  NDEBUG(CS.str());
+
+  std::string Result = execute(CS.str());
+
+  if (Result[Result.length()-1] == '\n')
+    Result = Result.erase(Result.length()-1);
+
+  return Result;
 }
 
 #ifdef DEBUG_TYPE
