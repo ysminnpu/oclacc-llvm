@@ -21,7 +21,7 @@ using namespace llvm;
 // If this option is set (to true) the barrier function call will seperated into
 // its own block (besides the terminator). If it is unset (false) the call will
 // be the last instruction before the terminator.
-cl::opt<bool> SplitIntoOwnBlock("seperatebarriers", cl::desc("Move barrier function calls into their own blocks."), cl::Optional, cl::init(false));
+cl::opt<bool> SplitIntoOwnBlock("seperatebarriers", cl::desc("Move barrier function calls into their own blocks."), cl::Optional, cl::init(true));
 
 STATISTIC(StatsNumBarriersSeen, "Number of found barrier function calls.");
 STATISTIC(StatsNumBlocksCreated, "Number of created blocks.");

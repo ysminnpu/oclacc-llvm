@@ -230,16 +230,6 @@ class Kernel : public Component {
     BlocksTy Blocks;
 
     StreamsTy Streams;
-#if 0
-    StreamsTy InStreams;
-    StreamMapTy InStreamsMap;
-
-    StreamsTy OutStreams;
-    StreamMapTy OutStreamsMap;
-
-    StreamsTy InOutStreams;
-    StreamMapTy InOutStreamsMap;
-#endif
 
   public:
 
@@ -261,31 +251,10 @@ class Kernel : public Component {
     bool isWorkItem() const;
 
     void addStream(streamport_p);
-    const StreamsTy getStreams() const;
 
-#if 0
-
-    // InStreams
-    void addInStream(streamport_p);
-
-    bool containsInStreamForValue(const Value *);
-
-    const StreamsTy getInStreams() const;
-
-    // OutStreams
-    void addOutStream(streamport_p);
-
-    bool containsOutStreamForValue(const Value *);
-
-    const StreamsTy &getOutStreams() const;
-    
-    // InOutStreams
-    void addInOutStream(streamport_p);
-
-    bool containsInOutStreamForValue(const Value *);
-    
-    const StreamsTy &getInOutStreams() const;
-#endif
+    inline const StreamsTy getStreams() const {
+      return Streams; 
+    }
 
     // Unified access
     virtual const PortsTy getOuts(void) const;

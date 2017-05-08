@@ -335,10 +335,6 @@ void Kernel::addStream(streamport_p P) {
   Streams.push_back(P);
 }
 
-const Kernel::StreamsTy Kernel::getStreams() const { 
-  return Streams; 
-}
-
 #ifdef DEBUG_TYPE
 #undef DEBUG_TYPE
 #endif

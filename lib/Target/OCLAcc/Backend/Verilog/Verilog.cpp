@@ -21,6 +21,7 @@
 #include "OperatorInstances.h"
 #include "DesignFiles.h"
 #include "Flopoco.h"
+#include "BramArbiter.h"
 
 
 #define DEBUG_TYPE "verilog"
@@ -65,7 +66,47 @@ Verilog::~Verilog() {
 int Verilog::visit(DesignUnit &R) {
   VISIT_ONCE(R);
 
-  for (kernel_p K : R.Kernels) {
+  unsigned II = 0;
+
+  std::string Filename = "top.v";
+  FileTy FS = openFile(Filename);
+
+  std::stringstream SS;
+
+  SS << header();
+  std::string Linebreak = "";
+
+  SS << "module top(\n";
+  for (const Signal &P : getSignals(R)) {
+    SS << Linebreak << I(1) << P.getDefStr();
+    Linebreak = ",\n";
+  }
+
+  SS << "\n" << ");\n";
+
+  // instantiate Kernels
+  for (kernel_p K : R.getKernels()) {
+    Signal::SignalListTy Ports = getSignals(K);
+
+    // Block instance name
+    SS << K->getName() << " " << K->getUniqueName() << "(\n";
+
+    Linebreak = "";
+    for (const Signal &P : Ports) {
+      const std::string PName = P.Name;
+
+      SS << Linebreak << I(1) << "." << PName << "(" << PName << ")";
+      Linebreak = ",\n";
+    }
+
+    SS << "\n" << ");\n";
+  }
+
+  (*FS) << SS.str();
+
+  FS->close();
+
+  for (kernel_p K : R.getKernels()) {
     K->accept(*this);
   }
 
@@ -94,6 +135,12 @@ int Verilog::visit(Kernel &R) {
   (*FS) << KM->declBlockWires();
 
   (*FS) << KM->instBlocks();
+
+  // Local memory
+  for (streamport_p P : R.getStreams()) {
+    if (P->getAddressSpace() == ocl::AS_LOCAL)
+      (*FS) << ip::declBramArbiter(P);
+  }
 
   (*FS) << KM->declFooter();
 

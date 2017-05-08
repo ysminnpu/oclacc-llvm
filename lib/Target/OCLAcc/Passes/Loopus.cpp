@@ -4,7 +4,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/Transforms/Loopus.h"
+#include "OCLAccPasses.h"
 #include "llvm-c/Initialization.h"
 #include "llvm/Analysis/Passes.h"
 #include "llvm/IR/Verifier.h"

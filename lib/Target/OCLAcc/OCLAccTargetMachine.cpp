@@ -1,10 +1,9 @@
 #include "OCLAccTargetMachine.h"
 
+#include "OCLAccPasses.h"
 #include "Backend/Vhdl/VhdlTargetMachine.h"
 #include "Backend/Verilog/VerilogTargetMachine.h"
 #include "Backend/Dot/DotTargetMachine.h"
-
-#include "llvm/Transforms/Loopus.h"
 
 #include "llvm/PassManager.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -64,6 +63,10 @@ bool OCLAccTargetMachine::addPassesToEmitFile(PassManagerBase &PM,
   PM.add(createInstructionNamerPass());
   // Rename values like 'ir.cond3' which result in problems when used in HDL
   PM.add(createRenameInvalidPass());
+  PM.add(createHDLPromoteIDPass());
+  PM.add(createSplitBarrierBlocksPass());
+
+  PM.add(createPrintModulePass());
 
   return false;
 }

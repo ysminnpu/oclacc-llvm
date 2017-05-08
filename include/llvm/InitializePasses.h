@@ -84,6 +84,7 @@ void initializeCanonicalizePredecessorsPass(PassRegistry&);
 void initializeCFGOptimizerPass(PassRegistry&);
 void initializeFindAllPathsPass(PassRegistry&);
 void initializeRenameInvalidPass(PassRegistry&);
+void initializePrintModulePass(PassRegistry&);
 
 /// XXX: Direct initialization functions for OCLAcc passes
 void initializeOCLAccHWPass(PassRegistry&);

@@ -10,6 +10,7 @@ add_llvm_target(OCLAccCodeGen
   Utils.cpp
   )
 
+add_subdirectory(Passes)
 add_subdirectory(TargetInfo)
 add_subdirectory(Backend)
 add_subdirectory(HW)

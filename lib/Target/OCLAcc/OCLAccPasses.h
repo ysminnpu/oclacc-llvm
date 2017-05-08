@@ -4,8 +4,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TRANSFORMS_LOOPUS_H
-#define LLVM_TRANSFORMS_LOOPUS_H
+#ifndef OCLACCPASSES_H
+#define OCLACCPASSES_H
 
 namespace llvm {
 class BasicBlock;
@@ -110,6 +110,8 @@ Pass* createCFGOptimizerPass();
 
 Pass* createRenameInvalidPass();
 
+Pass *createPrintModulePass();
+
 } // End llvm namespace
 
-#endif
+#endif /* OCLACCPASSES_H */

@@ -21,7 +21,6 @@
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/PassManager.h"
-#include "llvm/IR/IRPrintingPasses.h"
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCSubtargetInfo.h"
@@ -34,12 +33,13 @@
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/TargetRegistry.h"
 
-#include "llvm/Transforms/Loopus.h"
-#include "../../../lib/Transforms/Loopus/OpenCLMDKernels.h"
-#include "../../../lib/Transforms/Loopus/HDLPromoteID.h"
-#include "../../../lib/Transforms/Loopus/ArgPromotionTracker.h"
-#include "../../../lib/Transforms/Loopus/BitWidthAnalysis.h"
-#include "../../../lib/Transforms/Loopus/FindAllPaths.h"
+#include "OCLAccPasses.h"
+#include "Passes/OpenCLMDKernels.h"
+#include "Passes/HDLPromoteID.h"
+#include "Passes/ArgPromotionTracker.h"
+#include "Passes/BitWidthAnalysis.h"
+#include "Passes/FindAllPaths.h"
+#include "Passes/SplitBarrierBlocks.h"
 
 #include <algorithm>
 #include <cctype>
@@ -97,9 +97,9 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
 static cl::opt<bool> CfgDot("cfg-dot", cl::desc("Write Dot CFG"), cl::init(false));
 
 INITIALIZE_PASS_BEGIN(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
-INITIALIZE_PASS_DEPENDENCY(HDLPromoteID);
 INITIALIZE_PASS_DEPENDENCY(ArgPromotionTracker);
 INITIALIZE_PASS_DEPENDENCY(OpenCLMDKernels);
+
 INITIALIZE_PASS_DEPENDENCY(BitWidthAnalysis);
 INITIALIZE_PASS_DEPENDENCY(FindAllPaths);
 INITIALIZE_PASS_END(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
@@ -128,11 +128,16 @@ bool OCLAccHW::doFinalization(Module &M) {
 }
 
 void OCLAccHW::getAnalysisUsage(AnalysisUsage &AU) const {
-  AU.addRequired<HDLPromoteID>();
+
   AU.addRequired<ArgPromotionTracker>();
   AU.addRequired<OpenCLMDKernels>();
+
+
+  // Analysis
   AU.addRequired<BitWidthAnalysis>();
   AU.addRequired<FindAllPaths>();
+
+  AU.setPreservesAll();
 }
 
 void OCLAccHW::createMakefile() {
@@ -181,17 +186,38 @@ bool OCLAccHW::runOnModule(Module &M) {
 
   HWDesign.setName(ModuleName);
 
-  {
-    // Print current state of optimization
-    std::error_code EC;
-    std::string FileName = ModuleName+".final.ll";
-    raw_fd_ostream File(FileName, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
-    if (EC) {
-      errs() << "Failed to create " << FileName << "(" << __LINE__ << "): " << EC.message() << "\n";
-      return -1;
+  // Allocate global arrays (OpenCL Local)
+  for (const GlobalVariable &G : M.getGlobalList()) {
+    const PointerType *T = G.getType();
+    const Type *AT = T->getArrayElementType();
+
+    const std::string Name = G.getName();
+
+    ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(T->getAddressSpace());
+    assert(AS == ocl::AS_LOCAL);
+
+    uint64_t Length = AT->getArrayNumElements();
+    const Type *ST = AT->getArrayElementType();
+
+    const Datatype D = getDatatype(ST);
+
+    streamport_p S = makeHW<StreamPort>(&G, Name, T->getScalarSizeInBits(), AS, D, Length);
+
+    //Add the Stream to the Kernel and all BasicBlocks using it.
+    std::set<const BasicBlock *> Blocks;
+    for (const Use &U : G.uses()) {
+      if (const  Instruction *I = dyn_cast<Instruction>(U.getUser())) {
+        errs() << "Instruction " << I->getName() << " uses " << Name << "\n";
+        const BasicBlock *IBB = I->getParent();
+        const Function *IF = IBB->getParent();
+
+        Blocks.insert(IBB);
+      }
     }
-    PrintModulePass PrintPass(File);
-    PrintPass.run(M);
+    for (const BasicBlock *BB : Blocks) {
+      BlockValueMap[BB][&G] = S;
+      errs() << "Add " << Name << " to BB " << BB->getName() << "\n";
+    }
   }
 
   // Process all kernel functions
@@ -541,7 +567,6 @@ void OCLAccHW::handleArgument(const Argument &A) {
   const BasicBlock *EB = &(F->getEntryBlock());
   block_p HWEB = getBlock(EB);
 
-  // TODO Use BitWdith Analysis
   BitWidthAnalysis &BW = getAnalysis<BitWidthAnalysis>(const_cast<Function &>(*F));
   std::pair<int, Loopus::ExtKind> W = BW.getBitWidth(&A);
   unsigned Bits = W.first;
@@ -592,68 +617,15 @@ void OCLAccHW::handleArgument(const Argument &A) {
         assert(0 && "Invalid AddressSpace");
     }
 
-    // Walk through use list and collect Load/Store/GEP Instructions using it
-#if 0
-    std::list<const Value *> Values;
-    for (const auto &Inst : A.uses() ) {
-      Values.push_back(Inst.getUser());
-    }
+    const Type *ElementType   = AType->getPointerElementType();
 
-    while (! Values.empty()) {
-      const Value *CurrVal = Values.back();
-      Values.pop_back();
+    const Datatype D = getDatatype(ElementType);
+    streamport_p S = makeHW<StreamPort>(&A, Name, Bits, static_cast<ocl::AddressSpace>(AS), D);
+    ArgMap[&A] = S;
+    S->setParent(HWKernel);
 
-      if (const StoreInst *I = dyn_cast<StoreInst>(CurrVal)) {
-        isWritten = true;
-        ArgStreamWrites[I->getParent()].push_back(&A);
-      }
-      else if (const LoadInst *I = dyn_cast<LoadInst>(CurrVal)) {
-        isRead = true;
-        ArgStreamReads[I->getParent()].push_back(&A);
-      }
-      else if (const GetElementPtrInst *I = dyn_cast<GetElementPtrInst>(CurrVal)) {
-        for ( auto &Inst : CurrVal->uses() ) {
-          Values.push_back(Inst.getUser());
-        }
-      } else {
-        CurrVal->dump();
-        llvm_unreachable("Invalid use of ptr operand.");
-      }
-    }
-
-
-    if (!isWritten && !isRead)
-      DEBUG(dbgs() << "omitting unused Argument " << A.getName() << "\n");
-    else {
-#endif
-      const Type *ElementType   = AType->getPointerElementType();
-
-      const Datatype D = getDatatype(ElementType);
-      streamport_p S = makeHW<StreamPort>(&A, Name, Bits, static_cast<ocl::AddressSpace>(AS), D);
-      ArgMap[&A] = S;
-      S->setParent(HWKernel);
-
-      HWKernel->addStream(S);
-#if 0
-      if (isRead && isWritten) {
-        HWKernel->addInOutStream(S);
-        DEBUG(dbgs() << "Argument '" << Name << "' is InOutStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
-      } else if (!isRead && isWritten) {
-        HWKernel->addOutStream(S);
-        DEBUG(dbgs() << "Argument '" << Name << "' is OutStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
-      } else if (isRead && !isWritten) {
-        HWKernel->addInStream(S);
-        DEBUG(dbgs() << "Argument '" << Name << "' is InStream (" << Strings_Datatype[D] << ":" <<  Bits << ")\n");
-      } else {
-        llvm_unreachable("Stream not used");
-      }
-#endif
-    }
-#if 0
+    HWKernel->addStream(S);
   }
-  else
-    llvm_unreachable("Unknown Argument Type");
-#endif
 }
 
 //////////////////////////////////////////////////////////////////////////////

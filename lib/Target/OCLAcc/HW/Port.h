@@ -131,8 +131,12 @@ class StreamPort : public Port {
   private:
     AccessListTy AccessList;
 
+    ocl::AddressSpace AddressSpace;
+
+    unsigned Length;
+
   public:
-    StreamPort(const std::string &Name, unsigned BitWidth, ocl::AddressSpace, const Datatype &T);
+    StreamPort(const std::string &Name, unsigned BitWidth, ocl::AddressSpace, const Datatype &T, unsigned Length = 0);
 
     DECLARE_VISIT;
 
@@ -140,8 +144,20 @@ class StreamPort : public Port {
       return false;
     }
 
+    inline void setLength(unsigned L) {
+      Length = L;
+    }
+
+    inline unsigned getLength() {
+      return Length;
+    }
+
     inline const AccessListTy &getAccessList() const {
       return AccessList;
+    }
+
+    inline ocl::AddressSpace getAddressSpace() const {
+      return AddressSpace;
     }
 
     const AccessListTy getAccessList(block_p HWB) const;

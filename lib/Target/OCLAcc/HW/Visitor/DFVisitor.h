@@ -165,7 +165,7 @@ class DFVisitor : public BaseVisitor
     virtual int visit(DesignUnit &R) override {
       DEBUG_FUNC;
 
-      for ( kernel_p p : R.Kernels ) {
+      for ( kernel_p p : R.getKernels() ) {
         p->accept(*this);
       }
 

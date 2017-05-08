@@ -9,6 +9,8 @@
 
 namespace oclacc {
 
+class DesignUnit;
+
 /// \brief Return the name used to connect a component to the component
 /// generating the signal.
 ///
@@ -23,18 +25,28 @@ const std::string getOpName(const base_p P);
 const std::string getOpName(const HW &R);
 const std::string getOpName(const ConstVal &R);
 const std::string getOpName(const StreamAccess &R);
-//const std::string getOpName(const ScalarPort &R);
+
+const Signal::SignalListTy getSignals(const DesignUnit &);
 
 // Components
-const Signal::SignalListTy getSignals(const block_p);
-const Signal::SignalListTy getSignals(const Block &);
 
-const Signal::SignalListTy getSignals(const kernel_p);
+const Signal::SignalListTy getSignals(const Block &);
+inline const Signal::SignalListTy getSignals(const block_p P) {
+  return getSignals(*P);
+}
+
 const Signal::SignalListTy getSignals(const Kernel &);
+inline const Signal::SignalListTy getSignals(const kernel_p P) {
+  return getSignals(*P);
+}
+
 
 // Streams
-const Signal::SignalListTy getSignals(const streamport_p);
 const Signal::SignalListTy getSignals(const StreamPort &);
+inline const Signal::SignalListTy getSignals(const streamport_p P) {
+  return getSignals(*P);
+}
+
 
 const std::string createPortList(const Signal::SignalListTy &);
 
@@ -71,26 +83,10 @@ inline const Signal::SignalListTy getSignals(const StreamAccess &R) {
   if (R.isLoad()) return getSignals(static_cast<const LoadAccess &>(R));
   else return getSignals(static_cast<const StoreAccess &>(R));
 }
+
 inline const Signal::SignalListTy getSignals(const streamaccess_p P) {
   return getSignals(*P);
 }
-#if 0
-const Signal::SignalListTy getInSignals(const streamindex_p);
-const Signal::SignalListTy getOutSignals(const streamindex_p);
-
-const Signal::SignalListTy getInSignals(const staticstreamindex_p);
-const Signal::SignalListTy getInSignals(const StaticStreamIndex &);
-
-const Signal::SignalListTy getOutSignals(const staticstreamindex_p);
-const Signal::SignalListTy getOutSignals(const StaticStreamIndex &);
-
-const Signal::SignalListTy getInSignals(const dynamicstreamindex_p);
-const Signal::SignalListTy getInSignals(const DynamicStreamIndex &);
-
-const Signal::SignalListTy getOutSignals(const dynamicstreamindex_p);
-const Signal::SignalListTy getOutSignals(const DynamicStreamIndex &);
-#endif
-
 } // end ns oclacc
 
 #endif /* NAMING_H */

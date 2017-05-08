@@ -112,8 +112,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
       // A single Constant value might be used by
       // multiple instructions, leading to conflicts in the Map.
-      if (isa<Constant>(IR))
-        llvm_unreachable("Do not use makeHW to create constants.");
+      assert(! isa<ConstantInt>(IR) && !isa<ConstantFP>(IR) && "Do not use makeHW to create constants.");
 
       std::shared_ptr<HW> HWP = std::make_shared<HW>(args...);
       HWP->setIR(IR);

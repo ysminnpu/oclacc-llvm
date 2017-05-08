@@ -9,7 +9,7 @@
 ;===------------------------------------------------------------------------===;
 
 [common]
-subdirectories = TargetInfo HW Backend
+subdirectories = TargetInfo HW Backend Passes
 
 [component_0]
 type = TargetGroup
@@ -20,5 +20,5 @@ parent = Target
 type = Library
 name = OCLAccCodeGen
 parent = OCLAcc
-required_libraries = Core Support Target Loopus
+required_libraries = Core Support Target OCLAccPasses
 add_to_library_groups = OCLAcc

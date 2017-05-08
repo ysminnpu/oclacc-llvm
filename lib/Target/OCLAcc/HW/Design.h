@@ -13,7 +13,12 @@ namespace oclacc {
 class DesignUnit : public Identifiable, public Visitable
 {
   public:
-    std::vector<kernel_p> Kernels;
+    typedef std::vector<kernel_p> KernelListTy;
+
+  private:
+    KernelListTy Kernels;
+
+  public:
 
     DesignUnit();
     DesignUnit(const std::string &Name);
@@ -21,6 +26,10 @@ class DesignUnit : public Identifiable, public Visitable
     DesignUnit &operator =(const DesignUnit &) = delete;
 
     void addKernel(kernel_p Kernel);
+
+    inline const KernelListTy &getKernels() const {
+      return Kernels;
+    }
 
     DECLARE_VISIT
 };

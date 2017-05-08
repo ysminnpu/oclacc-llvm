@@ -1,4 +1,4 @@
-add_llvm_library(LLVMLoopus
+add_llvm_library(LLVMOCLAccPasses
   Loopus.cpp
   HDLLoopUnroll.cpp
   SimplifyIDCalls.cpp
@@ -21,6 +21,7 @@ add_llvm_library(LLVMLoopus
   CFGOptimizer.cpp
   FindAllPaths.cpp
   RenameInvalid.cpp
+  PrintModule.cpp
 )
 
-add_dependencies(LLVMLoopus intrinsics_gen)
+add_dependencies(LLVMOCLAccPasses intrinsics_gen)
