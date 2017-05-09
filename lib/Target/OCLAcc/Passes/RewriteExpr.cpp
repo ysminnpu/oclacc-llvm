@@ -441,7 +441,7 @@ Value* RewriteExpr::getSineArg(Value *I) {
   CallInst *CI = dyn_cast<CallInst>(I);
   if (CI == nullptr) { return nullptr; }
   if (CI->getNumArgOperands() != 1) { return nullptr; }
-  if (MFN->unmangleName(CI->getCalledFunction()->getName()) != "sin") {
+  if (ocl::NameMangling::unmangleName(CI->getCalledFunction()->getName()) != "sin") {
     return nullptr;
   }
   return CI->getArgOperand(0);
@@ -452,7 +452,7 @@ Value* RewriteExpr::getCosineArg(Value *I) {
   CallInst *CI = dyn_cast<CallInst>(I);
   if (CI == nullptr) { return nullptr; }
   if (CI->getNumArgOperands() != 1) { return nullptr; }
-  if (MFN->unmangleName(CI->getCalledFunction()->getName()) != "cos") {
+  if (ocl::NameMangling::unmangleName(CI->getCalledFunction()->getName()) != "cos") {
     return nullptr;
   }
   return CI->getArgOperand(0);
@@ -515,8 +515,8 @@ bool RewriteExpr::isMulAddMulExpr(Instruction *I, Value **Mul0Op0, Value **Mul0O
   } else if (I->getOpcode() == Instruction::OtherOps::Call) {
     // Now the strange stuff with intrisics with fused multiply-add operations
     CallInst *CI = dyn_cast<CallInst>(I);
-    if ((CI->getCalledFunction()->getName() == MFN->mangleName("fmuladd.f32"))
-     || (CI->getCalledFunction()->getName() == MFN->mangleName("fmuladd.f64"))) {
+    if ((CI->getCalledFunction()->getName() == ocl::NameMangling::mangleName("fmuladd.f32"))
+     || (CI->getCalledFunction()->getName() == ocl::NameMangling::mangleName("fmuladd.f64"))) {
       // We have something like
       // %tmp = fmul %c, %d
       // %result = call @llvm.fmuladd(%a, %b, %tmp)
@@ -551,8 +551,8 @@ bool RewriteExpr::isMulSubMulExpr(Instruction *I, Value **Mul0Op0, Value **Mul0O
   } else if (I->getOpcode() == Instruction::OtherOps::Call) {
     // Now the strange stuff with intrisics with fused multiply-add operations
     CallInst *CI = dyn_cast<CallInst>(I);
-    if ((CI->getCalledFunction()->getName() == MFN->mangleName("fmuladd.f32"))
-     || (CI->getCalledFunction()->getName() == MFN->mangleName("fmuladd.f64"))) {
+    if ((CI->getCalledFunction()->getName() == ocl::NameMangling::mangleName("fmuladd.f32"))
+     || (CI->getCalledFunction()->getName() == ocl::NameMangling::mangleName("fmuladd.f64"))) {
       // We should have something like
       // %tmp = fmul %c, %d
       // %tmp.neg = fsub 0.0, %tmp
@@ -981,7 +981,7 @@ namespace llvm {
 }
 
 RewriteExpr::RewriteExpr(void)
- : FunctionPass(ID), DT(nullptr), MFN(nullptr), OK(nullptr) {
+ : FunctionPass(ID), DT(nullptr), OK(nullptr) {
 }
 
 void RewriteExpr::getAnalysisUsage(AnalysisUsage &AU) const {
@@ -994,10 +994,9 @@ void RewriteExpr::getAnalysisUsage(AnalysisUsage &AU) const {
 
 bool RewriteExpr::runOnFunction(Function &F) {
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
-  MFN = &Loopus::MangledFunctionNames::getInstance();
   OK = &getAnalysis<OpenCLMDKernels>();
 
-  if ((MFN == nullptr) || (OK == nullptr) || (DT == nullptr)) {
+  if ((OK == nullptr) || (DT == nullptr)) {
     return false;
   }
 

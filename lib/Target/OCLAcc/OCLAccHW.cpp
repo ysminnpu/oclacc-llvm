@@ -34,6 +34,7 @@
 #include "llvm/Support/TargetRegistry.h"
 
 #include "OCLAccPasses.h"
+#include "OCL/NameMangling.h"
 #include "Passes/OpenCLMDKernels.h"
 #include "Passes/HDLPromoteID.h"
 #include "Passes/ArgPromotionTracker.h"
@@ -915,8 +916,8 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
 
   // The pointer base can either be a local Array or a input stream
   unsigned BaseAddressSpace = I.getPointerAddressSpace();
-  if ( BaseAddressSpace != ocl::AS_GLOBAL && BaseAddressSpace != ocl::AS_LOCAL )
-    assert(0 &&  "Only global and local address space supported." );
+  assert((BaseAddressSpace == ocl::AS_GLOBAL || BaseAddressSpace == ocl::AS_LOCAL) 
+      && "Only global and local address space supported." );
 
   streamport_p HWBase = getHW<StreamPort>(I.getParent(), BaseValue);
 

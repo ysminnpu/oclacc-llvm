@@ -16,6 +16,7 @@
 #include "HW/Compare.h"
 #include "HW/Design.h"
 #include "HW/Kernel.h"
+#include "HW/Synchronization.h"
 
 //#define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
 #define TYPENAME(x) x.getName()
@@ -266,6 +267,12 @@ class DFVisitor : public BaseVisitor
       DEBUG_FUNC;
 
       return visit(static_cast<StreamIndex &>(R));
+    }
+
+    virtual int visit(Barrier &R) override {
+      DEBUG_FUNC;
+
+      return 0;
     }
 };
 

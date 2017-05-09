@@ -6,7 +6,7 @@
 #include "HDLFlattenCFG.h"
 
 #include "LoopusUtils.h"
-#include "MangledFunctionNames.h"
+#include "OCL/NameMangling.h"
 #include "OpenCLMDKernels.h"
 
 #include "llvm/ADT/PostOrderIterator.h"
@@ -449,8 +449,7 @@ bool Loopus::canExecuteSpeculatively(const Value *V, const DataLayout *DL) {
     if (CI == nullptr) { return false; }
     const Function *calledfunc = CI->getCalledFunction();
     const std::string funcname = calledfunc->getName();
-    const Loopus::MangledFunctionNames &FNames = Loopus::MangledFunctionNames::getInstance();
-    if (FNames.isSynchronizationFunction(funcname) == true) {
+    if (ocl::NameMangling::isSynchronizationFunction(funcname) == true) {
       // The function is a synchronization function and we must not speculate
       // synchronization points
       return false;

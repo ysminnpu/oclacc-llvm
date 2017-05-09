@@ -151,7 +151,7 @@ LoadInst* AggregateLoads::findMatchingLoad(LoadInst* const LD, bool &areReversed
         if (CalledF == nullptr) {
           continue;
         }
-        if (MFN->isSynchronizationFunction(CalledF->getName()) == true) {
+        if (ocl::NameMangling::isSynchronizationFunction(CalledF->getName()) == true) {
           DEBUG(dbgs() << "  Found SYNC barrier: " << *CurCI << " @" << CurCI << "\n");
           return nullptr;
         }
@@ -477,7 +477,7 @@ unsigned AggregateLoads::splitIntoLoadChainChunks(SmallVectorImpl<LoadInst*> &LD
           const CallInst *CurCI = dyn_cast<CallInst>(CurI);
           const Function *CalledF = CurCI->getCalledFunction();
           if ((CalledF != nullptr)
-           && (MFN->isSynchronizationFunction(CalledF->getName()) == true)) {
+           && (ocl::NameMangling::isSynchronizationFunction(CalledF->getName()) == true)) {
               DEBUG(dbgs() << "  Found SYNC barrier: " << *CurCI << " @" << CurCI << "\n"
                            << "  >>Rejecting current element fur current chunk: " << *curElem << " @" << curElem << "\n"
                            << "  >>Creating new chunk!\n");
@@ -859,7 +859,7 @@ namespace llvm {
 
 AggregateLoads::AggregateLoads(void)
  : FunctionPass(ID), LimitToBB(true), AA(nullptr), DL(nullptr), DT(nullptr),
-   LLI(nullptr), MFN(nullptr), SE(nullptr) {
+   LLI(nullptr), SE(nullptr) {
   initializeAggregateLoadsPass(*PassRegistry::getPassRegistry());
 }
 
@@ -880,10 +880,9 @@ bool AggregateLoads::runOnFunction(Function &F) {
   DL = &getAnalysis<DataLayoutPass>().getDataLayout();
   DT = &getAnalysis<DominatorTreeWrapperPass>().getDomTree();
   LLI = &getAnalysis<LoopInfo>();
-  MFN = &Loopus::MangledFunctionNames::getInstance();
   SE = &getAnalysis<ScalarEvolution>();
   if ((AA == nullptr) || (DL == nullptr) || (DT == nullptr) || (LLI == nullptr)
-   || (MFN == nullptr) || (SE == nullptr)) {
+   || (SE == nullptr)) {
     return false;
   }
 

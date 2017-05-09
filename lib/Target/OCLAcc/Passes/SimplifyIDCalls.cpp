@@ -95,7 +95,7 @@ bool SimplifyIDCalls::reduceIDCalls(Function *F) {
 
     // Check that we are calling a workitem function
     const std::string CalledFName = CalledF->getName();
-    if (MFNames->isWorkItemFunction(CalledFName) == false) { continue; }
+    if (ocl::NameMangling::isWorkItemFunction(CalledFName) == false) { continue; }
     // Check that the argument is a constant
     MapKeyTy BIFKey;
     const unsigned NumArgs = CI->getNumArgOperands();
@@ -149,7 +149,7 @@ bool SimplifyIDCalls::replaceConstIDCalls(Function *F) {
     if (CalledF == nullptr) { continue; }
     const std::string CalledFName = CalledF->getName().str();
 
-    if (CalledFName.compare(MFNames->mangleName("get_local_size")) == 0) {
+    if (CalledFName.compare(ocl::NameMangling::mangleName("get_local_size")) == 0) {
       if (CI->getNumArgOperands() != 1) { continue; }
       const ConstantInt *CIArg = dyn_cast<ConstantInt>(CI->getArgOperand(0));
       if (CIArg == nullptr) { continue; }
@@ -162,7 +162,7 @@ bool SimplifyIDCalls::replaceConstIDCalls(Function *F) {
       ++StatsNumCSsReplacedConst;
 
     } else if ((NoNullifyGlobalOffset == false)
-     && (CalledFName.compare(MFNames->mangleName("get_global_offset")) == 0)) {
+     && (CalledFName.compare(ocl::NameMangling::mangleName("get_global_offset")) == 0)) {
       if (CI->getNumArgOperands() != 0) { continue; }
       Constant *ConstZero = ConstantInt::get(
           CalledF->getFunctionType()->getReturnType(), 0, false);
@@ -228,10 +228,10 @@ bool SimplifyIDCalls::replaceAggregateIDCalls(Function *F, Module *M) {
     if (CalledF == nullptr) { continue; }
     const std::string CalledFName = CalledF->getName();
 
-    // const std::string GetGlobIDMFN = MFNames->mangleName("get_global_id");
+    // const std::string GetGlobIDMFN = ocl::NameMangling::mangleName("get_global_id");
 
-    const std::string GetLocLinIDMFN = MFNames->mangleName("get_local_linear_id");
-    const std::string GetGlobLinIDMFN = MFNames->mangleName("get_global_linear_id");
+    const std::string GetLocLinIDMFN = ocl::NameMangling::mangleName("get_local_linear_id");
+    const std::string GetGlobLinIDMFN = ocl::NameMangling::mangleName("get_global_linear_id");
 
     if ((CalledFName.compare(GetLocLinIDMFN) != 0)
      && (CalledFName.compare(GetGlobLinIDMFN) != 0)) {
@@ -244,8 +244,8 @@ bool SimplifyIDCalls::replaceAggregateIDCalls(Function *F, Module *M) {
 
       if (LocLinIDResult == nullptr) {
         // We need these functions: get_local_id, get_local_size
-        const std::string GetLocIDMFN = MFNames->mangleName("get_local_id");
-        const std::string GetLocSizeMFN = MFNames->mangleName("get_local_size");
+        const std::string GetLocIDMFN = ocl::NameMangling::mangleName("get_local_id");
+        const std::string GetLocSizeMFN = ocl::NameMangling::mangleName("get_local_size");
 
         Function *GetLocIDF = M->getFunction(GetLocIDMFN);
         Function *GetLocSizeF = M->getFunction(GetLocSizeMFN);
@@ -356,9 +356,9 @@ bool SimplifyIDCalls::replaceAggregateIDCalls(Function *F, Module *M) {
     } else if (CalledFName.compare(GetGlobLinIDMFN) == 0) {
       if (GlobLinIDResult == nullptr) {
         // We need these functions: get_global_id, get_global_size, get_global_offset
-        const std::string GetGlobIDMFN = MFNames->mangleName("get_global_id");
-        const std::string GetGlobSizeMFN = MFNames->mangleName("get_global_size");
-        const std::string GetGlobOffMFN = MFNames->mangleName("get_global_offset");
+        const std::string GetGlobIDMFN = ocl::NameMangling::mangleName("get_global_id");
+        const std::string GetGlobSizeMFN = ocl::NameMangling::mangleName("get_global_size");
+        const std::string GetGlobOffMFN = ocl::NameMangling::mangleName("get_global_offset");
 
         Function *GetGlobIDF = M->getFunction(GetGlobIDMFN);
         Function *GetGlobSizeF = M->getFunction(GetGlobSizeMFN);
@@ -555,7 +555,7 @@ namespace llvm {
 }
 
 SimplifyIDCalls::SimplifyIDCalls(void)
- : ModulePass(ID), APT(nullptr), MDK(nullptr), MFNames(nullptr) {
+ : ModulePass(ID), APT(nullptr), MDK(nullptr) {
   initializeSimplifyIDCallsPass(*PassRegistry::getPassRegistry());
 }
 
@@ -570,8 +570,7 @@ void SimplifyIDCalls::getAnalysisUsage(AnalysisUsage &AU) const {
 bool SimplifyIDCalls::runOnModule(Module &M) {
   APT = &getAnalysis<ArgPromotionTracker>();
   MDK = &getAnalysis<OpenCLMDKernels>();
-  MFNames = &Loopus::MangledFunctionNames::getInstance();
-  if ((APT == nullptr) || (MDK == nullptr) || (MFNames == nullptr)) {
+  if ((APT == nullptr) || (MDK == nullptr)) {
     return false;
   }
 

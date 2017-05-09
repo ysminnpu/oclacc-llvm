@@ -8,7 +8,7 @@
 #ifndef _LOOPUS_REWRITEEXPR_H_INCLUDE_
 #define _LOOPUS_REWRITEEXPR_H_INCLUDE_
 
-#include "MangledFunctionNames.h"
+#include "OCL/NameMangling.h"
 #include "OpenCLMDKernels.h"
 
 #include "llvm/ADT/APInt.h"
@@ -24,7 +24,6 @@
 class RewriteExpr : public llvm::FunctionPass {
   private:
     llvm::DominatorTree *DT;
-    const Loopus::MangledFunctionNames *MFN;
     const OpenCLMDKernels *OK;
 
     bool isDoubleBinExpr(llvm::Instruction *I, llvm::Value **Mul1Op1,

@@ -7,7 +7,7 @@
 #ifndef _LOOPUS_AGGREGATELOADS_H_INCLUDE_
 #define _LOOPUS_AGGREGATELOADS_H_INCLUDE_
 
-#include "MangledFunctionNames.h"
+#include "OCL/NameMangling.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,7 +31,6 @@ class AggregateLoads : public llvm::FunctionPass {
     const llvm::DataLayout *DL;
     llvm::DominatorTree *DT;
     llvm::LoopInfo *LLI;
-    const Loopus::MangledFunctionNames *MFN;
     llvm::ScalarEvolution *SE;
 
   protected:

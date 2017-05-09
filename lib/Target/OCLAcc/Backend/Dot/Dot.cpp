@@ -17,6 +17,7 @@
 #define C_CONSTVAL   "\"/reds9/4\""
 #define C_FPARITH    "\"/greens9/5\""
 #define C_COMPARE    "\"/blues9/7\""
+#define C_SYNCH      "\"/pigy9/2\""
 using namespace oclacc;
 
 Dot::Dot() : IndentLevel(0) {
@@ -187,7 +188,7 @@ int Dot::visit(IntCompare &R) {
   F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=" << C_COMPARE << ",style=filled,label=\"" << R.getUniqueName() << "\n" << R.getOp() << "\"];\n";
 
   super::visit(R);
-  
+
   for ( base_p p : R.getOuts() ) {
     Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_COMPARE << ",fontcolor=" << C_COMPARE << ",label=" << R.getBitWidth() << "];\n";
   }
@@ -202,60 +203,13 @@ int Dot::visit(FPCompare &R) {
   F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=" << C_COMPARE << ",style=filled,label=\"" << R.getUniqueName() << "\n" << R.getOp() << "\"];\n";
 
   super::visit(R);
-  
+
   for ( base_p p : R.getOuts() ) {
     Conn() << "n" << R.getUID() << " -> " << "n" << p->getUID() << " [color=" << C_COMPARE << ",fontcolor=" << C_COMPARE << ",label=" << R.getBitWidth() << "];\n";
   }
 
   return 0;
 }
-
-#if 0 
-int Dot::visit(Reg &r)
-{
-  VISIT_ONCE(r)
-  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-  F() << "n" << r.getUID() << " [shape=rect,fillcolor=\"/reds9/3\",style=filled,tailport=n,label=\"" << r.getUniqueName() << "\"];" << "\n";
-  super::visit(r);
-
-  for ( base_p p : r.getOuts() ) {
-    F() << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
-  }
-
-  return 0;
-}
-
-int Dot::visit(Ram &r)
-{
-  VISIT_ONCE(r)
-  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-  F() << "n" << r.getUID() << " [shape=box3d,fillcolor=\"/reds9/4\",style=filled,tailport=n,label=\"" << r.getUniqueName() << "\\n" << "W=" << r.getBitWidth() << " D="<< r.D << "\"];" << "\n";
-  super::visit(r);
-
-  for ( base_p p : r.getOuts() ) {
-    F() << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
-  }
-
-  return 0;
-}
-
-int Dot::visit(Fifo &r)
-{
-  VISIT_ONCE(r)
-  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-  F() << "n" << r.getUID() << " [shape=rect,fillcolor=\"/reds9/5\",style=filled,tailport=n,label=\"" << r.getUniqueName() << "\\nD=" << r.D << "\"];" << "\n";
-  super::visit(r);
-
-  for ( base_p p : r.getOuts() ) {
-    F() << "n" << r.getUID() << " -> " << "n" << p->getUID() << ";\n";
-  }
-
-  return 0;
-}
-#endif
 
 int Dot::visit(ConstVal &R) {
   VISIT_ONCE(R)
@@ -284,7 +238,7 @@ int Dot::visit(StreamPort &R) {
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
   // By using invisible edges between separate Loads and Stores to the Port,
-  // they are hierarchically ordered in the graph. 
+  // they are hierarchically ordered in the graph.
 
   // No range-based loop to call std::next()
   const StreamPort::AccessListTy &AL = R.getAccessList();
@@ -334,7 +288,7 @@ int Dot::visit(LoadAccess &R) {
 int Dot::visit(StoreAccess &R) {
   VISIT_ONCE(R);
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
-  
+
   F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\"];\n";
 
   super::visit(R);
@@ -416,7 +370,7 @@ int Dot::visit(ScalarPort &R) {
     // Special handling of Muxers because they use sub-labels to connect their
     // inputs. As Muxers are created from PHINodes, only ScalarInputs may be
     // used as Muxer imput.
-    // 
+    //
     if(!std::dynamic_pointer_cast<Mux>(P)) {
       Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_SCALARPORT << ",fontcolor=" << C_SCALARPORT << ",label=" << R.getBitWidth() << "];\n";
     }
@@ -453,6 +407,16 @@ int Dot::visit(Mux &R) {
   for ( base_p P : R.getOuts() ) {
     Conn() << "n" << R.getUID() << " -> " << "n" << P->getUID() << " [color=" << C_MUX << ",fontcolor=" << C_MUX << ",label=" << R.getBitWidth() << "];\n";
   }
+
+  return 0;
+}
+
+int Dot::visit(Barrier &R) {
+  VISIT_ONCE(R);
+
+  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
+
+  F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=" << C_SYNCH << ",style=filled,label=\"" << R.getUniqueName() << "\"];\n";
 
   return 0;
 }

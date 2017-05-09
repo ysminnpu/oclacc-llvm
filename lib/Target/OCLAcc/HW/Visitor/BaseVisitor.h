@@ -68,6 +68,8 @@ class StreamIndex;
 class DynamicStreamIndex;
 class StaticStreamIndex;
 
+class Barrier;
+
 class BaseVisitor
 {
   private:
@@ -129,6 +131,8 @@ class BaseVisitor
     virtual int visit(StreamIndex & ) = 0;
     virtual int visit(DynamicStreamIndex & ) = 0;
     virtual int visit(StaticStreamIndex & ) = 0;
+
+    virtual int visit(Barrier & ) = 0;
 };
 
 } //ns oclacc

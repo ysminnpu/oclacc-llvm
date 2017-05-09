@@ -5,7 +5,7 @@
 
 #include "HDLPromoteID.h"
 
-#include "MangledFunctionNames.h"
+#include "OCL/NameMangling.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/IR/Constant.h"
@@ -222,13 +222,12 @@ Function* HDLPromoteID::createPromotedFunction(const Function &F,
   for (Function::arg_iterator NPEND = NewF->arg_end(); NPI != NPEND; ++NPI) {
     // Create nice parameter names
     BuiltInFunctionCall &CurrentBIFC = UsedBuiltIns[NPIndex];
-    const Loopus::MangledFunctionNames &FNames = Loopus::MangledFunctionNames::getInstance();
 
     auto BIPBasenameIT = BuiltInFunctionNamesMap.find(CurrentBIFC.CallTarget);
     if (BIPBasenameIT == BuiltInFunctionNamesMap.end()) {
       NPI->setName("promotedparam." + Twine(NPIndex));
     } else {
-      std::string ParamBasenameStr = FNames.unmangleName(BIPBasenameIT->second);
+      std::string ParamBasenameStr = ocl::NameMangling::unmangleName(BIPBasenameIT->second);
       if (CurrentBIFC.hasArg == true) {
         Twine PNameBaseU(ParamBasenameStr + Twine("_"));
         Twine Paramname(PNameBaseU + Twine(CurrentBIFC.ArgValue));

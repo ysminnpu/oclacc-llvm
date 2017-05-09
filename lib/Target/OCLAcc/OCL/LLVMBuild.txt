@@ -17,7 +17,7 @@
 
 [component_0]
 type = Library
-name = OCLAccPasses
+name = OCLAccOCL
 parent = OCLAcc
-library_name = OCLAccPasses
-required_libraries = Analysis Core Support Target TransformUtils OCLAccOCL
+library_name = OCLAccOCL
+;required_libraries = Analysis Core Support Target TransformUtils

@@ -3,7 +3,7 @@
 
 #include "LoopusUtils.h"
 
-#include "MangledFunctionNames.h"
+#include "OCL/NameMangling.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -242,8 +242,7 @@ unsigned Loopus::moveBefore(llvm::Instruction *SourceI, llvm::Instruction *Targe
       } else if (llvm::isa<llvm::CallInst>(CurOp) == true) {
         llvm::CallInst *CurOpCI = llvm::dyn_cast<llvm::CallInst>(CurOp);
         // Check if it is a sync barrier
-        const Loopus::MangledFunctionNames &FNames = Loopus::MangledFunctionNames::getInstance();
-        if (FNames.isSynchronizationFunction(CurOpCI->getCalledFunction()->getName()) == true) {
+        if (ocl::NameMangling::isSynchronizationFunction(CurOpCI->getCalledFunction()->getName()) == true) {
           return 0;
         }
         // Check if it has nouwind and onlyreadsmemory flags

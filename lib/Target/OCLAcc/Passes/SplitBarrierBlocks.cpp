@@ -5,7 +5,7 @@
 
 #include "SplitBarrierBlocks.h"
 
-#include "MangledFunctionNames.h"
+#include "OCL/NameMangling.h"
 
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Casting.h"
@@ -33,8 +33,7 @@ bool SplitBarrierBlocks::isBarrierFunctionCall(const Instruction *I) const {
   const CallInst *CI = dyn_cast<CallInst>(I);
   if (CI == 0) { return false; }
   const std::string funcname = CI->getCalledFunction()->getName();
-  const Loopus::MangledFunctionNames &FNames = Loopus::MangledFunctionNames::getInstance();
-  if (FNames.isSynchronizationFunction(funcname) == true) {
+  if (ocl::NameMangling::isSynchronizationFunction(funcname) == true) {
     return true;
   } else {
     return false;

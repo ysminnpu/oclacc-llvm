@@ -6,7 +6,6 @@ add_llvm_library(LLVMOCLAccPasses
   OpenCLMDKernels.cpp
   HDLInliner.cpp
   HDLFlattenCFG.cpp
-  MangledFunctionNames.cpp
   HardwareModel.cpp
   SplitBarrierBlocks.cpp
   DelayStores.cpp

@@ -22,6 +22,7 @@ class Compare;
 class ConstVal;
 class ScalarPort;
 class StreamPort;
+class Barrier;
 
 class Dot: public DFVisitor {
   private:
@@ -66,6 +67,7 @@ class Dot: public DFVisitor {
     virtual int visit(StaticStreamIndex &);
     virtual int visit(DynamicStreamIndex &);
     virtual int visit(Mux &);
+    virtual int visit(Barrier &);
 };
 
 } // end ns oclacc

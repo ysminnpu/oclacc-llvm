@@ -2,7 +2,6 @@
 #define CONTROL_H
 
 #include <list>
-#include <initializer_list>
 
 #include "HW.h"
 

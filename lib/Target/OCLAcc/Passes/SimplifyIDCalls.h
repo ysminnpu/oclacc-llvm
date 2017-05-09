@@ -8,7 +8,7 @@
 #define _LOOPUS_SIMPLIFYIDCALLS_H_INCLUDE_
 
 #include "ArgPromotionTracker.h"
-#include "MangledFunctionNames.h"
+#include "OCL/NameMangling.h"
 #include "OpenCLMDKernels.h"
 
 #include "llvm/IR/Constant.h"
@@ -21,7 +21,6 @@ class SimplifyIDCalls : public llvm::ModulePass {
   protected:
     ArgPromotionTracker *APT;
     OpenCLMDKernels *MDK;
-    const Loopus::MangledFunctionNames *MFNames;
 
     llvm::ConstantInt* getRequiredWorkGroupSizeConst(const llvm::Function *F,
         unsigned Dimension) const;

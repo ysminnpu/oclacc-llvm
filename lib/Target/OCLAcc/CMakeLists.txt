@@ -8,9 +8,11 @@ add_llvm_target(OCLAccCodeGen
   OCLAccSubtarget.cpp
   OCLAccHW.cpp
   Utils.cpp
+  OCL/NameMangling.cpp
   )
 
 add_subdirectory(Passes)
 add_subdirectory(TargetInfo)
 add_subdirectory(Backend)
 add_subdirectory(HW)
+add_subdirectory(OCL)
