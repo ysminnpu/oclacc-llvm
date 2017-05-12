@@ -41,6 +41,7 @@
 #include "Passes/BitWidthAnalysis.h"
 #include "Passes/FindAllPaths.h"
 #include "Passes/SplitBarrierBlocks.h"
+#include "Passes/HDLLoopUnroll.h"
 
 #include <algorithm>
 #include <cctype>
@@ -56,7 +57,7 @@
 #include "OCLAccHW.h"
 #include "OCLAccTargetMachine.h"
 #include "OCLAccGenSubtargetInfo.inc"
-#include "OpenCLDefines.h"
+#include "OCL/OpenCLDefines.h"
 
 #include "HW/HW.h"
 #include "HW/Arith.h"
@@ -97,6 +98,8 @@ static cl::opt<bool> clRelaxedMath("cl-relaxed-math", cl::init(false), cl::desc(
 
 static cl::opt<bool> CfgDot("cfg-dot", cl::desc("Write Dot CFG"), cl::init(false));
 
+// The TargetMachine enqueues all Transformations from which we do not need any
+// info except from the transformed Module itself.
 INITIALIZE_PASS_BEGIN(OCLAccHW, "oclacc-hw", "Generate OCLAccHW",  false, true)
 INITIALIZE_PASS_DEPENDENCY(ArgPromotionTracker);
 INITIALIZE_PASS_DEPENDENCY(OpenCLMDKernels);
@@ -133,11 +136,11 @@ void OCLAccHW::getAnalysisUsage(AnalysisUsage &AU) const {
   AU.addRequired<ArgPromotionTracker>();
   AU.addRequired<OpenCLMDKernels>();
 
-
   // Analysis
   AU.addRequired<BitWidthAnalysis>();
   AU.addRequired<FindAllPaths>();
 
+  // We do not change the Module any more
   AU.setPreservesAll();
 }
 
@@ -167,6 +170,8 @@ bool OCLAccHW::runOnModule(Module &M) {
 
   const std::string ModuleName = M.getName();
 
+  DL = M.getDataLayout();
+
   createMakefile();
 
   // OpenCL-C 2.0 6.5
@@ -187,38 +192,12 @@ bool OCLAccHW::runOnModule(Module &M) {
 
   HWDesign.setName(ModuleName);
 
-  // Allocate global arrays (OpenCL Local)
+  // Allocate global values (OpenCL Local)
+  // These may be simple variables or (multi-dimensional) arrays. We handle all
+  // similarly to allow uniform handling e.g. of atomic access for all work
+  // items.
   for (const GlobalVariable &G : M.getGlobalList()) {
-    const PointerType *T = G.getType();
-    const Type *AT = T->getArrayElementType();
-
-    const std::string Name = G.getName();
-
-    ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(T->getAddressSpace());
-    assert(AS == ocl::AS_LOCAL);
-
-    uint64_t Length = AT->getArrayNumElements();
-    const Type *ST = AT->getArrayElementType();
-
-    const Datatype D = getDatatype(ST);
-
-    streamport_p S = makeHW<StreamPort>(&G, Name, T->getScalarSizeInBits(), AS, D, Length);
-
-    //Add the Stream to the Kernel and all BasicBlocks using it.
-    std::set<const BasicBlock *> Blocks;
-    for (const Use &U : G.uses()) {
-      if (const  Instruction *I = dyn_cast<Instruction>(U.getUser())) {
-        errs() << "Instruction " << I->getName() << " uses " << Name << "\n";
-        const BasicBlock *IBB = I->getParent();
-        const Function *IF = IBB->getParent();
-
-        Blocks.insert(IBB);
-      }
-    }
-    for (const BasicBlock *BB : Blocks) {
-      BlockValueMap[BB][&G] = S;
-      errs() << "Add " << Name << " to BB " << BB->getName() << "\n";
-    }
+    handleGlobalVariable(G);
   }
 
   // Process all kernel functions
@@ -230,10 +209,7 @@ bool OCLAccHW::runOnModule(Module &M) {
     // We do currently not support loops.
     SmallVector<std::pair<const BasicBlock*,const BasicBlock*>, 32 > Result;
     FindFunctionBackedges(*KF, Result);
-    if (! Result.empty()) {
-      TODO("Handle Loops");
-      assert(0);
-    }
+    assert (Result.empty() && "Handle Loops");
 
     // Print bitwidth of functions
 
@@ -263,6 +239,54 @@ bool OCLAccHW::runOnModule(Module &M) {
   }
 
   return false;
+}
+
+void OCLAccHW::handleGlobalVariable(const GlobalVariable &G) {
+  const std::string Name = G.getName();
+  const PointerType *T = G.getType();
+
+  ocl::AddressSpace AS = static_cast<ocl::AddressSpace>(T->getAddressSpace());
+  assert(AS == ocl::AS_LOCAL);
+
+  Type *ObjTy = T->getElementType();
+
+  uint64_t Length = 1;
+
+  while (true) {
+    SequentialType *ST = dyn_cast<SequentialType>(ObjTy);
+    if (!ST) break;
+
+    // ST may be a Pointer, Vector or Array
+    assert(!isa<PointerType>(ST) && "TODO Global Pointer Arrays");
+    assert(!isa<VectorType>(ST) && "TODO Global Vector Arrays");
+
+    Length *= ST->getArrayNumElements();
+
+    ObjTy = ST->getElementType();
+  }
+
+  // Now ObjTy contains the elementTy, which may be still a structure. No
+  // special handling needed, we just see structs as large scalars here.
+  uint64_t ScalarBitWidth = DL->getTypeAllocSizeInBits(ObjTy);
+
+  ODEBUG("Global " << Name << ": " << Length << "x" << ScalarBitWidth/8 << " Bytes");
+
+  Datatype D = getDatatype(ObjTy);
+
+  streamport_p S = makeHW<StreamPort>(&G, Name, ScalarBitWidth, AS, D, Length);
+
+  //Add the Stream to the Kernel and all BasicBlocks using it.
+  std::set<const BasicBlock *> Blocks;
+  for (const Use &U : G.uses()) {
+    if (const  Instruction *I = dyn_cast<Instruction>(U.getUser())) {
+      const BasicBlock *IBB = I->getParent();
+
+      Blocks.insert(IBB);
+    }
+  }
+  for (const BasicBlock *BB : Blocks) {
+    BlockValueMap[BB][&G] = S;
+  }
 }
 
 /// \brief Create arguments and basicBlocks for each kernel function
@@ -414,7 +438,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     else if (const Argument *A = dyn_cast<Argument>(I))
       DefBB = &(A->getParent()->getEntryBlock());
     else
-      assert(0);
+      assert(0 && "Value not Instruction or Argument");
 
     block_p HWDefBB = getBlock(DefBB);
     base_p HWI = getHW<HW>(DefBB, I);
@@ -428,11 +452,6 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     // If the current Instruction is a PHINode, we only have to find all paths
     // between the Value's definition and the incoming block of the PHINode.
     const FindAllPaths::PathTy &Paths = AP.getPathForValue(DefBB, &BB, I);
-
-#if 0
-    DEBUG(dbgs() << "For Value " << I->getName() << " in Block " << BB.getName() << "\n");
-    DEBUG(FindPaths::dump(Paths, dbgs()));
-#endif
 
     if (IT->isIntegerTy() || IT->isFloatingPointTy()) {
       for (const FindAllPaths::SinglePathTy P : Paths) {
@@ -477,7 +496,7 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
     }
     else if (IT->isPointerTy()) {
       IT->dump();
-      assert(0 && "pointer operand in code. fixme.");
+      assert(0 && "FIXME: Pointer operand in code.");
     }
   }
 
@@ -501,36 +520,6 @@ void OCLAccHW::visitBasicBlock(BasicBlock &BB) {
       continue;
     }
   }
-
-#if 0
-
-  // We try to eliminate the StreamAccess List in Block to keep only a single
-  // one in the STream itself
-
-  // Is the Argument used to read from or write at? The list of read and write
-  // StreamPorts was collected by handleArguments(), when we had to find out, if
-  // we have to create a read or write port for the kernel.
-  //
-  StreamAccessMapIt AReads = ArgStreamReads.find(&BB);
-  StreamAccessMapIt AWrites = ArgStreamWrites.find(&BB);
-
-  if (AReads != ArgStreamReads.end()) {
-    for (const Argument *RA : AReads->second) {
-      if (!HWBB->containsInStreamIndexForValue(RA)) {
-        streamindex_p HWArg = getHW<StreamIndex>(&BB, RA);
-        HWBB->addInStreamIndex(HWArg);
-      }
-    }
-  }
-  if (AWrites != ArgStreamReads.end()) {
-    for (const Argument *RA : AWrites->second) {
-      if (!HWBB->containsOutStreamIndexForValue(RA)) {
-        streamindex_p HWArg = getHW<StreamIndex>(&BB, RA);
-        HWBB->addOutStreamIndex(HWArg);
-      }
-    }
-  }
-#endif
 }
 
 /// \brief Create ScalarInput/InputStream for Kernel
@@ -572,8 +561,6 @@ void OCLAccHW::handleArgument(const Argument &A) {
   std::pair<int, Loopus::ExtKind> W = BW.getBitWidth(&A);
   unsigned Bits = W.first;
 
-  errs() << "Argument " << A.getName() << " uses " << Bits << " Bits\n";
-
   // Normal Scalars are not pipelined as they have the same value for all
   // WorkItems
   if (AType->isIntegerTy() || AType->isFloatingPointTy()) {
@@ -602,9 +589,6 @@ void OCLAccHW::handleArgument(const Argument &A) {
   // Create Ports for all Pointers. The direction of the Port will be defined
   // depending on its usage in the BBs.
   else if (const PointerType *PType = dyn_cast<PointerType>(AType)) {
-    bool isRead = false;
-    bool isWritten = false;
-
     unsigned AS = PType->getAddressSpace();
 
     switch (AS) {
@@ -767,32 +751,35 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   unsigned AddrSpace = I.getPointerAddressSpace();
 
   if ( AddrSpace != ocl::AS_GLOBAL && AddrSpace != ocl::AS_LOCAL )
-    assert(0 && "NOT_IMPLEMENTED: Only global and local address space supported.");
+    assert(0 && "FIXME: Only global and local address space supported.");
 
   //Get Address to load from
-  const GetElementPtrInst * P = dyn_cast<GetElementPtrInst>(AddrVal);
-  if (!P)
-    assert(0);
+  streamindex_p HWStreamIndex;
+  streamport_p HWStream;
 
-  streamindex_p HWStreamIndex = getHW<StreamIndex>(I.getParent(), P);
-  if (!HWStreamIndex) {
-    assert(0 && "Index base address only streams.");
+  const GetElementPtrInst *P = dyn_cast<GetElementPtrInst>(AddrVal);
+  if (P) {
+    HWStreamIndex = getHW<StreamIndex>(Parent, P);
+    HWStream = HWStreamIndex->getStream();
+  } else {
+    HWStream = getHW<StreamPort>(Parent, AddrVal);
+    HWStreamIndex = std::make_shared<StaticStreamIndex>("0", HWStream, 0, 1);
+    HWStreamIndex->addOut(HWStream);
   }
+
+  assert(HWStreamIndex && "No Index.");
+  assert(HWStream && "No Stream");
 
   // We may have loads with different types using the same StreamIndex.
   const Type *T = I.getType();
   unsigned BitWidth = T->getPrimitiveSizeInBits();
+
   // TODO: Maybe we should support Non-primitive types
-  assert(BitWidth);
+  assert(BitWidth && "FIXME: Type not primitive");
 
   loadaccess_p HWLoad = makeHWBB<LoadAccess>(Parent, &I, Name, BitWidth, HWStreamIndex);
 
   connect(HWStreamIndex, HWLoad);
-
-  // get the stream to read from
-  streamport_p HWStream = HWStreamIndex->getStream();
-  //TODO This is the case for local arrays!
-  assert(HWStream && "Load base address is not a stream");
 
   // Check if the load has the same BitWidth as the port.
   unsigned StreamBitWidth = HWStream->getBitWidth();
@@ -896,6 +883,101 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   connect(HWData, HWStore);
 }
 
+base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Type *NextTy) {
+  block_p HWParent = getBlock(Parent);
+
+  const std::string Name = IV->getName();
+
+  base_p HWOffset;
+
+  // If the current index is zero, just skip it
+  if (ConstantInt *C = dyn_cast<ConstantInt>(IV)) {
+    if (C->isZero()) {
+      // do nothing
+      ODEBUG("    Size: " << DL->getTypeAllocSize(NextTy));
+      ODEBUG("    Index: 0");
+    } else {
+      // get constant value and multiply by size of current element
+      APInt A = APInt(64, C->getZExtValue(), false);
+      uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
+
+      ODEBUG("  Size: " << CurrSize);
+      ODEBUG("  Index: " << A.toString(10, false));
+
+      A *= APInt(64, CurrSize, false);
+
+      HWOffset = std::make_shared<ConstVal>(
+          A.toString(10, false),
+          Datatype::Integer,
+          A.toString(2, false),
+          A.getActiveBits());
+    }
+  } else {
+    // For the index, there must be a HW instance available.
+    base_p HWLocalIndex = getHW(Parent, IV);
+
+    // Get the size of the Type
+    uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
+
+    ODEBUG("    Size: " << CurrSize);
+    ODEBUG("    Index: " << IV->getName());
+
+    // Sizes may be not a power of two, e.g.
+    // struct foo {
+    //  int a;
+    //  int b;
+    //  int c;
+    // }
+    //
+    // struct foo bar[123];
+
+    // Insert shifter if size is a power of two or a multiplication otherwise.
+    APInt CurrSizeAP(64, CurrSize, false);
+    uint64_t AddrWidth = CurrSizeAP.getActiveBits();
+
+    const_p HWSize = std::make_shared<ConstVal>(std::to_string(CurrSize), CurrSizeAP.toString(2, false), AddrWidth);
+
+    int32_t Log = CurrSizeAP.exactLogBase2();
+    if (Log != -1) {
+      // Power of two, use left shift
+      AddrWidth = Log + HWLocalIndex->getBitWidth();
+      std::string IndexName = Name+"_shift";
+
+      shl_p HWShift = std::make_shared<Shl>(IndexName, AddrWidth);
+      HWParent->addOp(HWShift);
+
+      HWParent->addConstVal(HWSize);
+
+      connect(HWLocalIndex, HWShift);
+      connect(HWSize,HWShift);
+
+      HWOffset = HWShift;
+    } else {
+      // No power of two, use multiplication
+      AddrWidth = CurrSizeAP.getActiveBits() + HWLocalIndex->getBitWidth();
+      std::string IndexName = Name+"_mul";
+
+      mul_p HWMul = std::make_shared<Mul>(IndexName, AddrWidth);
+      HWParent->addOp(HWMul);
+
+      HWParent->addConstVal(HWSize);
+
+      connect(HWLocalIndex, HWMul);
+      connect(HWSize, HWMul);
+
+      HWOffset = HWMul;
+    }
+  }
+  return HWOffset;
+}
+
+base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, Type *NextTy) {
+  base_p HWOffset;
+
+  return HWOffset;
+}
+
+
 /// \brief Create StaticStreamIndex or DynamicStreamIndex used by Load or
 /// StoreInst.
 ///
@@ -904,10 +986,13 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
 /// load/store connects the index with re stream, either with a value used as
 /// input (st) or an output (ld).
 ///
-void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
-{
+void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
+
+  BasicBlock *Parent = I.getParent();
   Value *InstValue = &I;
   Value *BaseValue = I.getPointerOperand();
+
+  SequentialType *IType = I.getType();
 
   if (! I.isInBounds() )
     assert(0 && "Not in Bounds.");
@@ -916,41 +1001,131 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I)
 
   // The pointer base can either be a local Array or a input stream
   unsigned BaseAddressSpace = I.getPointerAddressSpace();
-  assert((BaseAddressSpace == ocl::AS_GLOBAL || BaseAddressSpace == ocl::AS_LOCAL) 
+  assert((BaseAddressSpace == ocl::AS_GLOBAL || BaseAddressSpace == ocl::AS_LOCAL)
       && "Only global and local address space supported." );
 
   streamport_p HWBase = getHW<StreamPort>(I.getParent(), BaseValue);
 
-  // Handle index on the base address
-  if ( I.getNumIndices() != 1 )
-    assert(0 && "Only 1D arrays supported");
+  ODEBUG("GEP " << Name);
 
-  Value *IndexValue = *(I.idx_begin());
+  // Walk throught the indices. The GEP instruction may have multiple indices
+  // when arrays or structures are accessed.
 
-  base_p HWIndex;
-  streamindex_p HWStreamIndex;
+  // Constant zero address
+  if (I.hasAllZeroIndices()) {
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), InstValue, Name, HWBase, 0, 1);
 
-  // Create Constant or look for computed Index
+    BlockValueMap[Parent][InstValue] = HWStreamIndex;
 
-  if (const Constant *ConstValue = dyn_cast<Constant>(IndexValue)) {
-    const Type *CType = ConstValue->getType();
+    ODEBUG("  Zero Index " << HWStreamIndex->getUniqueName());
 
-    assert(!CType->isIntegerTy() && "Array Index must be Integer");
-
-    const ConstantInt *IntConst = dyn_cast<ConstantInt>(ConstValue);
-    if (!IntConst)
-      assert(0 && "Unknown Constant Type");
-
-    int64_t C = IntConst->getSExtValue();
-    HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), InstValue, Name, HWBase, C, IntConst->getValue().getActiveBits());
-  } else {
-    HWIndex = getHW<HW>(I.getParent(), IndexValue);
-
-    // No need to add StreamIndex to BlockValueMap so create object directly
-    HWStreamIndex = makeHWBB<DynamicStreamIndex>(I.getParent(), InstValue, Name, HWBase, HWIndex, 64);
-
-    HWIndex->addOut(HWStreamIndex);
+    return;
   }
+
+  // We currently only support GEP instructions with the same Type as their
+  // Pointer, no Vectors.
+  Type *BaseType = BaseValue->getType();
+  PointerType *BasePointer = dyn_cast<PointerType>(BaseType);
+
+  assert(BasePointer->isValidElementType(I.getType()) && "Pointer type differs from GEP Type");
+
+  // When we walk through the indices, dereference the Types
+  Type *NextTy = BasePointer;
+
+  // We can compute the Index at compile time. Walk through all indices and
+  // types and compute the Index in an APInt. Finally save its numerical value
+  // as StaticStreamIndex.
+
+  // TODO does not work for Structs
+  if (I.hasAllConstantIndices()) {
+    APInt API;
+
+    for (User::op_iterator II = I.idx_begin(), E = I.idx_end(); II != E; ++II) {
+
+      //TODO
+      // The curr Type indexed by II. Update on each iteration;
+      assert(NextTy);
+
+      // All are Constants
+      ConstantInt *C = cast<ConstantInt>(*II);
+      const APInt &A = C->getValue();
+
+      // In bytes, incl padding
+      uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
+
+      API += A * APInt(64, CurrSize, false);
+
+      // Correctnes of cast will be checked within the next Index operand
+      SequentialType *ST = dyn_cast<SequentialType>(NextTy);
+      if (ST)
+        NextTy = ST->getElementType();
+      else NextTy = nullptr;
+    }
+
+    uint64_t Index = API.getSExtValue();
+
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), InstValue, Name, HWBase, 0, 1);
+
+    BlockValueMap[Parent][InstValue] = HWStreamIndex;
+
+    ODEBUG("  static index " << HWStreamIndex->getUniqueName() << " = " << Index);
+
+    return;
+  }
+
+  // Mixed indices, so we have to arithmetically compute the address at runtime.
+  // Use shifter for the multiplication with the scalar sizes. Indizes can refer
+  // to SequentialTypes or StructTypes. The latter must have constant indices.
+  
+  Value *CurrValue;
+  block_p HWParent = getBlock(Parent);
+
+  base_p HWIndex = nullptr;
+
+  int IndexNo = 0;
+  for (User::op_iterator II = I.idx_begin(), E = I.idx_end(); II != E; ++II, IndexNo++) {
+    Value *IV = *II;
+    base_p HWOffset = nullptr;
+
+    // Correctnes of cast will be checked within the next Index operand
+    if (SequentialType *ST = dyn_cast<SequentialType>(NextTy)) {
+      NextTy = ST->getElementType();
+      HWOffset = computeSequentialIndex(Parent, IV, NextTy);
+    }
+    else if (StructType *ST = dyn_cast<StructType>(NextTy)) {
+      NextTy = ST->getElementType(0);
+      HWOffset = computeStructIndex(Parent, IV, NextTy);
+    } else
+      assert(0 && "Invalid Type");
+
+    DEBUG(
+        dbgs() << "[" << DEBUG_TYPE << "] " << "  Index " << IndexNo << ": ";
+        NextTy->print(dbgs());
+        dbgs() << "\n";
+        );
+
+    // We have no offset if the fist indices are zero
+    if (HWOffset) {
+      // If we already have an address computation, add the current index
+      if (HWIndex) {
+        // The Address may grow by one bit
+        uint64_t AddrWidth = std::max(HWOffset->getBitWidth(), HWIndex->getBitWidth())+1;
+        std::string IndexName = Name+"_"+std::to_string(IndexNo)+"_add";
+
+        base_p HWAdd = std::make_shared<Add>(IndexName, AddrWidth);
+        HWParent->addOp(HWAdd);
+
+        connect(HWOffset, HWAdd);
+
+        HWIndex = HWAdd;
+      } else
+        HWIndex = HWOffset;
+    }
+  }
+
+  streamindex_p HWStreamIndex = makeHWBB<DynamicStreamIndex>(Parent, InstValue, Name, HWBase, HWIndex, HWIndex->getBitWidth());
+
+  connect(HWIndex, HWStreamIndex);
 
   BlockValueMap[I.getParent()][InstValue] = HWStreamIndex;
 
@@ -1059,14 +1234,24 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   const Value *Callee = I.getCalledValue();
   std::string CN = Callee->getName().str();
 
-  if (ocl::isArithmeticBuiltIn(CN)) {
+  assert(ocl::NameMangling::isKnownName(CN) && "Unknown or invalid Builtin");
 
-  } else if (ocl::isWorkItemBuiltIn(CN)) {
+  if (ocl::NameMangling::isWorkItemFunction(CN)) {
     assert(0 && "Run pass to inline WorkItem builtins");
+  }
 
-  } else {
-    errs() << "Function Name: " << CN << "\n";
-    assert(0 && "Invalid Builtin.");
+  // If barriers are used, the attributes reqd or max workgroup size must be set
+  // to avoid unnecessary hardware generation.
+  if (ocl::NameMangling::isSynchronizationFunction(CN)) {
+    BasicBlock* BB = I.getParent();
+    Function *F = BB->getParent();
+
+    OpenCLMDKernels &CLK = getAnalysis<OpenCLMDKernels>();
+    unsigned Dim0 = CLK.getRequiredWorkGroupSize(*F, 0);
+    unsigned Dim1 = CLK.getRequiredWorkGroupSize(*F, 1);
+    unsigned Dim2 = CLK.getRequiredWorkGroupSize(*F, 2);
+
+    ODEBUG("Required WorkGroupSize: (" << Dim0 << "," << Dim1 << "," << Dim2 << ")");
   }
 }
 
@@ -1107,9 +1292,8 @@ void OCLAccHW::visitPHINode(PHINode &I) {
 
   mux_p HWM = makeHWBB<Mux>(BB, &I, I.getName(), W.first);
 
-  DEBUG(dbgs() << "Block " << BB->getName() << "\n";
-  dbgs() << "\tPHI " << I.getName() << "\n";
-  );
+  ODEBUG("Block " << BB->getName());
+  ODEBUG("\tPHI " << I.getName());
   for (unsigned i = 0; i < I.getNumIncomingValues(); ++i) {
     const BasicBlock *FromBB = I.getIncomingBlock(i);
     const Value *V = I.getIncomingValue(i);
@@ -1132,11 +1316,11 @@ void OCLAccHW::visitPHINode(PHINode &I) {
     } else {
       assert(Cond && !NegCond || !Cond && NegCond);
       DEBUG(
-      dbgs() << "\t\tFrom Block " << FromBB->getName() << "\n";
+      ODEBUG("\t\tFrom Block " << FromBB->getName());
       if (Cond)
-        dbgs() << "\t\t\t" << Cond->getUniqueName() << "\n";
+        ODEBUG("\t\t\t" << Cond->getUniqueName());
       if (NegCond)
-        dbgs() << "\t\t\t!" << NegCond->getUniqueName() << "\n";
+        ODEBUG("\t\t\t!" << NegCond->getUniqueName());
 
       );
 
@@ -1184,7 +1368,7 @@ void OCLAccHW::visitBranchInst(BranchInst &I) {
     scalarport_p HWOut = makeHWBB<ScalarPort>(BB, &I, "uncond", 1, oclacc::Integer, true);
     connect(HWConst, HWOut);
     HWBB->addOutScalar(HWOut);
-    
+
     scalarport_p HWIn = makeHWBB<ScalarPort>(SuccBB, &I, "uncond", 1, oclacc::Integer, true);
     HWSucc->addInScalar(HWIn);
 

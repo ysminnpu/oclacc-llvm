@@ -9,7 +9,7 @@
 #include "Visitor/Visitable.h"
 #include "typedefs.h"
 #include "Identifiable.h"
-#include "OpenCLDefines.h"
+#include "OCL/OpenCLDefines.h"
 
 namespace oclacc {
 

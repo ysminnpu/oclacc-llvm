@@ -12,10 +12,10 @@ class ConstVal : public HW
     const Datatype T;
     std::string Bits;
 
-    ConstVal(const std::string Name, const std::string Bits, size_t W);
-    ConstVal(const std::string Name, Datatype T, const std::string Bits, size_t W);
+    ConstVal(const std::string Name, const std::string Bits, size_t BitWidth);
+    ConstVal(const std::string Name, Datatype T, const std::string Bits, size_t BitWidth);
 
-    const std::string dump(const std::string &Indent) const override;
+    const std::string dump(const std::string &Indent="") const override;
 
     inline const std::string getUniqueName() const override {
       return getName();
@@ -31,6 +31,6 @@ class ConstVal : public HW
     using HW::addIn;
 };
 
-} // end ns oclacc
+}
 
 #endif /* CONST_H */

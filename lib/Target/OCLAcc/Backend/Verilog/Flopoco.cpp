@@ -36,7 +36,7 @@ unsigned flopoco::genModule(const std::string Name, const std::string M, BlockMo
   CS << " " << M;
   CS << " 2>&1";
 
-  NDEBUG(CS.str());
+  ODEBUG(CS.str());
 
   const std::string Result = execute(CS.str());
 
@@ -73,7 +73,7 @@ unsigned flopoco::genModule(const std::string Name, const std::string M, BlockMo
 
   ModuleMap[Name] = Latency;
 
-  NDEBUG("Latency of " << Name << ": " << Latency << " clock cycles");
+  ODEBUG("Latency of " << Name << ": " << Latency << " clock cycles");
 
   return Latency;
 }
@@ -85,7 +85,7 @@ std::string flopoco::convert(float V, unsigned MantissaBitWidth, unsigned Expone
   std::stringstream CS;
   CS << Path << " " << MantissaBitWidth << " " << ExponentBitwidth << " " << V;
 
-  NDEBUG(CS.str());
+  ODEBUG(CS.str());
 
   std::string Result = execute(CS.str());
 

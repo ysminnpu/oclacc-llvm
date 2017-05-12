@@ -806,7 +806,7 @@ const std::string BlockModule::declStores() const {
   S << "// Store processes\n";
 
   for (storeaccess_p SA : Comp.getStores()) {
-    assert(R.getIns().size() == 1 && "Stores may only have a single input");
+    assert(SA->getIns().size() == 1 && "Stores may only have a single input");
 
     const std::string Name = getOpName(SA);
     const streamindex_p Index = SA->getIndex();
@@ -1044,7 +1044,7 @@ void BlockModule::schedule(const OperatorInstances &I) {
     }
   } 
 
-  NDEBUG("Critical path of " << Comp.getUniqueName() << ": " << CriticalPath);
+  ODEBUG("Critical path of " << Comp.getUniqueName() << ": " << CriticalPath);
 }
 
 int BlockModule::getReadyCycle(const std::string OpName) const {

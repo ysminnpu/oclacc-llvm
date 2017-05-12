@@ -14,18 +14,18 @@
 using namespace oclacc;
 
 FlopocoFPFormat::FlopocoFPFormat() {
-  NDEBUG(__PRETTY_FUNCTION__);
+  ODEBUG(__PRETTY_FUNCTION__);
 }
 
 FlopocoFPFormat::~FlopocoFPFormat() {
-  NDEBUG(__PRETTY_FUNCTION__);
+  ODEBUG(__PRETTY_FUNCTION__);
 }
 
 int FlopocoFPFormat::visit(ScalarPort &R) {
   VISIT_ONCE(R);
   if (R.isFP()) {
     R.setBitWidth(R.getBitWidth()+2);
-    NDEBUG("set bitwidth for " << R.getUniqueName());
+    ODEBUG("set bitwidth for " << R.getUniqueName());
   }
   super::visit(R);
   return 0;
@@ -35,7 +35,7 @@ int FlopocoFPFormat::visit(StreamPort &R) {
   VISIT_ONCE(R);
   if (R.isFP()) {
     R.setBitWidth(R.getBitWidth()+2);
-    NDEBUG("set bitwidth for " << R.getUniqueName());
+    ODEBUG("set bitwidth for " << R.getUniqueName());
   }
   super::visit(R);
   return 0;
@@ -48,7 +48,7 @@ int FlopocoFPFormat::visit(StreamAccess &R) {
 
   if (S->isFP()) {
     R.setBitWidth(R.getBitWidth()+2);
-    NDEBUG("set bitwidth for " << R.getUniqueName());
+    ODEBUG("set bitwidth for " << R.getUniqueName());
   }
   super::visit(R);
   return 0;
@@ -57,7 +57,7 @@ int FlopocoFPFormat::visit(StreamAccess &R) {
 int FlopocoFPFormat::visit(FPArith &R) {
   VISIT_ONCE(R);
   R.setBitWidth(R.getBitWidth()+2);
-  NDEBUG("set bitwidth for " << R.getUniqueName());
+  ODEBUG("set bitwidth for " << R.getUniqueName());
   super::visit(R);
   return 0;
 }
@@ -65,7 +65,7 @@ int FlopocoFPFormat::visit(FPArith &R) {
 int FlopocoFPFormat::visit(FPCompare &R) {
   VISIT_ONCE(R);
   R.setBitWidth(R.getBitWidth()+2);
-  NDEBUG("set bitwidth for " << R.getUniqueName());
+  ODEBUG("set bitwidth for " << R.getUniqueName());
   super::visit(R);
 }
 

@@ -24,6 +24,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
   private:
     void createMakefile();
 
+    void handleGlobalVariable(const GlobalVariable &G);
     void handleKernel(const Function &F);
     void handleArgument(const Argument &);
 
@@ -102,7 +103,12 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
     oclacc::DesignUnit HWDesign;
 
+    const DataLayout *DL;
+
     oclacc::const_p makeConstant(const Constant *, const Instruction *);
+    oclacc::base_p computeSequentialIndex(BasicBlock *, Value *IV, Type *NextTy);
+    oclacc::base_p computeStructIndex(BasicBlock *, Value *IV, Type *NextTy);
+
 
     /// \brief Create shared_ptr to HW object and return requested pointer type.
     ///
@@ -180,6 +186,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
     }
 
+
     template<class HW>
     std::shared_ptr<HW> getHW(const BasicBlock *BB, const Value *IR) const {
 
@@ -215,6 +222,11 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
         }
       } else
         return std::static_pointer_cast<HW>(VI->second);
+    }
+
+    /// \brief Return a base class object
+    oclacc::base_p getHW(const BasicBlock *BB, const Value *IR) const {
+      return getHW<oclacc::HW>(BB, IR);
     }
 
     /// \brief Return true if Value is already Valid in \param BB
@@ -291,6 +303,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
       else if (T->isHalfTy()) DT=oclacc::Half;
       else if (T->isFloatTy()) DT=oclacc::Float;
       else if (T->isDoubleTy()) DT = oclacc::Double;
+      else if (T->isStructTy()) DT = oclacc::Struct;
       else {
         T->dump();
         llvm_unreachable("Invalid Type");

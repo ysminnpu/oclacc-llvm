@@ -118,6 +118,20 @@ bool ocl::NameMangling::isKnownUnmangledName(const std::string &name) {
   return false;
 }
 
+/// \brief Determines if the given name exists and if its category is Math.
+/// \param name The name of the function to test.
+bool ocl::NameMangling::isArithmeticFunction(const std::string &name) {
+  const auto result = Mappings.find(name);
+  if (result == Mappings.end()) {
+    return false;
+  }
+  if (result->second.FuncCat == BuiltInFunctionName::FunctionCategory::FC_Math) {
+    return true;
+  } else {
+    return false;
+  }
+}
+
 /// \brief Determines if the given name exists and if its category is WorkItem.
 /// \param name The name of the function to test.
 bool ocl::NameMangling::isWorkItemFunction(const std::string &name) {

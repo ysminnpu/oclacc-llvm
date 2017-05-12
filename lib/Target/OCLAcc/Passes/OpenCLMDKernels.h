@@ -10,6 +10,7 @@
 
 #include "llvm/IR/Metadata.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/Pass.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -75,6 +76,9 @@ class OpenCLMDKernels : public llvm::ModulePass {
     bool isKernel(const llvm::Function* const F) const;
     bool isWorkitemFunction(const llvm::Function* const F) const;
     bool isSingleFunction(const llvm::Function* const F) const;
+
+    unsigned getRequiredWorkGroupSize(const llvm::Function &F, unsigned Dimension);
+    const llvm::ConstantInt* getRequiredWorkGroupSizeConst(const llvm::Function &F, unsigned Dimension);
 };
 
 #endif

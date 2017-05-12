@@ -127,6 +127,7 @@ enum Datatype {
   Signed,
   Unsigned,
   Integer,
+  Struct,
   Invalid
 };
 

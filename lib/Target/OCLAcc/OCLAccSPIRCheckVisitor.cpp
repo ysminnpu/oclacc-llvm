@@ -7,7 +7,7 @@
 
 #include "OCLAccSPIRCheckVisitor.h"
 #include "OCLAccHW.h"
-#include "OpenCLDefines.h"
+#include "OCL/OpenCLDefines.h"
 
 #include "kernel_builtins.h"
 

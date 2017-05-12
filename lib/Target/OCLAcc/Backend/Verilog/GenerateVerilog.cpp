@@ -15,7 +15,7 @@
 #include "GenerateVerilog.h"
 #include "OCLAccHWVisitor.h"
 #include "OCLAccHW.h"
-#include "OpenCLDefines.h"
+#include "OCL/OpenCLDefines.h"
 #include "FlopocoFPFormat.h"
 
 #define DEBUG_TYPE "verilog"

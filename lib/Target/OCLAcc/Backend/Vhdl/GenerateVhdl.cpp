@@ -15,7 +15,6 @@
 #include "GenerateVhdl.h"
 #include "OCLAccHWVisitor.h"
 #include "OCLAccHW.h"
-#include "OpenCLDefines.h"
 
 using namespace llvm;
 using namespace oclacc;

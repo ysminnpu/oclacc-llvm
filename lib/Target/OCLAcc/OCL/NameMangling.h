@@ -36,6 +36,7 @@ void add(const std::string &MangledName, const std::string &UnmangledName,
 
 bool isKnownName(const std::string &name);
 bool isKnownUnmangledName(const std::string &name);
+bool isArithmeticFunction(const std::string &name);
 bool isWorkItemFunction(const std::string &name);
 bool isPrintfFunction(const std::string &name);
 bool isSynchronizationFunction(const std::string &name);

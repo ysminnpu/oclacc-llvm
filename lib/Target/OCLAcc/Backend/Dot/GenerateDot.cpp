@@ -15,7 +15,6 @@
 #include "GenerateDot.h"
 #include "OCLAccHWVisitor.h"
 #include "OCLAccHW.h"
-#include "OpenCLDefines.h"
 
 #define DEBUG_TYPE "dot"
 

@@ -212,9 +212,9 @@ const HW::HWListTy Block::getOpsTopologicallySorted() const {
     }
   }
 
-  NDEBUG("Order of block " << getUniqueName() << ":");
+  ODEBUG("Order of block " << getUniqueName() << ":");
   for (base_p P : L) {
-    NDEBUG("  " << P->getUniqueName());
+    ODEBUG("  " << P->getUniqueName());
   }
 
   return L;

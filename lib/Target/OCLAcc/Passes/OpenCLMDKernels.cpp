@@ -467,3 +467,55 @@ MDNode* OpenCLMDKernels::getMDNodeForFunction(const Function* const F) const {
   }
 }
 
+/// \brief Tries to read the required workgroup size from the metadata.
+///
+/// Tries to read the required workgroup size for the given kernel function
+/// in the given dimension from the metadata. If the metadata does not exist
+/// or cannot be read for any reasons \c 0 is returned.
+unsigned OpenCLMDKernels::getRequiredWorkGroupSize(const Function &F, unsigned Dimension) {
+  const ConstantInt *ReqdSizeCI = getRequiredWorkGroupSizeConst(F, Dimension);
+  if (ReqdSizeCI != nullptr) {
+    return ReqdSizeCI->getZExtValue();
+  } else {
+    return 0;
+  }
+}
+/// \brief Tries to read the required workgroup size from the metadata.
+///
+/// Tries to read the required workgroup size for the given kernel function
+/// in the given dimension from the metadata. If the metadata does not exist
+/// or cannot be read for any reasons \c 0 is returned.
+const ConstantInt* OpenCLMDKernels::getRequiredWorkGroupSizeConst(const Function &F, unsigned Dimension) {
+  if (isKernel(&F) == false) {
+    // The rerquired workgroupsize metadata is invalid on non-kernel functions
+    return nullptr;
+  }
+  // There are only three dimensions
+  if (Dimension > 2) { return nullptr; }
+
+  const MDNode *KernelMDNode = getMDNodeForFunction(&F);
+  if (KernelMDNode == nullptr) { return nullptr; }
+
+  if (KernelMDNode->getNumOperands() <= 1) { return nullptr; }
+  for (unsigned i = 0, e = KernelMDNode->getNumOperands(); i < e; ++i) {
+    const MDNode *MDOp = dyn_cast<MDNode>(KernelMDNode->getOperand(i).get());
+    if (MDOp == nullptr) { continue; }
+
+    if (MDOp->getNumOperands() != 4) { continue; }
+    if (isa<MDString>(MDOp->getOperand(0)) == false) { continue; }
+    const MDString *MDOpDescription = dyn_cast<MDString>(MDOp->getOperand(0));
+    if (MDOpDescription == nullptr) { continue; }
+    if (MDOpDescription->getString().equals(
+        Loopus::KernelMDStrings::SPIR_REQD_WGSIZE) == false) { continue; }
+
+    // Now we found the metadata node containing the workgroups sizes
+    const Metadata *ReqdSizeMD = MDOp->getOperand(1 + Dimension).get();
+    if (ReqdSizeMD == nullptr) { continue; }
+    const ConstantInt *ReqdSize = mdconst::dyn_extract<ConstantInt>(ReqdSizeMD);
+    if (ReqdSize == nullptr) { continue; }
+
+    return ReqdSize;
+  }
+  return nullptr;
+}
+
