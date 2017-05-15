@@ -801,6 +801,7 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
 /// - If Value: Could be getElementPtrInst
 /// - If getElementPtrInst: Connect Base and Index
 ///
+///
 void OCLAccHW::visitStoreInst(StoreInst &I)
 {
   // TODO atomic, volatile
@@ -809,9 +810,9 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   // Stores do not have any name
   const std::string Name = "store";
 
-  const Value *DataVal = I.getValueOperand();
-  const Value *AddrVal = I.getPointerOperand();
-  const BasicBlock *Parent = I.getParent();
+  Value *DataVal = I.getValueOperand();
+  Value *AddrVal = I.getPointerOperand();
+  BasicBlock *Parent = I.getParent();
 
   const block_p HWParent = getBlock(Parent);
 
@@ -840,7 +841,16 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   }
 
   //Get Address to store at
-  HWOut = getHW<HW>(Parent, AddrVal);
+  // The instruction may have the following form, so check if the address val is
+  // already available:
+  // store int32 0, float addrspace(3)* getelementptr inbounds .....
+  if (existsHW(Parent, AddrVal))
+    HWOut = getHW<HW>(Parent, AddrVal);
+  else {
+    GEPOperator *AddrOp = cast<GEPOperator>(AddrVal);
+    visitGEPOperator(*AddrOp);
+    HWOut = getHW<HW>(Parent, AddrVal);
+  }
 
   streamport_p HWStream;
   streamindex_p HWStreamIndex;
@@ -883,53 +893,47 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   connect(HWData, HWStore);
 }
 
-base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, SequentialType *NextTy) {
+#define DEBUG_TYPE "gep"
+
+base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, SequentialType *IndexTy) {
   block_p HWParent = getBlock(Parent);
 
   const std::string Name = IV->getName();
 
-  base_p HWOffset;
+  base_p HWOffset = nullptr;
 
-  // If the current index is zero, just skip it
   if (ConstantInt *C = dyn_cast<ConstantInt>(IV)) {
+    // If the current index is zero, just skip it
     if (C->isZero()) {
       // do nothing
-      ODEBUG("    Size: " << DL->getTypeAllocSize(NextTy));
+      ODEBUG("    Size: " << DL->getTypeAllocSize(IndexTy));
       ODEBUG("    Index: 0");
-    } else {
-      // get constant value and multiply by size of current element
-      APInt A = APInt(64, C->getZExtValue(), false);
-      uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
 
-      ODEBUG("  Size: " << CurrSize);
-      ODEBUG("  Index: " << A.toString(10, false));
-
-      A *= APInt(64, CurrSize, false);
-
-      HWOffset = std::make_shared<ConstVal>(
-          A.toString(10, false),
-          Datatype::Integer,
-          A.toString(2, false),
-          A.getActiveBits());
+      return nullptr;
     }
+    // get constant value and multiply by size of current element
+    APInt A = APInt(64, C->getZExtValue(), false);
+    uint64_t CurrSize = DL->getTypeAllocSize(IndexTy);
+
+    ODEBUG("    Size: " << CurrSize);
+    ODEBUG("    Index: " << A.toString(10, false));
+
+    A *= APInt(64, CurrSize, false);
+
+    HWOffset = std::make_shared<ConstVal>(
+        A.toString(10, false),
+        Datatype::Integer,
+        A.toString(2, false),
+        A.getActiveBits());
   } else {
-    // For the index, there must be a HW instance available.
+    // For the index, there must be an HW instance available.
     base_p HWLocalIndex = getHW(Parent, IV);
 
     // Get the size of the Type
-    uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
+    uint64_t CurrSize = DL->getTypeAllocSize(IndexTy);
 
     ODEBUG("    Size: " << CurrSize);
     ODEBUG("    Index: " << IV->getName());
-
-    // Sizes may be not a power of two, e.g.
-    // struct foo {
-    //  int a;
-    //  int b;
-    //  int c;
-    // }
-    //
-    // struct foo bar[123];
 
     // Insert shifter if size is a power of two or a multiplication otherwise.
     APInt CurrSizeAP(64, CurrSize, false);
@@ -971,8 +975,49 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
   return HWOffset;
 }
 
-base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *NextTy) {
-  base_p HWOffset;
+base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *IndexTy, Type **NextTy) {
+  block_p HWParent = getBlock(Parent);
+
+  const std::string Name = IV->getName();
+
+  base_p HWOffset = nullptr;
+
+  ConstantInt *C = dyn_cast<ConstantInt>(IV);
+  assert(C && "Struct Index must be constant.");
+
+  uint64_t Index = C->getZExtValue();
+
+  // Struct member is next type. Must be assigned before any return.
+  *NextTy = IndexTy->getTypeAtIndex(Index);
+
+  // If the current index is zero, just skip it
+  if (C->isZero()) {
+    // do nothing
+    ODEBUG("    Struct Offset: " << DL->getTypeAllocSize(IndexTy));
+    ODEBUG("    Index: 0");
+
+    return nullptr;
+  } 
+
+  // get constant value and multiply by size of current element
+  APInt A = APInt(64, Index, false);
+  uint64_t Offset = 0;
+  
+  // Skip all Struct elements before the actual one
+  for (uint64_t i = 0; i < Index; ++i) {
+    Offset += DL->getTypeAllocSize(IndexTy->getTypeAtIndex(i));
+  }
+
+  ODEBUG("  Struct Offset: " << Offset);
+  ODEBUG("  Index: " << A.toString(10, false));
+
+  A *= APInt(64, Offset, false);
+
+  HWOffset = std::make_shared<ConstVal>(
+      A.toString(10, false),
+      Datatype::Integer,
+      A.toString(2, false),
+      A.getActiveBits());
 
   return HWOffset;
 }
@@ -988,11 +1033,27 @@ base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *N
 ///
 void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
 
-  BasicBlock *Parent = I.getParent();
+  GEPOperator &GO = cast<GEPOperator>(I);
+  visitGEPOperator(GO);
+
+
+  return;
+}
+
+void OCLAccHW::visitGEPOperator(GEPOperator &I) {
+  BasicBlock *Parent;
+  if (Instruction *II = dyn_cast<Instruction>(&I))
+    Parent = II->getParent();
+  else if (I.hasOneUse()) {
+    Instruction *II = cast<Instruction>(I.use_begin()->getUser());
+    Parent = II->getParent();
+  } else
+    assert(0 && "No Parent");
+
   Value *InstValue = &I;
   Value *BaseValue = I.getPointerOperand();
 
-  SequentialType *IType = I.getType();
+  SequentialType *IType = cast<SequentialType>(I.getType());
 
   if (! I.isInBounds() )
     assert(0 && "Not in Bounds.");
@@ -1004,7 +1065,7 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
   assert((BaseAddressSpace == ocl::AS_GLOBAL || BaseAddressSpace == ocl::AS_LOCAL)
       && "Only global and local address space supported." );
 
-  streamport_p HWBase = getHW<StreamPort>(I.getParent(), BaseValue);
+  streamport_p HWBase = getHW<StreamPort>(Parent, BaseValue);
 
   ODEBUG("GEP " << Name);
 
@@ -1013,7 +1074,7 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
 
   // Constant zero address
   if (I.hasAllZeroIndices()) {
-    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), InstValue, Name, HWBase, 0, 1);
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, Name, HWBase, 0, 1);
 
     BlockValueMap[Parent][InstValue] = HWStreamIndex;
 
@@ -1036,39 +1097,52 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
   // types and compute the Index in an APInt. Finally save its numerical value
   // as StaticStreamIndex.
 
-  // TODO does not work for Structs
   if (I.hasAllConstantIndices()) {
-    APInt API;
+    uint64_t Offset = 0;
 
     for (User::op_iterator II = I.idx_begin(), E = I.idx_end(); II != E; ++II) {
 
-      //TODO
-      // The curr Type indexed by II. Update on each iteration;
-      assert(NextTy);
-
       // All are Constants
       ConstantInt *C = cast<ConstantInt>(*II);
-      const APInt &A = C->getValue();
+      uint64_t Index = C->getZExtValue();
 
-      // In bytes, incl padding
-      uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
-
-      API += A * APInt(64, CurrSize, false);
-
-      // Correctnes of cast will be checked within the next Index operand
-      SequentialType *ST = dyn_cast<SequentialType>(NextTy);
-      if (ST)
+      if (SequentialType *ST = dyn_cast<SequentialType>(NextTy)) {
+        // In bytes, incl padding
         NextTy = ST->getElementType();
-      else NextTy = nullptr;
+        uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
+
+        ODEBUG("    Size: " << CurrSize);
+        ODEBUG("    Index: " << Index);
+
+        Offset += Index * CurrSize;
+
+
+      } else if (StructType *ST = dyn_cast<StructType>(NextTy)) {
+        // Compute offset for requested index
+        uint64_t LOffset = 0;
+        for (uint64_t i = 0; i < Index; ++i) {
+          LOffset += DL->getTypeAllocSize(ST->getTypeAtIndex(i));
+        }
+
+        ODEBUG("  Struct Offset: " << LOffset);
+        ODEBUG("  Index: " << Index);
+
+        Offset += LOffset;
+
+        NextTy = ST->getTypeAtIndex(Index);
+      } else
+        assert(0 && "Invalid Type");
+
+
     }
 
-    uint64_t Index = API.getSExtValue();
+    APInt APOffset(64, Offset, false);
 
-    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(I.getParent(), InstValue, Name, HWBase, 0, 1);
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, Name, HWBase, Offset, APOffset.getActiveBits());
 
     BlockValueMap[Parent][InstValue] = HWStreamIndex;
 
-    ODEBUG("  static index " << HWStreamIndex->getUniqueName() << " = " << Index);
+    ODEBUG("  static index " << HWStreamIndex->getUniqueName() << " = " << Offset);
 
     return;
   }
@@ -1088,13 +1162,14 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
     base_p HWOffset = nullptr;
 
     // Correctnes of cast will be checked within the next Index operand
+    // Set NextTy after getting the offset
     if (SequentialType *ST = dyn_cast<SequentialType>(NextTy)) {
-      NextTy = ST->getElementType();
       HWOffset = computeSequentialIndex(Parent, IV, ST);
+      NextTy = ST->getElementType();
     }
     else if (StructType *ST = dyn_cast<StructType>(NextTy)) {
-      NextTy = ST->getElementType(0);
-      HWOffset = computeStructIndex(Parent, IV, ST);
+      // Set NextTy as Index is retrieved by the function.
+      HWOffset = computeStructIndex(Parent, IV, ST, &NextTy);
     } else
       assert(0 && "Invalid Type");
 
@@ -1104,7 +1179,7 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
         dbgs() << "\n";
         );
 
-    // We have no offset if the fist indices are zero
+    // We have no offset if the index was a constant zero
     if (HWOffset) {
       // If we already have an address computation, add the current index
       if (HWIndex) {
@@ -1127,10 +1202,10 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
 
   connect(HWIndex, HWStreamIndex);
 
-  BlockValueMap[I.getParent()][InstValue] = HWStreamIndex;
-
-  return;
+  BlockValueMap[Parent][InstValue] = HWStreamIndex;
 }
+
+#define DEBUG_TYPE "oclacchw"
 
 /// \brief Create a Constant. Use bitwidth and datatype from BitWidthAnalysis
 ///

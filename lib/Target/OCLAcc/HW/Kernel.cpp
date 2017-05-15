@@ -159,12 +159,12 @@ void Block::dump() {
   outs() << "Loads:\n";
   for (const loadaccess_p HWL : getLoads()) {
     const streamport_p S = HWL->getStream();
-    outs() << HWL->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWL->getIndex()->getUniqueName() << "\n";
+    outs() << " " << HWL->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWL->getIndex()->getUniqueName() << "\n";
   }
   outs() << "Stores:\n";
   for (const storeaccess_p HWS : getStores()) {
     const streamport_p S = HWS->getStream();
-    outs() << HWS->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWS->getIndex()->getUniqueName() << " = " << HWS->getValue()->getUniqueName() << "\n";
+    outs() << " " << HWS->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWS->getIndex()->getUniqueName() << " = " << HWS->getValue()->getUniqueName() << "\n";
   }
 
   outs() << Line << "\n";

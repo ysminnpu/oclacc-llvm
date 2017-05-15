@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "llvm/IR/InstVisitor.h"
+#include "llvm/IR/Operator.h"
 #include "llvm/Pass.h"
 
 #include "OCLAccTargetMachine.h"
@@ -75,10 +76,15 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
     // Visitor Methods
     void visitBasicBlock(BasicBlock &);
+
     void visitBinaryOperator(BinaryOperator &);
+
     void visitLoadInst(LoadInst &);
     void visitStoreInst(StoreInst &);
+
     void visitGetElementPtrInst(GetElementPtrInst &);
+    void visitGEPOperator(GEPOperator &);
+
     void visitCallInst(CallInst &);
     void visitCmpInst(CmpInst &);
     //void visitICmpInst(ICmpInst &);
@@ -106,8 +112,20 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     const DataLayout *DL;
 
     oclacc::const_p makeConstant(const Constant *, const Instruction *);
-    oclacc::base_p computeSequentialIndex(BasicBlock *, Value *IV, SequentialType *NextTy);
-    oclacc::base_p computeStructIndex(BasicBlock *, Value *IV, StructType *NextTy);
+
+    /// \brief Return run-time operand for struct offset.
+    /// \param Parent BasicBlock pointer to add Operation to HWParent
+    /// \param IndexValue Constant or Dynamic Index
+    /// \param IndexTy Type of the indexed value
+    oclacc::base_p computeSequentialIndex(BasicBlock *, Value *IndexValue, SequentialType *IndexTy);
+
+    /// \brief Return run-time operand for struct offset.
+    /// \param Parent BasicBlock pointer to add Operation to HWParent
+    /// \param IndexValue Constant or Dynamic Index
+    /// \param IndexTy Type of the indexed value
+    ///
+    /// Skip \param IndexValue struct elements of \param IndexTy
+    oclacc::base_p computeStructIndex(BasicBlock *, Value *IndexValue, StructType *IndexTy, Type **NextTy);
 
 
     /// \brief Create shared_ptr to HW object and return requested pointer type.
