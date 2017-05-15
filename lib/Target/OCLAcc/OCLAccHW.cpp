@@ -902,18 +902,20 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
 
   base_p HWOffset = nullptr;
 
+  Type *ThisTy = IndexTy->getElementType();
+
   if (ConstantInt *C = dyn_cast<ConstantInt>(IV)) {
     // If the current index is zero, just skip it
     if (C->isZero()) {
       // do nothing
-      ODEBUG("    Size: " << DL->getTypeAllocSize(IndexTy));
+      ODEBUG("    Size: " << DL->getTypeAllocSize(ThisTy));
       ODEBUG("    Index: 0");
 
       return nullptr;
     }
     // get constant value and multiply by size of current element
     APInt A = APInt(64, C->getZExtValue(), false);
-    uint64_t CurrSize = DL->getTypeAllocSize(IndexTy);
+    uint64_t CurrSize = DL->getTypeAllocSize(ThisTy);
 
     ODEBUG("    Size: " << CurrSize);
     ODEBUG("    Index: " << A.toString(10, false));
@@ -930,7 +932,7 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
     base_p HWLocalIndex = getHW(Parent, IV);
 
     // Get the size of the Type
-    uint64_t CurrSize = DL->getTypeAllocSize(IndexTy);
+    uint64_t CurrSize = DL->getTypeAllocSize(ThisTy);
 
     ODEBUG("    Size: " << CurrSize);
     ODEBUG("    Index: " << IV->getName());
@@ -939,10 +941,12 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
     APInt CurrSizeAP(64, CurrSize, false);
     uint64_t AddrWidth = CurrSizeAP.getActiveBits();
 
-    const_p HWSize = std::make_shared<ConstVal>(std::to_string(CurrSize), CurrSizeAP.toString(2, false), AddrWidth);
 
     int32_t Log = CurrSizeAP.exactLogBase2();
+
     if (Log != -1) {
+      APInt LogAP(32, Log, false);
+      const_p HWLogSize = std::make_shared<ConstVal>(std::to_string(Log), LogAP.toString(2, false), LogAP.getActiveBits());
       // Power of two, use left shift
       AddrWidth = Log + HWLocalIndex->getBitWidth();
       std::string IndexName = Name+"_shift";
@@ -950,13 +954,14 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
       shl_p HWShift = std::make_shared<Shl>(IndexName, AddrWidth);
       HWParent->addOp(HWShift);
 
-      HWParent->addConstVal(HWSize);
+      HWParent->addConstVal(HWLogSize);
 
       connect(HWLocalIndex, HWShift);
-      connect(HWSize,HWShift);
+      connect(HWLogSize,HWShift);
 
       HWOffset = HWShift;
     } else {
+      const_p HWSize = std::make_shared<ConstVal>(std::to_string(CurrSize), CurrSizeAP.toString(2, false), AddrWidth);
       // No power of two, use multiplication
       AddrWidth = CurrSizeAP.getActiveBits() + HWLocalIndex->getBitWidth();
       std::string IndexName = Name+"_mul";
@@ -975,7 +980,7 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
   return HWOffset;
 }
 
-base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *IndexTy, Type **NextTy) {
+base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *IndexTy) {
   block_p HWParent = getBlock(Parent);
 
   const std::string Name = IV->getName();
@@ -986,9 +991,6 @@ base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *I
   assert(C && "Struct Index must be constant.");
 
   uint64_t Index = C->getZExtValue();
-
-  // Struct member is next type. Must be assigned before any return.
-  *NextTy = IndexTy->getTypeAtIndex(Index);
 
   // If the current index is zero, just skip it
   if (C->isZero()) {
@@ -1091,7 +1093,7 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
   assert(BasePointer->isValidElementType(I.getType()) && "Pointer type differs from GEP Type");
 
   // When we walk through the indices, dereference the Types
-  Type *NextTy = BasePointer;
+  CompositeType *NextTy = BasePointer;
 
   // We can compute the Index at compile time. Walk through all indices and
   // types and compute the Index in an APInt. Finally save its numerical value
@@ -1101,6 +1103,9 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
     uint64_t Offset = 0;
 
     for (User::op_iterator II = I.idx_begin(), E = I.idx_end(); II != E; ++II) {
+      Value *IV = *II;
+
+      assert(NextTy);
 
       // All are Constants
       ConstantInt *C = cast<ConstantInt>(*II);
@@ -1108,7 +1113,6 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
 
       if (SequentialType *ST = dyn_cast<SequentialType>(NextTy)) {
         // In bytes, incl padding
-        NextTy = ST->getElementType();
         uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
 
         ODEBUG("    Size: " << CurrSize);
@@ -1128,12 +1132,10 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
         ODEBUG("  Index: " << Index);
 
         Offset += LOffset;
-
-        NextTy = ST->getTypeAtIndex(Index);
       } else
         assert(0 && "Invalid Type");
 
-
+      NextTy = dyn_cast<CompositeType>(NextTy->getTypeAtIndex(IV));
     }
 
     APInt APOffset(64, Offset, false);
@@ -1159,17 +1161,19 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
   int IndexNo = 0;
   for (User::op_iterator II = I.idx_begin(), E = I.idx_end(); II != E; ++II, IndexNo++) {
     Value *IV = *II;
+
+    assert(NextTy);
+
     base_p HWOffset = nullptr;
 
     // Correctnes of cast will be checked within the next Index operand
     // Set NextTy after getting the offset
     if (SequentialType *ST = dyn_cast<SequentialType>(NextTy)) {
       HWOffset = computeSequentialIndex(Parent, IV, ST);
-      NextTy = ST->getElementType();
     }
     else if (StructType *ST = dyn_cast<StructType>(NextTy)) {
       // Set NextTy as Index is retrieved by the function.
-      HWOffset = computeStructIndex(Parent, IV, ST, &NextTy);
+      HWOffset = computeStructIndex(Parent, IV, ST);
     } else
       assert(0 && "Invalid Type");
 
@@ -1196,6 +1200,8 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
       } else
         HWIndex = HWOffset;
     }
+
+    NextTy = dyn_cast<CompositeType>(NextTy->getTypeAtIndex(IV));
   }
 
   streamindex_p HWStreamIndex = makeHWBB<DynamicStreamIndex>(Parent, InstValue, Name, HWBase, HWIndex, HWIndex->getBitWidth());

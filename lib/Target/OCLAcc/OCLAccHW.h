@@ -125,7 +125,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     /// \param IndexTy Type of the indexed value
     ///
     /// Skip \param IndexValue struct elements of \param IndexTy
-    oclacc::base_p computeStructIndex(BasicBlock *, Value *IndexValue, StructType *IndexTy, Type **NextTy);
+    oclacc::base_p computeStructIndex(BasicBlock *, Value *IndexValue, StructType *IndexTy);
 
 
     /// \brief Create shared_ptr to HW object and return requested pointer type.
