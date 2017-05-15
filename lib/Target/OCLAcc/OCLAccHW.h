@@ -106,8 +106,8 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     const DataLayout *DL;
 
     oclacc::const_p makeConstant(const Constant *, const Instruction *);
-    oclacc::base_p computeSequentialIndex(BasicBlock *, Value *IV, Type *NextTy);
-    oclacc::base_p computeStructIndex(BasicBlock *, Value *IV, Type *NextTy);
+    oclacc::base_p computeSequentialIndex(BasicBlock *, Value *IV, SequentialType *NextTy);
+    oclacc::base_p computeStructIndex(BasicBlock *, Value *IV, StructType *NextTy);
 
 
     /// \brief Create shared_ptr to HW object and return requested pointer type.

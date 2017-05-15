@@ -883,7 +883,7 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   connect(HWData, HWStore);
 }
 
-base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Type *NextTy) {
+base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, SequentialType *NextTy) {
   block_p HWParent = getBlock(Parent);
 
   const std::string Name = IV->getName();
@@ -971,7 +971,7 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Type *Nex
   return HWOffset;
 }
 
-base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, Type *NextTy) {
+base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *NextTy) {
   base_p HWOffset;
 
   return HWOffset;
@@ -1090,11 +1090,11 @@ void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
     // Correctnes of cast will be checked within the next Index operand
     if (SequentialType *ST = dyn_cast<SequentialType>(NextTy)) {
       NextTy = ST->getElementType();
-      HWOffset = computeSequentialIndex(Parent, IV, NextTy);
+      HWOffset = computeSequentialIndex(Parent, IV, ST);
     }
     else if (StructType *ST = dyn_cast<StructType>(NextTy)) {
       NextTy = ST->getElementType(0);
-      HWOffset = computeStructIndex(Parent, IV, NextTy);
+      HWOffset = computeStructIndex(Parent, IV, ST);
     } else
       assert(0 && "Invalid Type");
 
