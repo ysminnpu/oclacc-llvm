@@ -1195,6 +1195,7 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
         HWParent->addOp(HWAdd);
 
         connect(HWOffset, HWAdd);
+        connect(HWIndex, HWAdd);
 
         HWIndex = HWAdd;
       } else
