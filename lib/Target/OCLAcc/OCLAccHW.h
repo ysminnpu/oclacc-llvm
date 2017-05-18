@@ -25,9 +25,11 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
   private:
     void createMakefile();
 
+    // Helper
     void handleGlobalVariable(const GlobalVariable &G);
     void handleKernel(const Function &F);
     void handleArgument(const Argument &);
+    void setAttributesFromMD(const Function &F, oclacc::kernel_p K);
 
   public:
     OCLAccHW();
@@ -83,7 +85,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
     void visitStoreInst(StoreInst &);
 
     void visitGetElementPtrInst(GetElementPtrInst &);
-    void visitGEPOperator(GEPOperator &);
+    void handleGEPOperator(GEPOperator &);
 
     void visitCallInst(CallInst &);
     void visitCmpInst(CmpInst &);

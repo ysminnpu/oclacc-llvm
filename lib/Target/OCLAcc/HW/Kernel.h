@@ -1,9 +1,11 @@
 #ifndef KERNEL_H
 #define KERNEL_H
 
+#include <set>
 #include <map>
 #include <vector>
 #include <algorithm>
+#include <array>
 
 #include "typedefs.h"
 #include "Identifiable.h"
@@ -218,22 +220,20 @@ class Block : public Component {
 /// Kernels are blocks which represent the beginning dataflow of a WorkItem.
 class Kernel : public Component {
   public:
-    typedef std::vector<streamport_p> StreamsTy;
-    typedef std::vector<block_p> BlocksTy;
+    typedef std::set<streamport_p> StreamsTy;
+    typedef std::set<block_p> BlocksTy;
     typedef std::vector<port_p> PortsTy;
 
   private:
-
-  private:
     bool WorkItem;
-
-    BlocksTy Blocks;
+    std::array<size_t,3> RequiredWorkGroupSize;
 
     StreamsTy Streams;
+    BlocksTy Blocks;
 
   public:
 
-    Kernel (const std::string &, bool);
+    Kernel(const std::string &, bool);
 
     NO_COPY_ASSIGN(Kernel)
 
@@ -245,7 +245,9 @@ class Kernel : public Component {
     }
 
     void addBlock(block_p p);
-    const BlocksTy &getBlocks() const;
+    const BlocksTy &getBlocks() const {
+      return Blocks;
+    }
 
     void setWorkItem(bool T);
     bool isWorkItem() const;
@@ -264,6 +266,16 @@ class Kernel : public Component {
     const PortsTy getPorts(void) const;
 
     virtual void dump() override;
+
+    inline void setRequiredWorkGroupSize(size_t Dim0=0, size_t Dim1=0, size_t Dim2=0) {
+      RequiredWorkGroupSize[0] = Dim0;
+      RequiredWorkGroupSize[1] = Dim1;
+      RequiredWorkGroupSize[2] = Dim2;
+    }
+
+    inline std::array<size_t, 3> &getRequiredWorkGroupSize() {
+      return RequiredWorkGroupSize;
+    }
 
     DECLARE_VISIT;
 };

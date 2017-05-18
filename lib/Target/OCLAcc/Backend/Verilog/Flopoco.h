@@ -28,7 +28,7 @@ typedef std::pair<std::string, unsigned> ModMapElem;
 /// \param F - File collection
 unsigned genModule(const std::string Name, const std::string M, oclacc::BlockModule &BM);
 
-std::string convert(float V, unsigned MantissaBitWidth, unsigned ExponentBitwidth);
+std::string convert(double V, unsigned MantissaBitWidth, unsigned ExponentBitwidth);
 
 inline std::string getFPExPath(const std::string &E) {
   char *P = std::getenv("FLOPOCO_PATH");

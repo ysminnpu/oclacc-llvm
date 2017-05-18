@@ -70,12 +70,12 @@ int Dot::visit(Kernel &R) {
   }
   for (streamport_p P : R.getStreams()) {
     if (P->hasLoads()) {
-      F() << "n" << P->getUID() << " [shape=house,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
-      RankInStream << "n" << P->getUID() << " ";
+      F() << "ld" << P->getUID() << " [shape=house,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
+      RankInStream << "ld" << P->getUID() << " ";
     }
     if (P->hasStores()) {
-      F() << "n" << P->getUID() << " [shape=invhouse,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
-      RankOutStream << "n" << P->getUID() << " ";
+      F() << "st" << P->getUID() << " [shape=invhouse,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << P->getUniqueName() << "\"];\n";
+      RankOutStream << "st" << P->getUID() << " ";
     }
   }
   for (scalarport_p P : R.getOutScalars()) {
@@ -253,20 +253,12 @@ int Dot::visit(StreamPort &R) {
 
   // Draw connection from Index to base Stream only for Stores. Loads make the
   // graph look polluted.
-#if 0
-  for ( storeaccess_p I : R.getStores() ) {
-    Conn() << "n" << I->getUID() << " -> " << "n" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
-  }
-
-  // Draw connection from Index to uses
-  // Stores do not have Outs().
   for ( loadaccess_p I : R.getLoads() ) {
-    for ( base_p O : I->getOuts() ) {
-      Conn() << "n" << I->getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
-    }
-
+    Conn() << "ld" << R.getUID() << " -> " << "n" << I->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
   }
-#endif
+  for ( storeaccess_p I : R.getStores() ) {
+    Conn() << "n" << I->getUID() << " -> " << "st" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
+  }
 
   return 0;
 }
@@ -292,10 +284,6 @@ int Dot::visit(StoreAccess &R) {
   F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\"];\n";
 
   super::visit(R);
-
-  for ( base_p O : R.getOuts() ) {
-    Conn() << "n" << R.getUID() << " -> " << "n" << O->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
-  }
 
   return 0;
 }

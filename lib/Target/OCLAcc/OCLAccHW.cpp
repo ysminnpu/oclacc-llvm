@@ -209,7 +209,9 @@ bool OCLAccHW::runOnModule(Module &M) {
     // We do currently not support loops.
     SmallVector<std::pair<const BasicBlock*,const BasicBlock*>, 32 > Result;
     FindFunctionBackedges(*KF, Result);
-    assert (Result.empty() && "Handle Loops");
+    
+    if (!Result.empty())
+      report_fatal_error("Handle Loops.");
 
     // Print bitwidth of functions
 
@@ -277,16 +279,32 @@ void OCLAccHW::handleGlobalVariable(const GlobalVariable &G) {
 
   //Add the Stream to the Kernel and all BasicBlocks using it.
   std::set<const BasicBlock *> Blocks;
+  std::set<const Function *> Funcs;
   for (const Use &U : G.uses()) {
     if (const  Instruction *I = dyn_cast<Instruction>(U.getUser())) {
       const BasicBlock *IBB = I->getParent();
+      const Function *IF = IBB->getParent();
+
 
       Blocks.insert(IBB);
+      Funcs.insert(IF);
     }
   }
   for (const BasicBlock *BB : Blocks) {
     BlockValueMap[BB][&G] = S;
   }
+}
+
+void OCLAccHW::setAttributesFromMD(const Function &F, kernel_p K) {
+  OpenCLMDKernels &CLK = getAnalysis<OpenCLMDKernels>();
+  unsigned Dim0 = CLK.getRequiredWorkGroupSize(F, 0);
+  unsigned Dim1 = CLK.getRequiredWorkGroupSize(F, 1);
+  unsigned Dim2 = CLK.getRequiredWorkGroupSize(F, 2);
+
+  K->setRequiredWorkGroupSize(Dim0, Dim1, Dim2);
+
+  std::array<size_t, 3> WGS = K->getRequiredWorkGroupSize();
+  ODEBUG("Required WorkGroupSize: (" << WGS[0] << "," << WGS[1] << "," << WGS[2] << ")");
 }
 
 /// \brief Create arguments and basicBlocks for each kernel function
@@ -305,6 +323,9 @@ void OCLAccHW::handleKernel(const Function &F) {
 
   kernel_p HWKernel = makeKernel(&F, KernelName, isWorkItemKernel);
   HWDesign.addKernel(HWKernel);
+  
+  // Extract RequiredWorkGrouSize, ...
+  setAttributesFromMD(F, HWKernel);
 
   // We first create blocks for each BasicBlock, so we can handle the Kernel
   // Arguments.
@@ -603,9 +624,10 @@ void OCLAccHW::handleArgument(const Argument &A) {
     }
 
     const Type *ElementType   = AType->getPointerElementType();
+    ocl::AddressSpace OAS = static_cast<ocl::AddressSpace>(AS);
 
     const Datatype D = getDatatype(ElementType);
-    streamport_p S = makeHW<StreamPort>(&A, Name, Bits, static_cast<ocl::AddressSpace>(AS), D);
+    streamport_p S = makeHW<StreamPort>(&A, Name, Bits, OAS, D);
     ArgMap[&A] = S;
     S->setParent(HWKernel);
 
@@ -746,6 +768,9 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
   const Value *AddrVal = I.getPointerOperand();
   const BasicBlock *Parent = I.getParent();
 
+  const Function *F = Parent->getParent();
+  kernel_p HWF = getKernel(F);
+
   const block_p HWParent = getBlock(Parent);
 
   unsigned AddrSpace = I.getPointerAddressSpace();
@@ -765,6 +790,9 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
     HWStream = getHW<StreamPort>(Parent, AddrVal);
     HWStreamIndex = std::make_shared<StaticStreamIndex>("0", HWStream, 0, 1);
     HWStreamIndex->addOut(HWStream);
+
+    // A Local stream might not have been added to the kernel
+    HWF->addStream(HWStream);
   }
 
   assert(HWStreamIndex && "No Index.");
@@ -816,6 +844,9 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
 
   const block_p HWParent = getBlock(Parent);
 
+  const Function *F = Parent->getParent();
+  kernel_p HWF = getKernel(F);
+
   // Check Address Space
   unsigned AS = I.getPointerAddressSpace();
 
@@ -848,7 +879,7 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
     HWOut = getHW<HW>(Parent, AddrVal);
   else {
     GEPOperator *AddrOp = cast<GEPOperator>(AddrVal);
-    visitGEPOperator(*AddrOp);
+    handleGEPOperator(*AddrOp);
     HWOut = getHW<HW>(Parent, AddrVal);
   }
 
@@ -865,6 +896,9 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
   else {
     assert(0 && "Index base address only streams.");
   }
+
+  // A Local stream might not have been added to the kernel
+  HWF->addStream(HWStream);
 
 
   // We may have stores with different types using the same StreamIndex.
@@ -947,11 +981,13 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
     if (Log != -1) {
       APInt LogAP(32, Log, false);
       const_p HWLogSize = std::make_shared<ConstVal>(std::to_string(Log), LogAP.toString(2, false), LogAP.getActiveBits());
+      HWLogSize->setParent(HWParent);
       // Power of two, use left shift
       AddrWidth = Log + HWLocalIndex->getBitWidth();
       std::string IndexName = Name+"_shift";
 
       shl_p HWShift = std::make_shared<Shl>(IndexName, AddrWidth);
+      HWShift->setParent(HWParent);
       HWParent->addOp(HWShift);
 
       HWParent->addConstVal(HWLogSize);
@@ -962,11 +998,13 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
       HWOffset = HWShift;
     } else {
       const_p HWSize = std::make_shared<ConstVal>(std::to_string(CurrSize), CurrSizeAP.toString(2, false), AddrWidth);
+      HWSize->setParent(HWParent);
       // No power of two, use multiplication
       AddrWidth = CurrSizeAP.getActiveBits() + HWLocalIndex->getBitWidth();
       std::string IndexName = Name+"_mul";
 
       mul_p HWMul = std::make_shared<Mul>(IndexName, AddrWidth);
+      HWMul->setParent(HWParent);
       HWParent->addOp(HWMul);
 
       HWParent->addConstVal(HWSize);
@@ -1036,14 +1074,16 @@ base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *I
 void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
 
   GEPOperator &GO = cast<GEPOperator>(I);
-  visitGEPOperator(GO);
+  handleGEPOperator(GO);
 
 
   return;
 }
 
-void OCLAccHW::visitGEPOperator(GEPOperator &I) {
+void OCLAccHW::handleGEPOperator(GEPOperator &I) {
   BasicBlock *Parent;
+
+  // GEP can an Instruction or used as operator by load or store
   if (Instruction *II = dyn_cast<Instruction>(&I))
     Parent = II->getParent();
   else if (I.hasOneUse()) {
@@ -1051,6 +1091,9 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
     Parent = II->getParent();
   } else
     assert(0 && "No Parent");
+
+  Function *F= Parent->getParent();
+  kernel_p HWF = getKernel(F);
 
   Value *InstValue = &I;
   Value *BaseValue = I.getPointerOperand();
@@ -1067,7 +1110,10 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
   assert((BaseAddressSpace == ocl::AS_GLOBAL || BaseAddressSpace == ocl::AS_LOCAL)
       && "Only global and local address space supported." );
 
-  streamport_p HWBase = getHW<StreamPort>(Parent, BaseValue);
+  streamport_p HWStream = getHW<StreamPort>(Parent, BaseValue);
+
+  // If it is a local array, it may not have been added to the kernel
+  HWF->addStream(HWStream);
 
   ODEBUG("GEP " << Name);
 
@@ -1076,7 +1122,7 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
 
   // Constant zero address
   if (I.hasAllZeroIndices()) {
-    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, Name, HWBase, 0, 1);
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, "const_0", HWStream, 0, 1);
 
     BlockValueMap[Parent][InstValue] = HWStreamIndex;
 
@@ -1113,7 +1159,8 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
 
       if (SequentialType *ST = dyn_cast<SequentialType>(NextTy)) {
         // In bytes, incl padding
-        uint64_t CurrSize = DL->getTypeAllocSize(NextTy);
+        Type *ThisTy = ST->getElementType();
+        uint64_t CurrSize = DL->getTypeAllocSize(ThisTy);
 
         ODEBUG("    Size: " << CurrSize);
         ODEBUG("    Index: " << Index);
@@ -1140,11 +1187,11 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
 
     APInt APOffset(64, Offset, false);
 
-    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, Name, HWBase, Offset, APOffset.getActiveBits());
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, "const_"+std::to_string(Offset), HWStream, Offset, APOffset.getActiveBits());
 
     BlockValueMap[Parent][InstValue] = HWStreamIndex;
 
-    ODEBUG("  static index " << HWStreamIndex->getUniqueName() << " = " << Offset);
+    ODEBUG("  Static index " << HWStreamIndex->getUniqueName() << " = " << Offset);
 
     return;
   }
@@ -1192,6 +1239,7 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
         std::string IndexName = Name+"_"+std::to_string(IndexNo)+"_add";
 
         base_p HWAdd = std::make_shared<Add>(IndexName, AddrWidth);
+        HWAdd->setParent(HWParent);
         HWParent->addOp(HWAdd);
 
         connect(HWOffset, HWAdd);
@@ -1205,7 +1253,7 @@ void OCLAccHW::visitGEPOperator(GEPOperator &I) {
     NextTy = dyn_cast<CompositeType>(NextTy->getTypeAtIndex(IV));
   }
 
-  streamindex_p HWStreamIndex = makeHWBB<DynamicStreamIndex>(Parent, InstValue, Name, HWBase, HWIndex, HWIndex->getBitWidth());
+  streamindex_p HWStreamIndex = makeHWBB<DynamicStreamIndex>(Parent, InstValue, Name, HWStream, HWIndex, HWIndex->getBitWidth());
 
   connect(HWIndex, HWStreamIndex);
 
@@ -1316,6 +1364,8 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   const Value *Callee = I.getCalledValue();
   std::string CN = Callee->getName().str();
 
+  Function *F = I.getParent()->getParent();
+
   assert(ocl::NameMangling::isKnownName(CN) && "Unknown or invalid Builtin");
 
   if (ocl::NameMangling::isWorkItemFunction(CN)) {
@@ -1325,15 +1375,13 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   // If barriers are used, the attributes reqd or max workgroup size must be set
   // to avoid unnecessary hardware generation.
   if (ocl::NameMangling::isSynchronizationFunction(CN)) {
-    BasicBlock* BB = I.getParent();
-    Function *F = BB->getParent();
 
-    OpenCLMDKernels &CLK = getAnalysis<OpenCLMDKernels>();
-    unsigned Dim0 = CLK.getRequiredWorkGroupSize(*F, 0);
-    unsigned Dim1 = CLK.getRequiredWorkGroupSize(*F, 1);
-    unsigned Dim2 = CLK.getRequiredWorkGroupSize(*F, 2);
+    std::array<size_t, 3> Dim = getKernel(F)->getRequiredWorkGroupSize();
 
-    ODEBUG("Required WorkGroupSize: (" << Dim0 << "," << Dim1 << "," << Dim2 << ")");
+    if (!(Dim[0] && Dim[1] && Dim[2])) {
+      report_fatal_error("Specify '__attribute__((reqd_work_group_size(x,y,z)))' for function " + F->getName() + " when using barriers.");
+    }
+
   }
 }
 

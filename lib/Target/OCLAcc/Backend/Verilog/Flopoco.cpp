@@ -78,7 +78,7 @@ unsigned flopoco::genModule(const std::string Name, const std::string M, BlockMo
   return Latency;
 }
 
-std::string flopoco::convert(float V, unsigned MantissaBitWidth, unsigned ExponentBitwidth) {
+std::string flopoco::convert(double V, unsigned MantissaBitWidth, unsigned ExponentBitwidth) {
 
   std::string Path = getFPExPath("fp2bin"); 
 

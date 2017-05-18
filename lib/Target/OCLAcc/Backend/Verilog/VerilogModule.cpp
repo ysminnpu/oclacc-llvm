@@ -999,6 +999,7 @@ void BlockModule::schedule(const OperatorInstances &I) {
       if (In->getParent().get() != &Comp) continue;
 
       const std::string InName = getOpName(In);
+      errs() << In->getUniqueName() << " from " << P->getUniqueName() << "\n";
       int InReady = getReadyCycle(InName);
 
       // Latency of input operation
@@ -1020,8 +1021,6 @@ void BlockModule::schedule(const OperatorInstances &I) {
 
     if (Op)
       MaxPreds += Op->Cycles;
-
-    assert(MaxPreds > 0 && "MaxPreds must not be zero");
 
     CriticalPath = std::max((unsigned) MaxPreds, CriticalPath);
   }
@@ -1049,6 +1048,10 @@ void BlockModule::schedule(const OperatorInstances &I) {
 
 int BlockModule::getReadyCycle(const std::string OpName) const {
   ReadyMapConstItTy E = ReadyMap.find(OpName);
+
+  if (E == ReadyMap.end()) {
+    ODEBUG("No Entry in ReadyMap for " << OpName);
+  }
 
   assert(E != ReadyMap.end() && "No scheduling information");
 

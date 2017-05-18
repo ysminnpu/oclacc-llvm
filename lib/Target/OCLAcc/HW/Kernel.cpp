@@ -159,12 +159,12 @@ void Block::dump() {
   outs() << "Loads:\n";
   for (const loadaccess_p HWL : getLoads()) {
     const streamport_p S = HWL->getStream();
-    outs() << " " << HWL->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWL->getIndex()->getUniqueName() << "\n";
+    outs() << " " << HWL->getUniqueName() << ": "<< S->getUniqueName() << " @ " << HWL->getIndex()->getUniqueName() << "\n";
   }
   outs() << "Stores:\n";
   for (const storeaccess_p HWS : getStores()) {
     const streamport_p S = HWS->getStream();
-    outs() << " " << HWS->getUniqueName() << ": "<< S->getUniqueName() << "@" << HWS->getIndex()->getUniqueName() << " = " << HWS->getValue()->getUniqueName() << "\n";
+    outs() << " " << HWS->getUniqueName() << ": "<< S->getUniqueName() << " @ " << HWS->getIndex()->getUniqueName() << " = " << HWS->getValue()->getUniqueName() << "\n";
   }
 
   outs() << Line << "\n";
@@ -178,22 +178,31 @@ Block::Block (const std::string &Name, bool EntryBlock) : Component(Name), Entry
 // Use Kahn's algorithm without back edge detection but a map of deleted edges
 const HW::HWListTy Block::getOpsTopologicallySorted() const {
   const std::vector<scalarport_p> IS = getInScalars();
+
+  const std::vector<loadaccess_p> LD = getLoads();
+  const std::vector<storeaccess_p> ST = getStores();
+
   const std::vector<const_p> C = getConstVals();
 
+
   std::vector<base_p> L;
-  std::vector<base_p> S;
-  S.insert(S.end(), IS.begin(), IS.end());
-  S.insert(S.end(), C.begin(), C.end());
+  std::set<base_p> S;
+  S.insert(C.begin(), C.end());
+  S.insert(IS.begin(), IS.end());
+  S.insert(LD.begin(), LD.end());
+  S.insert(ST.begin(), ST.end());
 
   std::map<base_p, std::set<base_p> > DelEdges;
 
   while (S.size()) {
-    base_p F = S.front();
+    base_p F = *(S.begin());
     S.erase(S.begin());
 
     L.push_back(F);
     
     for (base_p O : F->getOuts()) {
+      if (O->getParent().get() != this) continue;
+
       bool hasOtherEdges = false;
       DelEdges[O].insert(F);
 
@@ -207,7 +216,7 @@ const HW::HWListTy Block::getOpsTopologicallySorted() const {
       }
 
       if (!hasOtherEdges) {
-        S.push_back(O);
+        S.insert(O);
       }
     }
   }
@@ -321,18 +330,24 @@ const StreamPort::StoreListTy Block::getStores() const {
 // 
 // Kernel
 //
-Kernel::Kernel (const std::string &Name, bool WorkItem) : Component(Name), WorkItem(WorkItem) { }
+Kernel::Kernel(const std::string &Name, bool WorkItem) : Component(Name), WorkItem(WorkItem), RequiredWorkGroupSize({{0,0,0}}) { }
 
-void Kernel::addBlock(block_p p) { Blocks.push_back(p); }
-const Kernel::BlocksTy &Kernel::getBlocks() const { return Blocks; }
+void Kernel::addBlock(block_p P) {
+  assert(P);
+  assert(P->getIR() != nullptr);
+
+  Blocks.insert(P);
+}
 
 void Kernel::setWorkItem(bool T) { WorkItem = T; }
 bool Kernel::isWorkItem() const { return WorkItem; }
 
 // Streams
 void Kernel::addStream(streamport_p P) { 
+  assert(P);
   assert(P->getIR() != nullptr);
-  Streams.push_back(P);
+
+  Streams.insert(P);
 }
 
 #ifdef DEBUG_TYPE
