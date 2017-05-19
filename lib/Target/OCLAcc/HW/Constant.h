@@ -25,6 +25,10 @@ class ConstVal : public HW
       return Bits;
     }
 
+    inline const std::string getBitString() const {
+      return Bits;
+    }
+
     DECLARE_VISIT
 
   private:
