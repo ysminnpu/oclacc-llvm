@@ -788,8 +788,12 @@ void OCLAccHW::visitLoadInst(LoadInst &I)
     HWStream = HWStreamIndex->getStream();
   } else {
     HWStream = getHW<StreamPort>(Parent, AddrVal);
-    HWStreamIndex = std::make_shared<StaticStreamIndex>("0", HWStream, 0, 1);
-    HWStreamIndex->addOut(HWStream);
+    const_p HWIndex = std::make_shared<ConstVal>("0", "0", 1);
+    HWParent->addConstVal(HWIndex);
+
+    HWStreamIndex = std::make_shared<StaticStreamIndex>("unnamed_idx", HWStream, HWIndex, 1);
+
+    connect(HWIndex, HWStreamIndex);
 
     // A Local stream might not have been added to the kernel
     HWF->addStream(HWStream);
@@ -890,8 +894,11 @@ void OCLAccHW::visitStoreInst(StoreInst &I)
     HWStream = HWStreamIndex->getStream();
   }
   else if ((HWStream = std::dynamic_pointer_cast<StreamPort>(HWOut))) {
-    HWStreamIndex = std::make_shared<StaticStreamIndex>("0", HWStream, 0, 1);
-    HWStreamIndex->addOut(HWStream);
+    const_p HWIndex = std::make_shared<ConstVal>("0", "0", 1);
+    HWParent->addConstVal(HWIndex);
+
+    HWStreamIndex = std::make_shared<StaticStreamIndex>("unnamed_idx", HWStream, HWIndex, 1);
+    connect(HWIndex, HWStreamIndex);
   }
   else {
     assert(0 && "Index base address only streams.");
@@ -1062,24 +1069,6 @@ base_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *I
   return HWOffset;
 }
 
-
-/// \brief Create StaticStreamIndex or DynamicStreamIndex used by Load or
-/// StoreInst.
-///
-/// By now, we do not know how this stream port is used (load and/or store
-/// index). The index used is a separate member of these classes while the
-/// load/store connects the index with re stream, either with a value used as
-/// input (st) or an output (ld).
-///
-void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
-
-  GEPOperator &GO = cast<GEPOperator>(I);
-  handleGEPOperator(GO);
-
-
-  return;
-}
-
 void OCLAccHW::handleGEPOperator(GEPOperator &I) {
   BasicBlock *Parent;
 
@@ -1092,6 +1081,8 @@ void OCLAccHW::handleGEPOperator(GEPOperator &I) {
   } else
     assert(0 && "No Parent");
 
+  block_p HWParent = getBlock(Parent);
+
   Function *F= Parent->getParent();
   kernel_p HWF = getKernel(F);
 
@@ -1103,7 +1094,9 @@ void OCLAccHW::handleGEPOperator(GEPOperator &I) {
   if (! I.isInBounds() )
     assert(0 && "Not in Bounds.");
 
-  const std::string Name = I.getName();
+  std::string Name = I.getName();
+  if (!Name.size())
+    Name = "unnamed_idx";
 
   // The pointer base can either be a local Array or a input stream
   unsigned BaseAddressSpace = I.getPointerAddressSpace();
@@ -1122,7 +1115,12 @@ void OCLAccHW::handleGEPOperator(GEPOperator &I) {
 
   // Constant zero address
   if (I.hasAllZeroIndices()) {
-    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, "const_0", HWStream, 0, 1);
+
+    const_p HWIndex = std::make_shared<ConstVal>("0", "0", 1);
+    HWParent->addConstVal(HWIndex);
+
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, Name, HWStream, HWIndex, 1);
+    connect(HWIndex, HWStreamIndex);
 
     BlockValueMap[Parent][InstValue] = HWStreamIndex;
 
@@ -1167,7 +1165,6 @@ void OCLAccHW::handleGEPOperator(GEPOperator &I) {
 
         Offset += Index * CurrSize;
 
-
       } else if (StructType *ST = dyn_cast<StructType>(NextTy)) {
         // Compute offset for requested index
         uint64_t LOffset = 0;
@@ -1187,7 +1184,13 @@ void OCLAccHW::handleGEPOperator(GEPOperator &I) {
 
     APInt APOffset(64, Offset, false);
 
-    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, "const_"+std::to_string(Offset), HWStream, Offset, APOffset.getActiveBits());
+    uint64_t BitWidth = APOffset.getActiveBits();
+
+    const_p HWIndex = std::make_shared<ConstVal>(APOffset.toString(10,false), APOffset.toString(2, false), BitWidth);
+    HWParent->addConstVal(HWIndex);
+
+    streamindex_p HWStreamIndex = makeHWBB<StaticStreamIndex>(Parent, InstValue, Name, HWStream, HWIndex, BitWidth);
+    connect(HWIndex, HWStreamIndex);
 
     BlockValueMap[Parent][InstValue] = HWStreamIndex;
 
@@ -1201,7 +1204,6 @@ void OCLAccHW::handleGEPOperator(GEPOperator &I) {
   // to SequentialTypes or StructTypes. The latter must have constant indices.
   
   Value *CurrValue;
-  block_p HWParent = getBlock(Parent);
 
   base_p HWIndex = nullptr;
 
@@ -1259,6 +1261,24 @@ void OCLAccHW::handleGEPOperator(GEPOperator &I) {
 
   BlockValueMap[Parent][InstValue] = HWStreamIndex;
 }
+
+/// \brief Create StaticStreamIndex or DynamicStreamIndex used by Load or
+/// StoreInst.
+///
+/// By now, we do not know how this stream port is used (load and/or store
+/// index). The index used is a separate member of these classes while the
+/// load/store connects the index with re stream, either with a value used as
+/// input (st) or an output (ld).
+///
+void OCLAccHW::visitGetElementPtrInst(GetElementPtrInst &I) {
+
+  GEPOperator &GO = cast<GEPOperator>(I);
+  handleGEPOperator(GO);
+
+
+  return;
+}
+
 
 #define DEBUG_TYPE "oclacchw"
 

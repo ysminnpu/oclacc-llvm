@@ -814,7 +814,7 @@ const std::string BlockModule::declStores() const {
     std::string IndexName;
 
     if (staticstreamindex_p SI = std::dynamic_pointer_cast<StaticStreamIndex>(Index)) {
-      IndexName = std::to_string(SI->getIndex());
+      IndexName = SI->getIndex()->getUniqueName();
     }
     else {
       dynamicstreamindex_p DI = std::static_pointer_cast<DynamicStreamIndex>(Index);
@@ -875,7 +875,7 @@ const std::string BlockModule::declLoads() const {
     std::string IndexName;
 
     if (staticstreamindex_p SI = std::dynamic_pointer_cast<StaticStreamIndex>(Index)) {
-      IndexName = std::to_string(SI->getIndex());
+      IndexName = SI->getIndex()->getUniqueName();
     }
     else {
       dynamicstreamindex_p DI = std::static_pointer_cast<DynamicStreamIndex>(Index);

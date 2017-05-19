@@ -333,8 +333,7 @@ const StreamPort::StoreListTy Block::getStores() const {
 Kernel::Kernel(const std::string &Name, bool WorkItem) : Component(Name), WorkItem(WorkItem), RequiredWorkGroupSize({{0,0,0}}) { }
 
 void Kernel::addBlock(block_p P) {
-  assert(P);
-  assert(P->getIR() != nullptr);
+  assert(P && P->getIR());
 
   Blocks.insert(P);
 }

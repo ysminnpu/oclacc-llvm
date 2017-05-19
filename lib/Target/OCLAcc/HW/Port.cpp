@@ -74,7 +74,8 @@ DynamicStreamIndex::DynamicStreamIndex(const std::string &Name, streamport_p Str
 ///
 /// The index is not represented as ConstantVal object to simplify offset
 /// analysis for stream optimization.
-StaticStreamIndex::StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, unsigned BitWidth) : StreamIndex(Name, Stream, BitWidth), Index(Index) {
+StaticStreamIndex::StaticStreamIndex(const std::string &Name, streamport_p Stream, const_p ConstVal, unsigned BitWidth) : StreamIndex(Name, Stream, BitWidth) {
+  setIndex(ConstVal);
 }
 
 const StreamPort::LoadListTy StreamPort::getDynamicLoads() const {

@@ -5,6 +5,7 @@
 #include <iterator>
 
 #include "HW.h"
+#include "Constant.h"
 
 #include "Visitor/Visitable.h"
 #include "typedefs.h"
@@ -257,21 +258,20 @@ class DynamicStreamIndex : public StreamIndex {
 /// analysis for stream optimization.
 class StaticStreamIndex : public StreamIndex {
   public:
-    typedef int64_t IndexTy;
-  private:
-    IndexTy Index;
-  public:
-    StaticStreamIndex(const std::string &Name, streamport_p Stream, int64_t Index, unsigned BitWidth);
+    StaticStreamIndex(const std::string &Name, streamport_p Stream, const_p ConstVal, unsigned BitWidth);
 
     StaticStreamIndex(const StaticStreamIndex&) = delete;
     StaticStreamIndex& operator=(const StaticStreamIndex&) = delete;
 
-    virtual void setIndex(IndexTy I) {
-      Index = I;
+    virtual void setIndex(const_p I) {
+      if (Ins.size() == 0)
+        Ins.push_back(I);
+      else
+        Ins[0] = I;
     }
 
-    inline IndexTy getIndex() const {
-      return Index;
+    inline const_p getIndex() const {
+      return std::static_pointer_cast<ConstVal>(Ins[0]);
     }
 
     inline bool isStatic() const override {

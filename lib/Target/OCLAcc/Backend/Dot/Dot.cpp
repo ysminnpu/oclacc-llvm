@@ -291,7 +291,7 @@ int Dot::visit(StoreAccess &R) {
 int Dot::visit(StaticStreamIndex &R) {
   VISIT_ONCE(R);
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
-  F() << "n" << R.getUID() << " [shape=box,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\n" << R.getStream()->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
+  F() << "n" << R.getUID() << " [shape=box,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\n" << " @ " << R.getStream()->getUniqueName() << "\"];\n";
 
   super::visit(R);
 
@@ -315,40 +315,6 @@ int Dot::visit(DynamicStreamIndex &R) {
 
   return 0;
 }
-#if 0
-/// \brief Create arrow for Load/Store
-///
-int Dot::visit(StaticStreamIndex &R) {
-  VISIT_ONCE(R)
-  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-  // Depending on being a Load or Store, the arrow direction must be correct.
-  streamport_p HWStream = R.getStream();
-  if (HWStream->isLoad(&R) )
-    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\""  << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
-  else
-    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex() << "\"];\n";
-
-  super::visit(R);
-
-  return 0;
-}
-
-int Dot::visit(DynamicStreamIndex &R) {
-  VISIT_ONCE(R)
-  DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
-
-  streamport_p HWStream = R.getStream();
-  if (HWStream->isLoad(&R) )
-    F() << "n" << R.getUID() << " [shape=larrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
-  else
-    F() << "n" << R.getUID() << " [shape=rarrow,fillcolor=" << C_STREAMPORT << ",style=filled,tailport=n,label=\"" << R.getUniqueName() << "\n" << HWStream->getUniqueName() << "\n@" << R.getIndex()->getUniqueName() << "\"];\n";
-
-  super::visit(R);
-
-  return 0;
-}
-#endif
 
 int Dot::visit(ScalarPort &R) {
   VISIT_ONCE(R)
