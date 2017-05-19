@@ -1515,7 +1515,7 @@ void OCLAccHW::visitBranchInst(BranchInst &I) {
 
   if (I.isUnconditional()) {
     // No condition, so all Ports can be used when ready.
-    const_p HWConst = std::make_shared<ConstVal>("true", "1", 1);
+    const_p HWConst = std::make_shared<ConstVal>("1", "1", 1);
     HWBB->addConstVal(HWConst);
 
     BasicBlock *SuccBB = I.getSuccessor(0);
