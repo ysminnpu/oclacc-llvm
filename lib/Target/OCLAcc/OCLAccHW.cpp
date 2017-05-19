@@ -64,6 +64,7 @@
 #include "HW/Constant.h"
 #include "HW/Compare.h"
 #include "HW/Control.h"
+#include "HW/Synchronization.h"
 
 #include <cxxabi.h>
 #define TYPENAME(x) abi::__cxa_demangle(typeid(x).name(),0,0,NULL)
@@ -1384,7 +1385,11 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   const Value *Callee = I.getCalledValue();
   std::string CN = Callee->getName().str();
 
-  Function *F = I.getParent()->getParent();
+  BasicBlock *Parent = I.getParent();
+  block_p HWParent = getBlock(Parent);
+
+  Function *F = Parent->getParent();
+  kernel_p HWF = getKernel(F);
 
   assert(ocl::NameMangling::isKnownName(CN) && "Unknown or invalid Builtin");
 
@@ -1396,12 +1401,14 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   // to avoid unnecessary hardware generation.
   if (ocl::NameMangling::isSynchronizationFunction(CN)) {
 
-    std::array<size_t, 3> Dim = getKernel(F)->getRequiredWorkGroupSize();
+    std::array<size_t, 3> Dim = HWF->getRequiredWorkGroupSize();
 
     if (!(Dim[0] && Dim[1] && Dim[2])) {
       report_fatal_error("Specify '__attribute__((reqd_work_group_size(x,y,z)))' for function " + F->getName() + " when using barriers.");
     }
 
+    barrier_p HWB = std::make_shared<Barrier>(HWParent->getUniqueName()+"_barrier");
+    HWParent->addBarrier(HWB);
   }
 }
 

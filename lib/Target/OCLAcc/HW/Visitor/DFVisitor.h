@@ -214,6 +214,11 @@ class DFVisitor : public BaseVisitor
         P->accept(*this);
       }
 
+      for ( barrier_p P : R.getBarriers()) {
+        P->accept(*this);
+      }
+
+
       return 0;
     }
 

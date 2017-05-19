@@ -17,7 +17,7 @@
 #define C_CONSTVAL   "\"/reds9/4\""
 #define C_FPARITH    "\"/greens9/5\""
 #define C_COMPARE    "\"/blues9/7\""
-#define C_SYNCH      "\"/pigy9/2\""
+#define C_SYNCH      "\"/piyg9/2\""
 using namespace oclacc;
 
 Dot::Dot() : IndentLevel(0) {
@@ -87,8 +87,8 @@ int Dot::visit(Kernel &R) {
 
   F() << Connections.str();
 
-  F() << "{ rank=source; " << RankInStream.str() << "}\n";
-  F() << "{ rank=sink; " << RankOutStream.str() << "}\n";
+  F() << "{ rank=same; " << RankInStream.str() << "}\n";
+  F() << "{ rank=same; " << RankOutStream.str() << "}\n";
 
   IndentLevel--;
   F() << "}" << "\n";

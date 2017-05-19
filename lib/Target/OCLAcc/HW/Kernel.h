@@ -107,6 +107,8 @@ class Block : public Component {
     typedef std::pair<base_p, base_p> TFTy;
     typedef std::map<scalarport_p, TFTy> SingleCondTy;
 
+    typedef std::vector<barrier_p> BarriersTy;
+
   private:
     std::vector<base_p> Ops;
     kernel_p Parent;
@@ -117,6 +119,7 @@ class Block : public Component {
     bool EntryBlock;
 
     StreamPort::AccessListTy AccessList;
+    BarriersTy Barriers;
 
   public:
     Block (const std::string &, bool);
@@ -209,6 +212,14 @@ class Block : public Component {
         if (P->isStore()) return true;
 
       return false;
+    }
+
+    inline void addBarrier(barrier_p B) {
+      Barriers.push_back(B);
+    }
+
+    inline const BarriersTy getBarriers() {
+      return Barriers;
     }
     
     virtual void dump() override;

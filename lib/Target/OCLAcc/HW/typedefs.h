@@ -106,6 +106,9 @@ typedef std::shared_ptr<DynamicStreamIndex> dynamicstreamindex_p;
 class StaticStreamIndex;
 typedef std::shared_ptr<StaticStreamIndex> staticstreamindex_p;
 
+class Barrier;
+typedef std::shared_ptr<Barrier> barrier_p;
+
 } //end namespace oclacc
 
 #endif /* TYPEDEFS_H */
