@@ -113,6 +113,7 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
     const DataLayout *DL;
 
+  private:
     oclacc::const_p makeConstant(const Constant *, const Instruction *);
 
     /// \brief Return run-time operand for struct offset.
@@ -267,30 +268,6 @@ class OCLAccHW : public ModulePass, public InstVisitor<OCLAccHW>{
 
       return false;
     }
-
-
-#if 0
-    /// \brief Return HW object for initial definition of IR.
-    /// Generally use getHW(const BasicBlock *BB, ...) 
-    template<class HW> std::shared_ptr<HW> getHW(const Value *IR) const {
-      if (const Instruction *I = dyn_cast<Instruction>(IR))
-        return getHW<HW>(I->getParent(), IR);
-      else if (const Argument *I = dyn_cast<Argument>(IR)) {
-        ArgMapConstIt AI = ArgMap.find(I);
-        if (AI == ArgMap.end()) {
-          I->dump();
-          llvm_unreachable("No Arg");
-        }
-
-        std::shared_ptr<HW> P = std::static_pointer_cast<HW>(AI->second);
-        return P;
-      }
-      else {
-        IR->dump();
-        llvm_unreachable("Called getHW on non-Instruction, non-Argument value");
-      }
-    }
-#endif
 
     oclacc::block_p getBlock(const BasicBlock *BB) const {
       BlockMapConstIt VI = BlockMap.find(BB);

@@ -189,8 +189,8 @@ const HW::HWListTy Block::getOpsTopologicallySorted() const {
   std::set<base_p> S;
   S.insert(C.begin(), C.end());
   S.insert(IS.begin(), IS.end());
-  S.insert(LD.begin(), LD.end());
-  S.insert(ST.begin(), ST.end());
+  S.insert(LD.begin(), LD.end()); // In[0] Index
+  S.insert(ST.begin(), ST.end()); // In[0] Index, In[1] Value
 
   std::map<base_p, std::set<base_p> > DelEdges;
 

@@ -7,6 +7,7 @@ add_llvm_target(OCLAccCodeGen
   OCLAccTargetMachine.cpp
   OCLAccSubtarget.cpp
   OCLAccHW.cpp
+  GEP.cpp
   Utils.cpp
   OCL/NameMangling.cpp
   )
