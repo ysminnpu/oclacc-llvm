@@ -58,17 +58,17 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
     if (Log != -1) {
       APInt LogAP(32, Log, false);
       const_p HWLogSize = std::make_shared<ConstVal>(std::to_string(Log), LogAP.toString(2, false), LogAP.getActiveBits());
-//HWLogSize->setParent(HWParent);
+      HWLogSize->setParent(HWParent);
+
+      HWParent->addConstVal(HWLogSize);
 
       // Power of two, use left shift
       AddrWidth = Log + HWLocalIndex->getBitWidth();
       std::string IndexName = Name+"_shift";
 
       shl_p HWShift = std::make_shared<Shl>(IndexName, AddrWidth);
-// HWShift->setParent(HWParent);
+      HWShift->setParent(HWParent);
       HWParent->addOp(HWShift);
-
-      HWParent->addConstVal(HWLogSize);
 
       connect(HWLocalIndex, HWShift);
       connect(HWLogSize,HWShift);
@@ -76,13 +76,13 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
       HWOffset = HWShift;
     } else {
       const_p HWSize = std::make_shared<ConstVal>(std::to_string(CurrSize), CurrSizeAP.toString(2, false), AddrWidth);
-//      HWSize->setParent(HWParent);
+      HWSize->setParent(HWParent);
       // No power of two, use multiplication
       AddrWidth = CurrSizeAP.getActiveBits() + HWLocalIndex->getBitWidth();
       std::string IndexName = Name+"_mul";
 
       mul_p HWMul = std::make_shared<Mul>(IndexName, AddrWidth);
-//      HWMul->setParent(HWParent);
+      HWMul->setParent(HWParent);
       HWParent->addOp(HWMul);
 
       HWParent->addConstVal(HWSize);
@@ -138,6 +138,7 @@ const_p OCLAccHW::computeStructIndex(BasicBlock *Parent, Value *IV, StructType *
       A.getActiveBits());
 
   HWParent->addConstVal(HWOffset);
+  HWOffset->setParent(HWParent);
 
   return HWOffset;
 }
