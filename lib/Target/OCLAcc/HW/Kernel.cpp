@@ -263,7 +263,7 @@ const Block::SingleCondTy Block::getCondForScalarPort(scalarport_p P) const {
 
   block_p PB = std::static_pointer_cast<Block>(P->getParent());
 
-  DEBUG(dbgs() << "Conditions for Scalarport " << P->getUniqueName() << "(" << PB->getUniqueName() << "):\n");
+  ODEBUG("Conditions for Scalarport " << P->getUniqueName() << "(" << PB->getUniqueName() << "):");
 
   // Walk through ScalarInputs, look up From and then Condition
   for (base_p I : P->getIns()) {
@@ -276,8 +276,8 @@ const Block::SingleCondTy Block::getCondForScalarPort(scalarport_p P) const {
     scalarport_p NC = PB->getNegCondReachedByBlock(IB);
 
     DEBUG(
-        if (C) dbgs() << "  from " << SSP->getUniqueName() << ": " << C->getUniqueName() << "(" << IB->getUniqueName() << ")\n";
-        if (NC) dbgs() << "  form " << SSP->getUniqueName() << ": !" << NC->getUniqueName() << "(" << IB->getUniqueName() << ")\n";
+        if (C) ODEBUG("  from " << SSP->getUniqueName() << ": " << C->getUniqueName() << "(" << IB->getUniqueName() << ")");
+        if (NC) ODEBUG("  form " << SSP->getUniqueName() << ": !" << NC->getUniqueName() << "(" << IB->getUniqueName() << ")");
         );
 
     R[SSP] = std::make_pair(C,NC);
