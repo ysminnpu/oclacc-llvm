@@ -806,7 +806,7 @@ const std::string BlockModule::declStores() const {
   S << "// Store processes\n";
 
   for (storeaccess_p SA : Comp.getStores()) {
-    assert(SA->getIns().size() == 1 && "Stores may only have a single input");
+    assert(SA->getIns().size() == 2 && "Stores must have an index and value");
 
     const std::string Name = getOpName(SA);
     const streamindex_p Index = SA->getIndex();
@@ -999,7 +999,6 @@ void BlockModule::schedule(const OperatorInstances &I) {
       if (In->getParent().get() != &Comp) continue;
 
       const std::string InName = getOpName(In);
-      errs() << In->getUniqueName() << " from " << P->getUniqueName() << "\n";
       int InReady = getReadyCycle(InName);
 
       // Latency of input operation
