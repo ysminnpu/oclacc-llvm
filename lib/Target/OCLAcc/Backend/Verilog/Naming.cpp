@@ -6,6 +6,7 @@
 #include "HW/Kernel.h"
 #include "HW/Arith.h"
 #include "HW/Constant.h"
+#include "HW/Synchronization.h"
 #include "HW/Design.h"
 #include "Naming.h"
 #include "VerilogMacros.h"
@@ -113,6 +114,12 @@ const Signal::SignalListTy oclacc::getSignals(const Block &R) {
   for (const storeaccess_p P : R.getStores()) {
     const Signal::SignalListTy SOST = getSignals(P);
     L.insert(std::end(L),std::begin(SOST), std::end(SOST)); 
+  }
+
+  // Barrier
+  for (const barrier_p P : R.getBarriers()) {
+    const Signal::SignalListTy B = getSignals(P);
+    L.insert(std::end(L),std::begin(B), std::end(B)); 
   }
 
   return L;
@@ -248,6 +255,16 @@ const Signal::SignalListTy oclacc::getSignals(const StoreAccess &R) {
   L.push_back(Signal(PName+"_buf", DataWidth, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_valid", 1, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_ack", 1, Signal::In, Signal::Wire));
+
+  return L;
+}
+
+const Signal::SignalListTy oclacc::getSignals(const Barrier &R) {
+  Signal::SignalListTy L;
+
+  const std::string PName = R.getUniqueName();
+
+  L.push_back(Signal(PName, 1, Signal::In, Signal::Wire));
 
   return L;
 }

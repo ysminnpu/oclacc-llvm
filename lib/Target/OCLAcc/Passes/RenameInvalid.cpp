@@ -20,12 +20,15 @@ namespace {
 
     bool runOnFunction(Function &F) override {
       for (BasicBlock &BB : F) {
-        
         for (Instruction &I : BB) {
           std::string name = I.getName();
           std::replace(name.begin(), name.end(), '.', '_');
           I.setName(name);
         }
+
+        std::string Name = BB.getName();
+        std::replace(Name.begin(), Name.end(), '.', '_');
+        BB.setName(Name);
       }
       return true;
     }

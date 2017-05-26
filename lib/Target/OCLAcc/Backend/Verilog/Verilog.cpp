@@ -728,6 +728,10 @@ int Verilog::visit(Mux &R) {
   return 0;
 }
 
+int Verilog::visit(Barrier &R) {
+  return 0;
+}
+
 #ifdef DEBUG_TYPE
 #undef DEBUG_TYPE
 #endif

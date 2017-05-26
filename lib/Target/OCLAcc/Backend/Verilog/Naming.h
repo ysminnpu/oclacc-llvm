@@ -87,6 +87,12 @@ inline const Signal::SignalListTy getSignals(const StreamAccess &R) {
 inline const Signal::SignalListTy getSignals(const streamaccess_p P) {
   return getSignals(*P);
 }
+
+const Signal::SignalListTy getSignals(const Barrier &);
+inline const Signal::SignalListTy getSignals(const barrier_p P) {
+  return getSignals(*P);
+}
+
 } // end ns oclacc
 
 #endif /* NAMING_H */

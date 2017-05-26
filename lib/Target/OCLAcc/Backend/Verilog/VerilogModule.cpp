@@ -496,9 +496,13 @@ const std::string BlockModule::declConstValues() const {
 const std::string BlockModule::declFSMSignals() const {
   std::stringstream S;
 
+  std::vector<std::string> States = {"state_free", "state_busy", "state_wait_load", "state_wait_store", "state_wait_barrier", "state_wait_output"};
 
   S << "// FSM signals\n";
-  S << "localparam state_free=0, state_busy=1, state_wait_load=2, state_wait_store=3, state_wait_output=4" << ";\n";
+  int N=0;
+  for (const std::string ST : States) {
+    S << "localparam "<< ST << "=" << N++ << ";\n";
+  }
 
   // States
   Signal State("state", 3, Signal::Local, Signal::Reg);
@@ -546,7 +550,7 @@ const std::string BlockModule::declFSM() const {
   ////////////////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////////////////
 
-  // Asynchronous state and output
+  S << "// Asynchronous state and output\n";
   S << "always @(*)" << "\n";
   S << "begin\n";
 
@@ -656,6 +660,9 @@ const std::string BlockModule::declFSM() const {
       END(S);
     }
     END(S);
+  S << Indent(II) << "state_wait_barrier:" << "\n";
+    BEGIN(S);
+    END(S);
 
 
   S << Indent(II) << "endcase" << "\n";
@@ -666,8 +673,7 @@ const std::string BlockModule::declFSM() const {
   ////////////////////////////////////////////////////////////////////////////
 
 
-  // Synchronous next_state
-  S << "//FSM next_state" << "\n";
+  S << "// Synchronous next_state\n";
   S << "always @(posedge clk)" << "\n";
   S << "begin\n";
   // Reset state
@@ -779,16 +785,20 @@ const std::string BlockModule::declFSM() const {
       END(S);
     
     S << Indent(II) << "state_wait_output:" << "\n";
-      S << Indent(++II) << "begin" << "\n";
-      S << Indent(II--) << "end\n";
+      BEGIN(S);
+      END(S);
 
     S << Indent(II) << "state_wait_store:" << "\n";
-      S << Indent(++II) << "begin" << "\n";
-      S << Indent(II--) << "end\n";
+      BEGIN(S);
+      END(S);
 
     S << Indent(II) << "state_wait_load:" << "\n";
-      S << Indent(++II) << "begin" << "\n";
-      S << Indent(II--) << "end\n";
+      BEGIN(S);
+      END(S);
+
+    S << Indent(II) << "state_wait_barrier:" << "\n";
+      BEGIN(S);
+      END(S);
 
 
     S << Indent(II) << "endcase" << "\n";

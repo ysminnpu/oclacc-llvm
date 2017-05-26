@@ -1052,7 +1052,7 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
 
 /// \brief Check if the call is really a built-in
 void OCLAccHW::visitCallInst(CallInst &I) {
-  const std::string IN = I.getName();
+  const std::string Name = I.getName();
   const Value *Callee = I.getCalledValue();
   std::string CN = Callee->getName().str();
 
@@ -1072,13 +1072,30 @@ void OCLAccHW::visitCallInst(CallInst &I) {
   // to avoid unnecessary hardware generation.
   if (ocl::NameMangling::isSynchronizationFunction(CN)) {
 
+    const std::string UName = ocl::NameMangling::unmangleName(CN);
+
+    if (UName != "barrier" && UName != "work_group_barrier")
+      report_fatal_error("Unknown synchronization function: "+ Name + " " + UName);
+
+    ConstantInt *Flags, *Scope;
+
+    Flags = cast<ConstantInt>(I.getArgOperand(0));
+    ocl::cl_mem_fence_flags FF = static_cast<ocl::cl_mem_fence_flags>(Flags->getZExtValue());
+
+    // default if not set
+    ocl::memory_scope MS = ocl::memory_scope_work_group;
+    if (I.getNumArgOperands() > 1) {
+      Scope = cast<ConstantInt>(I.getArgOperand(1));
+      MS = static_cast<ocl::memory_scope>(Scope->getZExtValue());
+    }
+
     std::array<size_t, 3> Dim = HWF->getRequiredWorkGroupSize();
 
     if (!(Dim[0] && Dim[1] && Dim[2])) {
       report_fatal_error("Specify '__attribute__((reqd_work_group_size(x,y,z)))' for function " + F->getName() + " when using barriers.");
     }
 
-    barrier_p HWB = std::make_shared<Barrier>(HWParent->getUniqueName()+"_barrier");
+    barrier_p HWB = std::make_shared<Barrier>(HWParent->getUniqueName()+"_barrier", FF, MS);
     HWParent->addBarrier(HWB);
   }
 }

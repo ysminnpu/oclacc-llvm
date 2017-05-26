@@ -13,14 +13,6 @@
 
 namespace oclacc {
 
-class DesignUnit;
-class Kernel;
-class Block;
-class ScalarPort;
-class StreamPort;
-class Arith;
-class FPArith;
-class Mux;
 class BlockModule;
 class KernelModule;
 
@@ -90,6 +82,7 @@ class Verilog : public DFVisitor {
 
     int visit(Mux &);
 
+    int visit(Barrier &);
 };
 
 } // end ns oclacc

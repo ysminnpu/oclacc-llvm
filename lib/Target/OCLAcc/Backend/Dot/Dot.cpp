@@ -370,7 +370,7 @@ int Dot::visit(Barrier &R) {
 
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-  F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=" << C_SYNCH << ",style=filled,label=\"" << R.getUniqueName() << "\"];\n";
+  F() << "n" << R.getUID() << " [shape=rectangle,fillcolor=" << C_SYNCH << ",style=filled,label=\"" << R.getUniqueName() << "\n" << R.getFlagsString() << "\n" << R.getScopeString() << "\"];\n";
 
   return 0;
 }

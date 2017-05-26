@@ -218,7 +218,7 @@ class Block : public Component {
       Barriers.push_back(B);
     }
 
-    inline const BarriersTy getBarriers() {
+    inline const BarriersTy getBarriers() const {
       return Barriers;
     }
     
