@@ -9,9 +9,12 @@ namespace oclacc {
 class ConstVal : public HW
 {
   public:
+    uint64_t Value;
     const Datatype T;
     std::string Bits;
+    bool Static;
 
+    ConstVal(uint64_t V);
     ConstVal(const std::string Name, const std::string Bits, size_t BitWidth);
     ConstVal(const std::string Name, Datatype T, const std::string Bits, size_t BitWidth);
 
@@ -27,6 +30,18 @@ class ConstVal : public HW
 
     inline const std::string getBitString() const {
       return Bits;
+    }
+
+    inline void setValue(uint64_t V) {
+      Value = V;
+    }
+
+    inline uint64_t getValue() {
+      return Value;
+    }
+
+    inline bool isStatic() {
+      return Static;
     }
 
     DECLARE_VISIT

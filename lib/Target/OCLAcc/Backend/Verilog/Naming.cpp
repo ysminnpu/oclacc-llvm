@@ -33,7 +33,9 @@ const std::string oclacc::getOpName(const ConstVal &R) {
   if (PName[0] == '-')
     PName[0] = '_';
 
-  Name << "const_" << PName;
+  std::replace(PName.begin(), PName.end(), '.', '_');
+
+  Name << "const_" << PName << "_" << R.getBitWidth();
 
   return Name.str();
 }
@@ -117,7 +119,8 @@ const Signal::SignalListTy oclacc::getSignals(const Block &R) {
   }
 
   // Barrier
-  for (const barrier_p P : R.getBarriers()) {
+  const barrier_p P = R.getBarrier();
+  if (P != nullptr) {
     const Signal::SignalListTy B = getSignals(P);
     L.insert(std::end(L),std::begin(B), std::end(B)); 
   }
@@ -264,7 +267,8 @@ const Signal::SignalListTy oclacc::getSignals(const Barrier &R) {
 
   const std::string PName = R.getUniqueName();
 
-  L.push_back(Signal(PName, 1, Signal::In, Signal::Wire));
+  L.push_back(Signal(PName+"_reached", 1, Signal::Out, Signal::Reg));
+  L.push_back(Signal(PName+"_release", 1, Signal::In, Signal::Wire));
 
   return L;
 }

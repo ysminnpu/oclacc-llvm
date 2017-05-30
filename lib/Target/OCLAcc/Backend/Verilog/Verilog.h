@@ -38,7 +38,7 @@ class Verilog : public DFVisitor {
     unsigned II=0;
 
     void handleInferableMath(const Arith &R, const std::string Op);
-
+    void handleConstShift(const Shl &, uint64_t C);
 
   public:
     Verilog();

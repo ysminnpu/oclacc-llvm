@@ -69,7 +69,7 @@ inline std::string execute(const std::string &C) {
       Result += buffer.data();
   }
 
-  if (int R = pclose(Pipe)) {
+  if (pclose(Pipe)) {
     llvm::errs() << "Failed to close pipe " << C << "\n";
     exit(1);
   }

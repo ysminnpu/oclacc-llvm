@@ -46,8 +46,6 @@ class Barrier : public HW
           return "memory_scope_all_svm_devices";
         case ocl::memory_scope_sub_group:
           return "memory_scope_sub_group";
-        default:
-          return "Invalid Scope";
       }
     }
 

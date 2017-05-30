@@ -56,8 +56,7 @@ base_p OCLAccHW::computeSequentialIndex(BasicBlock *Parent, Value *IV, Sequentia
     int32_t Log = CurrSizeAP.exactLogBase2();
 
     if (Log != -1) {
-      APInt LogAP(32, Log, false);
-      const_p HWLogSize = std::make_shared<ConstVal>(std::to_string(Log), LogAP.toString(2, false), LogAP.getActiveBits());
+      const_p HWLogSize = std::make_shared<ConstVal>(Log);
       HWLogSize->setParent(HWParent);
 
       HWParent->addConstVal(HWLogSize);

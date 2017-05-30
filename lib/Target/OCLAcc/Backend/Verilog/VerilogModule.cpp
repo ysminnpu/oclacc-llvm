@@ -367,6 +367,23 @@ const std::string KernelModule::declBlockWires() const {
       END(Logic);
   }
 
+  // Declare the wires for all barriers in the kernel
+  Signal::SignalListTy BS;
+  for (block_p BB : Comp.getBlocks()) {
+    barrier_p B = BB->getBarrier();
+    if (B != nullptr) {
+      Signal::SignalListTy SL = getSignals(B);
+      BS.insert(BS.end(), SL.begin(), SL.end());
+    }
+  }
+  if (!BS.empty()) {
+    Wires << "// Barrier signals\n";
+    for (Signal &S : BS) {
+      S.Direction = Signal::Local;
+      Wires << S.getDefStr() << ";\n";
+    }
+  }
+
   S << Wires.str();
   S << Assignments.str();
   S << Logic.str();
@@ -480,9 +497,10 @@ const std::string BlockModule::declConstValues() const {
 
   S << "// ConstVals\n";
   for (const const_p C : Comp.getConstVals()) {
+    if (C->isStatic()) continue;
     Signal CS(getOpName(*C), C->getBitWidth(), Signal::Local, Signal::Reg);
 
-    std::string Decl = CS.getDefStr() + " = " + C->getBits();
+    std::string Decl = CS.getDefStr() + " = 'b" + C->getBits();
     SS.insert(Decl);
   }
 
@@ -560,7 +578,8 @@ const std::string BlockModule::declFSM() const {
 
   S << Indent(II) << "case (state)" << "\n";
   S << Indent(II) << "state_free:" << "\n";
-    S << Indent(++II) << "begin" << "\n";
+  {
+    BEGIN(S);
 
     S << Indent(II++) << "if(\n";
 
@@ -571,15 +590,18 @@ const std::string BlockModule::declFSM() const {
     }
     S << "\n" << Indent(--II) << ")" << "\n";
 
-    // state_free
-      BEGIN(S);
+    // All inputs are valid. If we only have a barrier, skip the busy state and
+    // just jump to the barrier state.
+    barrier_p B = Comp.getBarrier();
+    if (B != nullptr)
+      S << Indent(II) << "next_state <= state_wait_barrier;\n";
+    else
       S << Indent(II) << "next_state <= state_busy" << ";\n";
-      END(S);
-
 
     END(S);
-
+  }
   S << Indent(II) << "state_busy:" << "\n";
+  {
     BEGIN(S);
     S << Indent(II) << "counter_enabled <= 1;\n";
 
@@ -603,11 +625,10 @@ const std::string BlockModule::declFSM() const {
     // state_wait_output
     S << Indent(II) << "if (counter == " << CriticalPath <<") next_state <= state_wait_output;\n";
 
-    // state_
-
     END(S);
-
+  }
   S << Indent(II) << "state_wait_output:" << "\n";
+  {
     if (Comp.getOutScalars().size()) {
       BEGIN(S);
       
@@ -625,9 +646,10 @@ const std::string BlockModule::declFSM() const {
     } else {
       S << Indent(II+1) << "next_state <= state_free;\n";
     }
-
+  }
 
   S << Indent(II) << "state_wait_store:" << "\n";
+  {
     BEGIN(S);
     if (Comp.hasStores()) {
       BEGIN(S);
@@ -641,9 +663,12 @@ const std::string BlockModule::declFSM() const {
       S << ") == 0)\n";
       S << Indent(II+1) << "next_state <= state_busy;\n";
       END(S);
-    }
+    } else
+      S << Indent(II) << "// no stores\n";
     END(S);
+  }
   S << Indent(II) << "state_wait_load:" << "\n";
+  {
     BEGIN(S);
     if (Comp.hasLoads()) {
       BEGIN(S);
@@ -658,12 +683,23 @@ const std::string BlockModule::declFSM() const {
       S << Indent(II+1) << "next_state <= state_busy;\n";
 
       END(S);
-    }
+    } else
+      S << Indent(II) << "// no loads\n";
     END(S);
+  }
+  // Each Barrier is a single input "..._release" to the Block, created by the top level
+  // design.
   S << Indent(II) << "state_wait_barrier:" << "\n";
+  {
     BEGIN(S);
+    barrier_p B = Comp.getBarrier();
+    if (B != nullptr) {
+      const std::string BName = B->getUniqueName();
+      S << Indent(II) << "if (" << BName << "_release == 1) next_state <= state_busy;\n";
+    } else
+      S << Indent(II) << "// no barriers\n";
     END(S);
-
+  }
 
   S << Indent(II) << "endcase" << "\n";
   END(S);
@@ -673,12 +709,13 @@ const std::string BlockModule::declFSM() const {
   ////////////////////////////////////////////////////////////////////////////
 
 
-  S << "// Synchronous next_state\n";
+  S << "// Synchronous next_state and register outputs\n";
   S << "always @(posedge clk)" << "\n";
   S << "begin\n";
   // Reset state
   S << Indent(II) << "if (rst)\n";
-    S << Indent(++II) << "begin\n";
+  {
+    BEGIN(S);
     S << Indent(II) << "state <= state_free;" << "\n";
 
     // Input buffers and valids
@@ -695,12 +732,19 @@ const std::string BlockModule::declFSM() const {
       S << Indent(II) << N << "_fin <= 0;\n";
     }
 
-    // counter
+    // Counter
     S << Indent(II) << "counter <= '0;\n";
 
-    S << Indent(II--) << "end\n";
+    // Barrier
+    barrier_p B = Comp.getBarrier();
+    if (B != nullptr)
+      S << Indent(II) << B->getUniqueName()<< "_reached <= 0;\n";
+
+    END(S);
+  }
   S << Indent(II) << "else\n";
-    S << Indent(++II) << "begin\n";
+  {
+    BEGIN(S);
     S << Indent(II) << "state <= next_state;" << "\n";
 
     // Synchronous outputs
@@ -712,19 +756,20 @@ const std::string BlockModule::declFSM() const {
 
     // Allow others to acknowledge an output port in every state except state_free
     S << Indent(II) << "if (state != state_free)\n";
-    BEGIN(S);
-    for (const std::string &N : ScalarOutputNames) {
-      S << Indent(II) << "if (" << N << "_ack == 1)\n";
-          BEGIN(S);
-          S << Indent(II) << N << " <= '0;\n";
-          S << Indent(II) << N << "_fin <= 1;\n";
-          S << Indent(II) << N << "_valid <= 0;\n";
-          END(S);
-    }
-    END(S);
+      BEGIN(S);
+      for (const std::string &N : ScalarOutputNames) {
+        S << Indent(II) << "if (" << N << "_ack == 1)\n";
+            BEGIN(S);
+            S << Indent(II) << N << " <= '0;\n";
+            S << Indent(II) << N << "_fin <= 1;\n";
+            S << Indent(II) << N << "_valid <= 0;\n";
+            END(S);
+      }
+      END(S);
 
     // Reset state after completion
     S << Indent(II) << "if (next_state == state_free)\n";
+    {
       BEGIN(S);
       for (const std::string &N : ScalarInputNames) {
         S << Indent(II) << N << " <= '0;\n";
@@ -736,12 +781,22 @@ const std::string BlockModule::declFSM() const {
         S << Indent(II) << N << "_valid <= 0;\n";
         S << Indent(II) << N << "_fin <= 0;\n";
       }
+
       END(S);
+    }
+
+    // Barrier, reset output at once
+    barrier_p B = Comp.getBarrier();
+    if (B != nullptr) {
+      S << Indent(II) << "if (" << B->getUniqueName() << "_release==1)\n";
+      S << Indent(II+1) << B->getUniqueName() << "_reached <= 0;\n";
+    }
+
 
     S << Indent(II) << "case (state)" << "\n";
     S << Indent(II) << "state_free:" << "\n";
+    {
       BEGIN(S);
-
       // Buffer Inputs
 
       // Only set ack for a single cycle and do not wait for state to change
@@ -753,9 +808,11 @@ const std::string BlockModule::declFSM() const {
         S << Indent(II) << N << "_valid" << " <= 1;\n";
         END(S);
       }
-      S << Indent(II--) << "end" << "\n";
+      END(S);
+    }
 
     S << Indent(II) << "state_busy:" << "\n";
+    {
       BEGIN(S);
       S << Indent(II) << "if (counter_enabled)\n";
         BEGIN(S);
@@ -783,22 +840,36 @@ const std::string BlockModule::declFSM() const {
         }
 
       END(S);
+    }
     
     S << Indent(II) << "state_wait_output:" << "\n";
+    {
       BEGIN(S);
       END(S);
+    }
 
     S << Indent(II) << "state_wait_store:" << "\n";
+    {
       BEGIN(S);
       END(S);
+    }
 
     S << Indent(II) << "state_wait_load:" << "\n";
+    {
       BEGIN(S);
       END(S);
+    }
 
     S << Indent(II) << "state_wait_barrier:" << "\n";
+    {
       BEGIN(S);
+      barrier_p B = Comp.getBarrier();
+      if (B != nullptr)
+        S << Indent(II) << B->getUniqueName()<< "_reached <= 1;\n";
+      else
+        S << "// no barrier\n";
       END(S);
+    }
 
 
     S << Indent(II) << "endcase" << "\n";
@@ -806,6 +877,7 @@ const std::string BlockModule::declFSM() const {
     S << Indent(II) << "// Reset counter\n";
     S << Indent(II) << "if (next_state == state_free) counter <= '0;\n";
     END(S);
+  }
   END(S);
 
   return S.str();
@@ -975,6 +1047,9 @@ const std::string BlockModule::declPortControlSignals() const {
   return S.str();
 }
 
+#undef DEBUG_TYPE
+#define DEBUG_TYPE "timing"
+
 void BlockModule::schedule(const OperatorInstances &I) {
   typedef Identifiable::UIDTy UIDTy;
   typedef std::set<std::pair<UIDTy, UIDTy> > AddedConsTy;
@@ -1054,6 +1129,9 @@ void BlockModule::schedule(const OperatorInstances &I) {
 
   ODEBUG("Critical path of " << Comp.getUniqueName() << ": " << CriticalPath);
 }
+
+#undef DEBUG_TYPE
+#define DEBUG_TYPE "verilog"
 
 int BlockModule::getReadyCycle(const std::string OpName) const {
   ReadyMapConstItTy E = ReadyMap.find(OpName);
@@ -1139,6 +1217,13 @@ void BlockModule::genTestBench() const {
   for (const scalarport_p P : Comp.getOutScalars()) {
     DoS << "when { /" << BName << "/" << getOpName(P) << "_valid==1} {\n";
     DoS << Indent(II+1) << "force /" << BName << "/" << getOpName(P) << "_ack 1 20 ns\n";
+    DoS << "}\n";
+  }
+
+  barrier_p B = Comp.getBarrier();
+  if (B != nullptr) {
+    DoS << "when { /" << BName << "/" << B->getUniqueName() << "_reached==1} {\n";
+    DoS << Indent(II+1) << "force /" << BName << "/" << B->getUniqueName() << "_release 1 20 ns\n";
     DoS << "}\n";
   }
 

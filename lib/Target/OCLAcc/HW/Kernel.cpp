@@ -173,7 +173,7 @@ void Block::dump() {
 //
 // Block
 //
-Block::Block (const std::string &Name, bool EntryBlock) : Component(Name), EntryBlock(EntryBlock) { }
+Block::Block (const std::string &Name, bool EntryBlock) : Component(Name), EntryBlock(EntryBlock), Barrier(nullptr) { }
 
 // Use Kahn's algorithm without back edge detection but a map of deleted edges
 const HW::HWListTy Block::getOpsTopologicallySorted() const {

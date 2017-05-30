@@ -215,7 +215,7 @@ int Dot::visit(ConstVal &R) {
   VISIT_ONCE(R)
   DEBUG(dbgs() << __PRETTY_FUNCTION__ << "\n");
 
-  F() << "n" << R.getUID() << " [shape=oval,fillcolor=" << C_CONSTVAL << ",style=filled,tailport=s,label=\"" << R.getName() << "\"];\n";
+  F() << "n" << R.getUID() << " [shape=oval,fillcolor=" << C_CONSTVAL << ",style=filled,tailport=s,label=\"" << R.getName() << "\n" << R.getBits() << "\"];\n";
   super::visit(R);
 
   for ( base_p P : R.getOuts() ) {

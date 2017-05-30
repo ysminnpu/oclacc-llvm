@@ -272,6 +272,29 @@ int Verilog::visit(DynamicStreamIndex &R) {
   return 0;
 }
 
+///  \brief Constant Shifts do not use a register
+void Verilog::handleConstShift(const Shl &R, uint64_t C) {
+  std::stringstream &BS = BM->getBlockSignals();
+  std::stringstream &LO = BM->getLocalOperators();
+
+  const base_p In0 = R.getIn(0);
+  const std::string Op0 = getOpName(In0);
+  const std::string Res = getOpName(R);
+
+  const std::string RName = getOpName(R);
+
+  Signal S(RName, R.getBitWidth(), Signal::Local, Signal::Wire);
+  BS << S.getDefStr() << ";\n";
+
+  uint64_t BitsOp = In0->getBitWidth();
+  uint64_t Start = BitsOp - 1;
+  if (BitsOp > C)
+    Start -= C;
+
+  LO << "assign " << Res << " = {{" << Op0 << "[" << Start << ":0]},{" << C << "{0}" << "}};\n";
+}
+
+
 // The following methods create arithmetic cores. The block then instantiates
 // them and takes care of the critical path.
 
@@ -586,9 +609,17 @@ int Verilog::visit(FRem &R) {
   super::visit(R);
   return 0;
 }
+
+
 int Verilog::visit(Shl &R) {
   VISIT_ONCE(R);
-  super::visit(R);
+
+  if (const_p C = std::dynamic_pointer_cast<ConstVal>(R.getIn(1))) {
+    assert(C->isStatic() && "Constant shifts must have a value");
+    handleConstShift(R, C->getValue());
+  } else
+    report_fatal_error("Shift with dynamic width");
+
   return 0;
 }
 int Verilog::visit(LShr &R) {

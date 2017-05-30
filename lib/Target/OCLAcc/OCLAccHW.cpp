@@ -214,7 +214,6 @@ bool OCLAccHW::runOnModule(Module &M) {
     if (!Result.empty())
       report_fatal_error("Handle Loops.");
 
-    // Print bitwidth of functions
 
     FindAllPaths &AP = getAnalysis<FindAllPaths>(*KF);
     AP.dump();
@@ -224,9 +223,11 @@ bool OCLAccHW::runOnModule(Module &M) {
       FunctionPass *CFG = createCFGPrinterPass();
       CFG->runOnFunction(*KF);
     }
+
+    // Print bitwidth of functions
     {
       std::error_code EC;
-      std::string FileName = ModuleName+"."+std::string(KF->getName())+".bitwidth";
+      std::string FileName = std::string(KF->getName())+".bitwidth";
       raw_fd_ostream File(FileName, EC, llvm::sys::fs::F_RW | llvm::sys::fs::F_Text);
       if (EC) {
         errs() << "Failed to create " << FileName << "(" << __LINE__ << "): " << EC.message() << "\n";
@@ -1235,8 +1236,8 @@ void OCLAccHW::visitBranchInst(BranchInst &I) {
 
   const Type *CIT = Cond->getType();
 
-  bool isCondInTrue = isValueInBB(TrueBB, Cond);
-  bool isCondInFalse = isValueInBB(FalseBB, Cond);
+  //bool isCondInTrue = isValueInBB(TrueBB, Cond);
+  //bool isCondInFalse = isValueInBB(FalseBB, Cond);
 
   scalarport_p HWPort, HWCondTrue, HWCondFalse;
 

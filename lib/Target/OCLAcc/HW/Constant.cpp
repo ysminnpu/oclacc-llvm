@@ -6,6 +6,11 @@
 
 namespace oclacc {
 
+/// \brief Compile-Time constant.
+ConstVal::ConstVal(uint64_t V) : HW("static_"+std::to_string(V), 0), Value(V), T(Unsigned), Bits(""), Static(true) {
+  
+}
+
 ConstVal::ConstVal(const std::string Name, const std::string Bits, size_t W) : ConstVal(Name, Unsigned, Bits, W) {
 
 }
@@ -16,7 +21,7 @@ ConstVal::ConstVal(const std::string Name, const std::string Bits, size_t W) : C
 /// - 0001        : 1
 /// - 0123.456000 : 123.456
 /// - 0000.5000      : 0.5
-ConstVal::ConstVal(const std::string Name, Datatype T, const std::string Bits, size_t W) : HW(Name, W), T(T), Bits(Bits) {
+ConstVal::ConstVal(const std::string Name, Datatype T, const std::string Bits, size_t W) : HW(Name, W), T(T), Static(false) {
   std::string NewName = Name;
 
   // Delete leading zero
@@ -44,6 +49,14 @@ ConstVal::ConstVal(const std::string Name, Datatype T, const std::string Bits, s
     NewName.erase(i);
   }
 
+  // Add leading zeros for Bits
+  // We assume that zeros have been left out. No sign extension here!
+  int SizeDiff = W - Bits.size();
+  if (SizeDiff)
+    this->Bits = std::string(SizeDiff, '0') + Bits;
+  else
+    this->Bits = Bits;
+    
 
   HW::Name = NewName;
 }
