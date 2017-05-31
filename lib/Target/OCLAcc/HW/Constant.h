@@ -28,6 +28,10 @@ class ConstVal : public HW
       return Bits;
     }
 
+    inline void setBits(const std::string &B) {
+      Bits = B;
+    }
+
     inline const std::string getBitString() const {
       return Bits;
     }
@@ -42,6 +46,10 @@ class ConstVal : public HW
 
     inline bool isStatic() {
       return Static;
+    }
+
+    inline Datatype getDatatype() {
+      return T;
     }
 
     DECLARE_VISIT

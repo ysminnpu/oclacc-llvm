@@ -1019,25 +1019,32 @@ const_p OCLAccHW::makeConstant(const Constant *C, const Instruction *I) {
   else if (const ConstantFP *FConst = dyn_cast<ConstantFP>(C)) {
     assert(BW.second != Loopus::FPNoExt && "Constant is FP Type but FPNoExt is not set");
 
-    const APFloat &Float = FConst->getValueAPF();
+    const APFloat &FV = FConst->getValueAPF();
 
-    if (CType->isHalfTy())
-      assert(0 &&"Half floating point type not supported");
+    if (CType->isHalfTy()) {
+      const APInt Bits = FV.bitcastToAPInt();
+
+      CName = std::to_string(FV.convertToFloat());
+      const std::string V = Bits.toString(2, false);
+
+      HWConst = std::make_shared<ConstVal>(CName, Half, V, Bits.getBitWidth());
+    }
     else if (CType->isFloatTy()) {
-      const APInt Bits = Float.bitcastToAPInt();
+      const APInt Bits = FV.bitcastToAPInt();
 
-      CName = std::to_string(Float.convertToFloat());
+      CName = std::to_string(FV.convertToFloat());
       const std::string V = Bits.toString(2, false);
 
-      HWConst = std::make_shared<ConstVal>(CName, V, Bits.getBitWidth());
+      HWConst = std::make_shared<ConstVal>(CName, Float, V, Bits.getBitWidth());
 
-    } else if (CType->isDoubleTy()) {
-      const APInt Bits = Float.bitcastToAPInt();
+    }
+    else if (CType->isDoubleTy()) {
+      const APInt Bits = FV.bitcastToAPInt();
 
-      CName = std::to_string(Float.convertToDouble());
+      CName = std::to_string(FV.convertToDouble());
       const std::string V = Bits.toString(2, false);
 
-      HWConst = std::make_shared<ConstVal>(CName, V, Bits.getBitWidth());
+      HWConst = std::make_shared<ConstVal>(CName, Double, V, Bits.getBitWidth());
     } else
       assert(0 && "Unknown floating point type");
   } else

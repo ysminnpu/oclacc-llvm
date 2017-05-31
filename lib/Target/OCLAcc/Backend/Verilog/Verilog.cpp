@@ -106,11 +106,8 @@ int Verilog::visit(DesignUnit &R) {
 
   FS->close();
 
-  for (kernel_p K : R.getKernels()) {
-    K->accept(*this);
-  }
-
-  // no need to call super::visit, all is done here.
+  // Visit all kernels
+  super::visit(R);
 
   return 0;
 }

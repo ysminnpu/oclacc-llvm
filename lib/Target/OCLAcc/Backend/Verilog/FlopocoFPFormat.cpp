@@ -21,6 +21,18 @@ FlopocoFPFormat::~FlopocoFPFormat() {
   ODEBUG(__PRETTY_FUNCTION__);
 }
 
+int FlopocoFPFormat::visit(ConstVal &R) {
+  Datatype T = R.getDatatype();
+
+  if (T == Half || T == Float || T == Double) {
+    R.setBits("00" + R.getBits());
+    R.setBitWidth(R.getBitWidth()+2);
+    ODEBUG("set bitwidth for constant " << R.getUniqueName());
+  }
+  super::visit(R);
+  return 0;
+}
+
 int FlopocoFPFormat::visit(ScalarPort &R) {
   VISIT_ONCE(R);
   if (R.isFP()) {
