@@ -18,6 +18,8 @@
 #include "HW/Writeable.h"
 #include "HW/typedefs.h"
 #include "VerilogModule.h"
+#include "KernelModule.h"
+#include "BlockModule.h"
 #include "OperatorInstances.h"
 #include "DesignFiles.h"
 #include "Flopoco.h"

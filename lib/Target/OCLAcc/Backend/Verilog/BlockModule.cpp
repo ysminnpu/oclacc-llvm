@@ -12,7 +12,7 @@
 
 #include "Flopoco.h"
 #include "Verilog.h"
-#include "VerilogModule.h"
+#include "BlockModule.h"
 #include "Naming.h"
 #include "VerilogMacros.h"
 #include "DesignFiles.h"

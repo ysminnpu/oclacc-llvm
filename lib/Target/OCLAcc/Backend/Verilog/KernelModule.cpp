@@ -10,9 +10,10 @@
 
 #include "../../HW/Kernel.h"
 
+#include "KernelModule.h"
+
 #include "Flopoco.h"
 #include "Verilog.h"
-#include "VerilogModule.h"
 #include "Naming.h"
 #include "VerilogMacros.h"
 #include "DesignFiles.h"

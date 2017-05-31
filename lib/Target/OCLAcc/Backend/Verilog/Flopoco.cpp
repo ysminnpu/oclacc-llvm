@@ -7,7 +7,7 @@
 #include "Utils.h"
 #include "OperatorInstances.h"
 #include "DesignFiles.h"
-#include "VerilogModule.h"
+#include "BlockModule.h"
 
 #define DEBUG_TYPE "flopoco"
 
@@ -16,8 +16,10 @@ using namespace llvm;
 using namespace flopoco;
 
 namespace flopoco {
+
 // Map Name to ModuleInstantiation
 ModMapTy ModuleMap;
+
 } // end ns flopoco
 
 /// \brief Generate modules
