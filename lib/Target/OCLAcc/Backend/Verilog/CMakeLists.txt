@@ -4,6 +4,8 @@ add_llvm_library(LLVMOCLAccVerilogBackend
   Portmux.cpp
   FileHeader.cpp
   VerilogModule.cpp
+  BlockModule.cpp
+  KernelModule.cpp
   Verilog.cpp
   Signal.cpp
   Naming.cpp
