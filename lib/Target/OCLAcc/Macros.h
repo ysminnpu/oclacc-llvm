@@ -14,6 +14,6 @@
 
 #define ODEBUG(x) DEBUG(llvm::dbgs() << "[" << DEBUG_TYPE << "] " << x << "\n")
 
-#define DEBUG_FUNC do {DEBUG(dbgs() << __PRETTY_FUNCTION__ << ": " << R.getUniqueName() << "\n");} while (0);
+#define DEBUG_FUNC ODEBUG(__PRETTY_FUNCTION__ << ": " << R.getUniqueName());
 
 #endif /* MACROS_H */
