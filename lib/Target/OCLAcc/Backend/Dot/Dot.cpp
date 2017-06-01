@@ -254,10 +254,10 @@ int Dot::visit(StreamPort &R) {
   // Draw connection from Index to base Stream only for Stores. Loads make the
   // graph look polluted.
   for ( loadaccess_p I : R.getLoads() ) {
-    Conn() << "ld" << R.getUID() << " -> " << "n" << I->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
+    Conn() << "ld" << R.getUID() << " -> " << "n" << I->getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << I->getBitWidth() << "];\n";
   }
   for ( storeaccess_p I : R.getStores() ) {
-    Conn() << "n" << I->getUID() << " -> " << "st" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << R.getBitWidth() << "];\n";
+    Conn() << "n" << I->getUID() << " -> " << "st" << R.getUID() << " [color=" << C_STREAMPORT << ",fontcolor=" << C_STREAMPORT << ",label=" << I->getBitWidth() << "];\n";
   }
 
   return 0;
