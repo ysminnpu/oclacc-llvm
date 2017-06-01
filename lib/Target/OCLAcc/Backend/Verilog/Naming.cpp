@@ -231,7 +231,7 @@ const Signal::SignalListTy oclacc::getSignals(const LoadAccess &R) {
   Signal::SignalListTy L;
 
   unsigned AddressWidth = 64;
-  unsigned DataWidth = R.getStream()->getBitWidth();
+  unsigned DataWidth = R.getBitWidth();
 
   const std::string PName = getOpName(R);
 
@@ -252,7 +252,7 @@ const Signal::SignalListTy oclacc::getSignals(const StoreAccess &R) {
   const base_p Index = R.getIndex();
 
   unsigned AddressWidth = Index->getBitWidth();
-  unsigned DataWidth = R.getStream()->getBitWidth();
+  unsigned DataWidth = R.getBitWidth();
 
   L.push_back(Signal(PName+"_address", AddressWidth, Signal::Out, Signal::Reg));
   L.push_back(Signal(PName+"_buf", DataWidth, Signal::Out, Signal::Reg));
