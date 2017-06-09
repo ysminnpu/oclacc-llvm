@@ -22,7 +22,7 @@ cmake -G "Unix Makefiles" --with-gcc-toolchain  -DCMAKE_BUILD_TYPE=Debug \
 -DCMAKE_INSTALL_PREFIX="$PWD/root" -DLLVM_REQUIRES_RTTI=on \
 -DLLVM_ENABLE_DOXYGEN=on \
 -DLLVM_ENABLE_CXX1Y=on \
-\DLLVM_ENABLE_ASSERTIONS=on \
+-DLLVM_ENABLE_ASSERTIONS=on \
 -DLLVM_TARGETS_TO_BUILD="OCLAcc" $OCLACC_SRC
 cd $PWD
 ```
@@ -49,3 +49,6 @@ You can use the pre-compiled kernels from [oclacc-kernels](https://github.com/si
 
 ## Generate verilog
 `oclacc-llc -march=dot <kernel>.bc`
+
+## Debug output
+`oclacc-llc -march=dot <kernel>.bc -debug`
