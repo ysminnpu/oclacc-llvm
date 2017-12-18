@@ -48,7 +48,7 @@ You can use the pre-compiled kernels from [oclacc-kernels](https://github.com/si
 `oclacc-llc -march=dot <kernel>.bc`
 
 ## Generate verilog
-`oclacc-llc -march=dot <kernel>.bc`
+`oclacc-llc -march=verilog <kernel>.bc`
 
 ## Debug output
 `oclacc-llc -march=dot <kernel>.bc -debug`
